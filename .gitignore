@@ -11,3 +11,5 @@ out/
 samples/
 *.hwpx
 !tests/fixtures/*.hwpx
+out_check/
+scripts/hancom_check.py
