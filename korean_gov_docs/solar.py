@@ -2,10 +2,11 @@
 
 환경변수
 - UPSTAGE_API_KEY: Upstage 클라우드 키(https://console.upstage.ai)
-- PRESS_RELEASE_SOLAR_BASE_URL: 내부(온프렘) Solar 주소(예: http://10.0.0.5:8000/v1). 없으면 https://api.upstage.ai/v1
-- PRESS_RELEASE_SOLAR_KEY: 내부 Solar 키(없으면 UPSTAGE_API_KEY, 키가 필요 없으면 비워도 됨)
-- PRESS_RELEASE_MODEL: 모델 이름(기본 solar-pro4 — 내부 설치 이름에 맞게)
-- PRESS_RELEASE_SOLAR_VERIFY=0: 사내 자체 인증서일 때 TLS 검증 끄기
+- KOREAN_GOV_DOCS_SOLAR_BASE_URL: 내부(온프렘) Solar 주소(예: http://10.0.0.5:8000/v1). 없으면 https://api.upstage.ai/v1
+- KOREAN_GOV_DOCS_SOLAR_KEY: 내부 Solar 키(없으면 UPSTAGE_API_KEY, 키가 필요 없으면 비워도 됨)
+- KOREAN_GOV_DOCS_MODEL: 모델 이름(기본 solar-pro4 — 내부 설치 이름에 맞게)
+- KOREAN_GOV_DOCS_SOLAR_VERIFY=0: 사내 자체 인증서일 때 TLS 검증 끄기
+(이전 이름 PRESS_RELEASE_SOLAR_BASE_URL·PRESS_RELEASE_SOLAR_KEY·PRESS_RELEASE_MODEL·PRESS_RELEASE_SOLAR_VERIFY도 읽음)
 """
 import json
 import os
@@ -16,18 +17,22 @@ import urllib.request
 CLOUD = "https://api.upstage.ai/v1"
 
 
+def env(name, default=""):
+    return (os.environ.get(f"KOREAN_GOV_DOCS_{name}") or os.environ.get(f"PRESS_RELEASE_{name}") or default).strip()
+
+
 def config():
-    base = os.environ.get("PRESS_RELEASE_SOLAR_BASE_URL", "").strip().rstrip("/") or CLOUD
-    key = os.environ.get("PRESS_RELEASE_SOLAR_KEY", "").strip() or os.environ.get("UPSTAGE_API_KEY", "").strip()
-    return base, key, os.environ.get("PRESS_RELEASE_MODEL", "solar-pro4"), base != CLOUD
+    base = env("SOLAR_BASE_URL").rstrip("/") or CLOUD
+    key = env("SOLAR_KEY") or os.environ.get("UPSTAGE_API_KEY", "").strip()
+    return base, key, env("MODEL", "solar-pro4"), base != CLOUD
 
 
 def chat_json(prompt, max_tokens=8000, timeout=240):
     base, key, model, onprem = config()
     if not onprem and not key:
-        raise RuntimeError("Solar 설정이 없습니다 — UPSTAGE_API_KEY(클라우드) 또는 PRESS_RELEASE_SOLAR_BASE_URL(내부 Solar 주소)")
+        raise RuntimeError("Solar 설정이 없습니다 — UPSTAGE_API_KEY(클라우드) 또는 KOREAN_GOV_DOCS_SOLAR_BASE_URL(내부 Solar 주소)")
     ctx = ssl.create_default_context()
-    if os.environ.get("PRESS_RELEASE_SOLAR_VERIFY", "1") == "0":
+    if env("SOLAR_VERIFY", "1") == "0":
         ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
     body = {"model": model, "temperature": 0.1, "max_tokens": max_tokens, "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": prompt}]}

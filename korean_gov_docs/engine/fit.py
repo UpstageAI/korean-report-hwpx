@@ -6,7 +6,8 @@ import re, unicodedata
 
 # 글자 종류별 폭(em). 보정값은 calibrate()로 갱신
 W = {"hangul": 1.0, "space": 0.5, "digit": 0.5, "latin": 0.5, "upper": 0.62, "narrow": 0.3, "punct": 0.5, "wide": 1.0}
-NARROW = set(".,:;'\"`!|()[]{}·‘’“”")
+NARROW = set(".,:;'\"`!|()[]{}‘’“”")
+MIDDOT = set("·‧ㆍ")
 
 
 def kind(ch):
@@ -15,15 +16,22 @@ def kind(ch):
     if ch.isdigit(): return "digit"
     if "a" <= ch <= "z": return "latin"
     if "A" <= ch <= "Z": return "upper"
+    if ch in MIDDOT: return "middot"
     if ch in NARROW: return "narrow"
     if ch in "□■○●◦◯〇ㅇ◇◆❍※①②③④⑤⑥⑦⑧⑨⑩▪▶►☞→←↑↓「」『』《》〈〉【】": return "wide"  # 기호·괄호는 전각(1칸)
     if unicodedata.east_asian_width(ch) in "WF": return "wide"
     return "punct"
 
 
+SP_PROP = True   # 자간을 글자 폭에 비례로 적용(한글 실측 줄 배치와 더 맞음, scripts/calibrate_widths.py)
+
+
 def width(s, pt, spacing, ratio=100, w=W):
+    """글자 폭 합(HWPUNIT). 자간은 글자 폭의 spacing% (SP_PROP) — 한글 2020 맥 실측 lineseg 대조로 정함."""
     em = pt * 100  # HWPUNIT (1pt = 100)
-    return sum(em * (w[kind(c)] * ratio / 100 + spacing / 100) for c in s)
+    g = lambda c: w.get(kind(c), w.get("narrow", 0.35) if kind(c) == "middot" else 0.5)
+    if SP_PROP: return sum(em * g(c) * ratio / 100 * (1 + spacing / 100) for c in s)
+    return sum(em * (g(c) * ratio / 100 + spacing / 100) for c in s)
 
 
 def wrap(text, pt, spacing, first_w, rest_w, ratio=100, w=W, keep_word=True):
