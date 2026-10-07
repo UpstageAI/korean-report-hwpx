@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "press_release_hwpx"
-SKIP = {".git", ".venv", "dist", "build", "__pycache__", ".pytest_cache"}
+SKIP = {".git", ".venv", "out_check", "dist", "build", "__pycache__", ".pytest_cache"}
 TEMPLATE_KEYS = {"org", "page", "cover", "release", "title", "contact", "heading"}
 
 
