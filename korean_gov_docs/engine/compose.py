@@ -217,13 +217,13 @@ class Composer:
             last = ls[-1].strip()
             fill = F.width(last, L_["pt"], sp, 100, w) / (rest if len(ls) > 1 else first)
             return len(ls) > 1 and (fill < 0.3 or len(last.replace(" ", "")) <= 2)
-        for sp in range(0, lo - 1, -1):
+        for sp in range(0, max(lo - 3, -10) - 1, -1):   # 규칙 하한에서 안 되면 3%p까지 더 조임
             ls = F.wrap(txt, L_["pt"], sp, first, rest, 100, w, False)  # 글자 단위 줄 나눔
-            # 글자 폭 추정 오차(±3%)에서도 줄 수가 같고 마지막 줄이 짧지 않은지
-            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, False) for k in (0.95, 1.05)]
+            # 글자 폭 추정 오차(±2.5%, calibrate_widths 실측 기준)에서도 줄 수가 같고 마지막 줄이 짧지 않은지
+            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, False) for k in (0.975, 1.025)]
             risky = sum(len(a) != len(ls) or short(a, sp) for a in alt)
             mid = sum(1 for a, c in zip(ls, ls[1:]) if a and c and not a.endswith(" ") and a[-1].isalnum() and c[0].isalnum())
-            key = (len(ls), short(ls, sp), risky, mid, -sp)
+            key = (len(ls) + (risky > 0) * 1.5, short(ls, sp), risky, sp < lo, mid, -sp)
             if best is None or key < best[0]: best = (key, sp)
         return best[1]
 
