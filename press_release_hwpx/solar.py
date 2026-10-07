@@ -4,7 +4,7 @@
 - UPSTAGE_API_KEY: Upstage 클라우드 키(https://console.upstage.ai)
 - PRESS_RELEASE_SOLAR_BASE_URL: 내부(온프렘) Solar 주소(예: http://10.0.0.5:8000/v1). 없으면 https://api.upstage.ai/v1
 - PRESS_RELEASE_SOLAR_KEY: 내부 Solar 키(없으면 UPSTAGE_API_KEY, 키가 필요 없으면 비워도 됨)
-- PRESS_RELEASE_MODEL: 모델 이름(기본 solar-pro3 — 내부 설치 이름에 맞게)
+- PRESS_RELEASE_MODEL: 모델 이름(기본 solar-pro4 — 내부 설치 이름에 맞게)
 - PRESS_RELEASE_SOLAR_VERIFY=0: 사내 자체 인증서일 때 TLS 검증 끄기
 """
 import json
@@ -19,7 +19,7 @@ CLOUD = "https://api.upstage.ai/v1"
 def config():
     base = os.environ.get("PRESS_RELEASE_SOLAR_BASE_URL", "").strip().rstrip("/") or CLOUD
     key = os.environ.get("PRESS_RELEASE_SOLAR_KEY", "").strip() or os.environ.get("UPSTAGE_API_KEY", "").strip()
-    return base, key, os.environ.get("PRESS_RELEASE_MODEL", "solar-pro3"), base != CLOUD
+    return base, key, os.environ.get("PRESS_RELEASE_MODEL", "solar-pro4"), base != CLOUD
 
 
 def chat_json(prompt, max_tokens=8000, timeout=240):
