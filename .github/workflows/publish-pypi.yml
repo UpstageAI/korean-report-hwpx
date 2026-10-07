@@ -1,0 +1,21 @@
+# PyPI 배포 — 신뢰된 배포(Trusted Publishing, OIDC). 토큰 없이 이 레포의 이 워크플로에서만 업로드. 작성 Mia(윤승미)
+# 수동 실행: gh workflow run publish-pypi.yml   (pyproject.toml의 version으로 빌드·업로드)
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
