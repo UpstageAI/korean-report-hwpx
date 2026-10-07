@@ -113,6 +113,7 @@ Government emblems and agency logos are not bundled, under the rules on the use 
 
 - Output is a draft. Check it in Hangul before release.
 - Fonts render with whatever is installed; missing fonts (e.g. 휴먼명조, HY헤드라인M) are substituted.
+- Normal generation fits line ends from estimated glyph widths; exact line-end cleanup needs the polish option (macOS + Hangul).
 
 ## License
 

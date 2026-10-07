@@ -81,6 +81,7 @@ class Composer:
             body = self.R["levels"].get("p" if self.R.get("style") == "para" else "l1") or {}
             if out["font"] in ("HY헤드라인M", "HY울릉도M", "궁서", "맑은 고딕", "돋움") and body.get("font") not in (None, out["font"]):
                 out["font"], out["pt"] = body["font"], body.get("pt", out["pt"])
+            if out["font"] in ("궁서", "HY헤드라인M", "HY울릉도M", "HY견명조"): out["font"] = "바탕"  # 본문은 일반 서체
         return out
 
     def box_gap_pt(self, b):
@@ -185,7 +186,8 @@ class Composer:
         self._seq += 1; pno = str(self._seq)
         ov = self.override.get(pno)
         ov = list(ov) if isinstance(ov, (tuple, list)) else ([ov, 100] if ov is not None else None)
-        sp, ra, word = (ov + [False])[:3] if ov else (self.pick_spacing(prefix + plain, L_, hang), 100, False)
+        tail = ("\u3000" + "가" * -(-3386 // int(L_["pt"] * 100))) if ref_tag else ""   # 참고 표시 자리(빈칸+상자 폭)
+        sp, ra, word = (ov + [False])[:3] if ov else (self.pick_spacing(prefix + plain + tail, L_, hang), 100, False)
         if word == "auto": sp = self.pick_spacing_word(prefix + plain, L_, hang); word = True
         self.items[pno] = {"lv": lv, "text": prefix + plain, "sp": (sp, ra, word)}
         n = self.char(L_["font"], L_["pt"], sp, ratio=ra); b = self.char(L_["font"], L_["pt"], sp, True, ratio=ra)
@@ -196,7 +198,9 @@ class Composer:
             for j, bit in enumerate(re.split(r"(?<=\S)(\*{1,3})(?=[\s),.]|$)", part)):  # 문장 속 각주 표시 → 위첨자
                 if bit: segs.append((sup if j % 2 else (b if k % 2 else n), bit))
         para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=bool(word), prev=300 if lv in ("note", "ref") and getattr(self, "_after_table", False) else 0), segs, pno)
-        if ref_tag: para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n}"><hp:t>\u3000</hp:t></hp:run><hp:run charPrIDRef="{n}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
+        if ref_tag:  # 앞 글자와 빈칸 1칸(묶음 빈칸: 줄 끝에서 앞 어절과 떨어지지 않음), 자간 0으로 겹침 방지
+            n0 = self.char(L_["font"], L_["pt"], 0, ratio=100)
+            para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n0}"><hp:t><hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="{n0}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
         return para_xml
 
     def pick_spacing(self, txt, L_, hang):
@@ -204,12 +208,17 @@ class Composer:
         first, rest = self.text_w, self.text_w - hang
         lo = self.R.get("spacing_min", -8)
         best = None
+        def short(ls, sp):
+            last = ls[-1].strip()
+            fill = F.width(last, L_["pt"], sp, 100, w) / (rest if len(ls) > 1 else first)
+            return len(ls) > 1 and (fill < 0.3 or len(last.replace(" ", "")) <= 2)
         for sp in range(0, lo - 1, -1):
             ls = F.wrap(txt, L_["pt"], sp, first, rest, 100, w, False)  # 글자 단위 줄 나눔
-            fill = F.width(ls[-1].rstrip(), L_["pt"], sp, 100, w) / (rest if len(ls) > 1 else first)
-            # 양쪽 정렬로 벌어질 폭: 마지막 줄 제외 각 줄의 남는 폭(글자 크기 대비)
+            # 글자 폭 추정 오차(±3%)에서도 줄 수가 같고 마지막 줄이 짧지 않은지
+            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, False) for k in (0.95, 1.05)]
+            risky = sum(len(a) != len(ls) or short(a, sp) for a in alt)
             mid = sum(1 for a, c in zip(ls, ls[1:]) if a and c and not a.endswith(" ") and a[-1].isalnum() and c[0].isalnum())
-            key = (len(ls), len(ls) > 1 and fill < 0.3, mid, -sp)
+            key = (len(ls), short(ls, sp), risky, mid, -sp)
             if best is None or key < best[0]: best = (key, sp)
         return best[1]
 
@@ -437,16 +446,48 @@ class Composer:
                            {"role": "release", "w": 12755, "h": 1700, "char": lab},
                            {"role": "distribute_label", "label": "배포", "w": 3401, "h": 1700, "char": lab},
                            {"role": "distribute", "w": 12755, "h": 1700, "char": lab}]}
-        cs = r["cells"]; ws = self.fit_widths([c["w"] for c in cs]); h = max(c.get("h", 1700) for c in cs)
+        cs = [dict(c) for c in r["cells"]]; h = max(c.get("h", 1700) for c in cs)
+        txt_of = lambda c: {"release": rel, "distribute": dist, "release_inline": f'{c.get("label", "보도시점")} : {rel}'}.get(c["role"], c.get("label", ""))
+        ws = self.release_widths(cs, txt_of)
         tcs = []
         for k, (c, w) in enumerate(zip(cs, ws)):
             role = c["role"]
             txt = {"release": rel, "distribute": dist, "release_inline": f'{c.get("label", "보도시점")} : {rel}'.rstrip(" :") + (" " if not rel else ""),
                    "release_label": c.get("label", ""), "distribute_label": c.get("label", ""), "label": c.get("label", "")}.get(role, "")
+            if role == "label" and txt and txt in rel: txt = ""   # 보도시점 값에 이미 들어간 말(예: 조간) 중복 방지
             bf = self.border(c.get("fill"), c.get("line") or "NONE")
             paras = self.p(self.para_pr(c.get("align") or "CENTER", 100), [(self.ch(c.get("char")), txt)])
             tcs.append(self.cell(k, 0, w, h, paras, bf))
         return self.tbl_para(["".join(tcs)], 1, len(cs), sum(ws), h, self.border(None, "NONE"))
+
+    def release_widths(self, cs, txt_of):
+        """날짜·시점 칸이 '2026. 1. 5.(월) 조간' 길이를 한 줄에 담도록: 필요 폭 = 추정 글자 폭×1.15 + 칸 여백.
+        모자라면 ① 라벨·여유 칸에서 덜어오고 ② 표 폭을 본문 폭까지 늘리고 ③ 그래도 모자라면 그 칸 자간·장평을 줄인다."""
+        def need(c, sp=None, ra=None):
+            ch = dict(DEFAULT_CHAR, **{k: v for k, v in (c.get("char") or {}).items() if v is not None})
+            w = WIDTHS.get(ch["font"]) or F.W
+            return F.width(txt_of(c), float(ch["pt"]), int(ch.get("spacing") or 0) if sp is None else sp, int(ch.get("ratio") or 100) if ra is None else ra, w) * 1.15 + 600
+        ws = [float(c["w"]) for c in cs]; nd = [need(c) for c in cs]
+        lim = self.text_w - 200
+        short = lambda: sum(max(0, nd[k] - ws[k]) for k in range(len(cs)))
+        if short() > 0:
+            room = [max(0, ws[k] - nd[k]) for k in range(len(cs))]
+            take = min(short(), sum(room))
+            if take > 0:
+                for k in range(len(cs)): ws[k] -= take * room[k] / sum(room)
+                gain = [max(0, nd[k] - ws[k]) for k in range(len(cs))]
+                for k in range(len(cs)): ws[k] += take * gain[k] / max(1e-9, sum(gain))
+            if short() > 0 and sum(ws) < lim:   # 표 폭을 본문 폭까지
+                add = min(short(), lim - sum(ws)); gain = [max(0, nd[k] - ws[k]) for k in range(len(cs))]
+                for k in range(len(cs)): ws[k] += add * gain[k] / sum(gain)
+        ws = self.fit_widths(ws)
+        for k, c in enumerate(cs):   # 마지막 수단: 자간 → 장평
+            if need(c) <= ws[k] + 1: continue
+            ch = dict(c.get("char") or {}); sp0 = int(ch.get("spacing") or 0)
+            for sp, ra in [(s, 100) for s in range(sp0 - 1, -11, -1)] + [(-10, r) for r in range(95, 79, -5)]:
+                if need(c, sp, ra) <= ws[k]: break
+            ch.update(spacing=sp, ratio=ra); c["char"] = ch
+        return ws
 
     # ── 제목·부제 ──
     def fit_spacing(self, text, spec, width):
@@ -458,12 +499,12 @@ class Composer:
 
     def fit_title(self, text, spec, width):
         """제목 맞춤: ① 자간을 규칙 하한까지 ② 글자 크기를 규칙 크기의 80%까지 1pt씩 ③ 어절 경계에서 두 줄.
-        반환 (spec, 줄 목록). 글자 폭은 widths.json 추정값에 5% 여유를 둔다(한글 실제 글꼴 대체 대비)."""
+        반환 (spec, 줄 목록). 글자 폭은 widths.json 추정값에 12% 여유를 둔다(한글 실제 글꼴 대체 대비)."""
         spec = dict(DEFAULT_CHAR, **{k: v for k, v in (spec or {}).items() if v is not None})
         w = WIDTHS.get(spec["font"]) or WIDTHS.get("바탕"); ra = int(spec.get("ratio") or 100)
         base_sp, pt0 = int(spec.get("spacing") or 0), float(spec["pt"])
         lo = min(base_sp, int(self.R.get("spacing_min", self.R["_base"].get("spacing_min", -8))))
-        lim = width * 0.95
+        lim = width * 0.88
         fits = lambda t, pt, sp: F.width(t.strip(), pt, sp, ra, w) <= lim
         pts = [pt0] + [p for p in range(int(pt0) - 1, 0, -1) if p >= pt0 * 0.8 - 1e-9]
         for pt in pts:
@@ -484,7 +525,7 @@ class Composer:
         if t.get("para"):
             spec, ls = self.fit_title(doc["title"], t["char"], self.text_w)
             out = [self.p(self.para_pr(t.get("align") or "CENTER", 130), [(self.ch(spec), ln)]) for ln in ls]
-            out += [self.p(self.para_pr("CENTER", 130), [(self.ch(t["char"], pt=max(11.0, float(t["char"]["pt"]) - 6), bold=False), s)]) for s in subs]
+            out += [self.p(self.para_pr("CENTER", 130), [(self.ch(t["char"], pt=min(16.0, max(11.0, float(t["char"]["pt"]) - 6)), bold=False), s)]) for s in subs]
             return out
         width = min(t.get("width", self.text_w), self.text_w - 200); rows = []; H = 0
         for k, row in enumerate(t["rows"]):
@@ -500,7 +541,7 @@ class Composer:
             rows.append(self.cell(0, len(rows), width, h, paras, bf, margin=(850, 850, 566, 566))); H += h
         if subs and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 표 아래 문단
             return [self.tbl_para(rows, len(rows), 1, width, H, self.border(None, "NONE"))] + \
-                   [self.p(self.para_pr("CENTER", 130), [(self.ch(t["rows"][0].get("char"), pt=max(11.0, float((t["rows"][0].get("char") or {}).get("pt", 18)) - 6), bold=False), s)]) for s in subs]
+                   [self.p(self.para_pr("CENTER", 130), [(self.ch(t["rows"][0].get("char"), pt=min(16.0, max(11.0, float((t["rows"][0].get("char") or {}).get("pt", 18)) - 6)), bold=False), s)]) for s in subs]
         return [self.tbl_para(rows, len(rows), 1, width, H, self.border(None, "NONE"))]
 
     # ── 담당 표 ──
