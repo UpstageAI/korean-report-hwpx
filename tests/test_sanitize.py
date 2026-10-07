@@ -1,8 +1,8 @@
-"""공개판 검증: 전 기관 더미 생성 → 개인정보·원본 내용·그림이 0건인지, 서식 수치가 규칙값과 같은지.
+"""공개판 검증: 전 기관 예시 생성 → 개인정보·원본 내용·그림이 0건인지, 서식 수치가 규칙값과 같은지.
 
-(a) 전화번호: 더미 번호(044-000-0000)만 허용
+(a) 전화번호: 예시 번호(044-000-0000)만 허용
 (b) 직위가 붙은 실명: 가명(김○○·이○○ 형식)만 허용
-(c) 더미 원고에 없는 문장: 서식 이름표(보도시점·배포·담당 부서 등) 외 0건
+(c) 예시 원고에 없는 문장: 서식 이름표(보도시점·배포·담당 부서 등) 외 0건
 (d) 그림: 0건(로고·슬로건은 사용자가 logo_path로 넣을 때만)
 (e) 서식 수치: 계층별 글꼴·크기·내어쓰기·줄 간격, 계층 사이 빈 줄 = rules 값
 """
@@ -77,7 +77,7 @@ def test_no_foreign_text(built, org):
         if not t or t in LABELS or t.replace(" ", "") in LABELS: continue
         if any(t in a for a in allowed): continue
         if t == org or t.startswith("보도시점 :"): continue
-        raise AssertionError(f"{org}: 더미에 없는 글 '{t}'")
+        raise AssertionError(f"{org}: 예시에 없는 글 '{t}'")
 
 
 @pytest.mark.parametrize("org", ORGS)

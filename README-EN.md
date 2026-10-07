@@ -2,7 +2,6 @@
 
 <!-- mcp-name: io.github.UpstageAI/press-release-hwpx -->
 
-<!-- TODO: add docs/demo.gif after recording (not yet available) -->
 ![Demo: manuscript → ministry-format press release](https://raw.githubusercontent.com/UpstageAI/press-release-hwpx/main/docs/demo.gif)
 
 [![PyPI](https://img.shields.io/pypi/v/press-release-hwpx)](https://pypi.org/project/press-release-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-press--release--hwpx-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=press-release-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)

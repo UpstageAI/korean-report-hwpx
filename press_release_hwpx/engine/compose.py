@@ -83,6 +83,14 @@ class Composer:
                 out["font"], out["pt"] = body["font"], body.get("pt", out["pt"])
         return out
 
+    def box_gap_pt(self, b):
+        """강조 상자 다음 문단: 붙여 쓰지 않고 상자 관련 빈 줄 규칙값(box>b → table>b, 기관값→전체값)을 넣는다."""
+        for src in (self.R, self.R["_base"]):
+            for k in (f"box>{b}", f"table>{b}"):
+                g = src.get("gaps", {}).get(k)
+                if g and g.get("pt"): return g["pt"]
+        return 10.0
+
     def gap_pt(self, a, b):
         if b == "h": return 14.0          # 소제목 앞은 한 줄
         if a == "h": return 6.0
@@ -248,7 +256,7 @@ class Composer:
                 '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>사각형입니다.</hp:shapeComment></hp:rect>')
 
     def gap(self, a, b):
-        pt = self.gap_pt(a, b)
+        pt = self.box_gap_pt(b) if a == "box" else self.gap_pt(a, b)
         if pt is None: return None
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
@@ -341,7 +349,7 @@ class Composer:
             elif t == "image":
                 bid, w, h = self.add_image(b["path"])
                 out.append(self.p_raw(self.para_pr("CENTER", 100), self.char("맑은 고딕", 10.0), self.picture(bid, w, h, min(b.get("width_mm", 150) * HU_MM, self.text_w - 200))))
-            prev = lv
+            prev = "box" if t == "box" else lv
 
     # ── 그림 ──
     def add_image(self, path):
@@ -448,11 +456,34 @@ class Composer:
             if F.width(text, float(spec["pt"]), sp, int(spec.get("ratio") or 100), w) <= width: return sp
         return int(spec.get("spacing") or 0)
 
+    def fit_title(self, text, spec, width):
+        """제목 맞춤: ① 자간을 규칙 하한까지 ② 글자 크기를 규칙 크기의 80%까지 1pt씩 ③ 어절 경계에서 두 줄.
+        반환 (spec, 줄 목록). 글자 폭은 widths.json 추정값에 5% 여유를 둔다(한글 실제 글꼴 대체 대비)."""
+        spec = dict(DEFAULT_CHAR, **{k: v for k, v in (spec or {}).items() if v is not None})
+        w = WIDTHS.get(spec["font"]) or WIDTHS.get("바탕"); ra = int(spec.get("ratio") or 100)
+        base_sp, pt0 = int(spec.get("spacing") or 0), float(spec["pt"])
+        lo = min(base_sp, int(self.R.get("spacing_min", self.R["_base"].get("spacing_min", -8))))
+        lim = width * 0.95
+        fits = lambda t, pt, sp: F.width(t.strip(), pt, sp, ra, w) <= lim
+        pts = [pt0] + [p for p in range(int(pt0) - 1, 0, -1) if p >= pt0 * 0.8 - 1e-9]
+        for pt in pts:
+            for sp in range(base_sp, lo - 1, -1):
+                if fits(text, pt, sp): return dict(spec, pt=float(pt), spacing=sp), [text]
+        words = text.split(" ")
+        cands = [(" ".join(words[:k]), " ".join(words[k:])) for k in range(1, len(words))]
+        cands.sort(key=lambda ab: max(F.width(ab[0], pt0, base_sp, ra, w), F.width(ab[1], pt0, base_sp, ra, w)))
+        for pt in pts:
+            for sp in range(base_sp, lo - 1, -1):
+                for a, b in cands[:1]:
+                    if fits(a, pt, sp) and fits(b, pt, sp): return dict(spec, pt=float(pt), spacing=sp), [a, b]
+        return dict(spec, pt=float(pts[-1]), spacing=lo), ([*cands[0]] if cands else [text])
+
     def title(self, doc):
         t = self.L.get("title") or {"para": True, "char": {"font": "HY헤드라인M", "pt": 22.0, "bold": False}, "align": "CENTER"}
         subs = [f"- {s} -" for s in doc.get("subtitles", [])]
         if t.get("para"):
-            out = [self.p(self.para_pr(t.get("align") or "CENTER", 130), [(self.ch(t["char"]), doc["title"])])]
+            spec, ls = self.fit_title(doc["title"], t["char"], self.text_w)
+            out = [self.p(self.para_pr(t.get("align") or "CENTER", 130), [(self.ch(spec), ln)]) for ln in ls]
             out += [self.p(self.para_pr("CENTER", 130), [(self.ch(t["char"], pt=max(11.0, float(t["char"]["pt"]) - 6), bold=False), s)]) for s in subs]
             return out
         width = min(t.get("width", self.text_w), self.text_w - 200); rows = []; H = 0
@@ -460,7 +491,7 @@ class Composer:
             if row["role"] == "subtitle" and not subs: continue
             lines = [doc["title"]] if row["role"] == "title" else subs
             spec = dict(row.get("char") or {})
-            if row["role"] == "title": spec["spacing"] = self.fit_spacing(doc["title"], spec, width - 1500)
+            if row["role"] == "title": spec, lines = self.fit_title(doc["title"], spec, width - 1700)
             cp = self.ch(spec)
             paras = "".join(self.p(self.para_pr(row.get("align") or "CENTER", 130), [(cp, ln)]) for ln in lines)
             b = row.get("border") or {}
@@ -479,7 +510,11 @@ class Composer:
         people = [(list(p) + ["", "", "", ""])[:4] if len(p) >= 4 else ["", *([""] * (3 - len(p))), *p] for p in c.get("people", [])]
         if not people: people = [["담당자", "", "", ""]]
         L_ = self.L.get("contact") or {"widths": [6236, 15167, 6081, 5605, 5605, 9003], "row_h": 1800}
-        ws = self.fit_widths(L_["widths"]); h = L_.get("row_h", 1800); n = len(people)
+        # 칸 높이: 기관값이 글자 크기에 비해 과도하면(실물은 두 줄 이름 등) 글자 크기 기준 한 줄 + 여백으로 줄임
+        cpt = float((L_.get("value_char") or L_.get("label_char") or DEFAULT_CHAR).get("pt") or 10.0)
+        h = int(min(max(L_.get("row_h", 1800), 1500), cpt * 100 * 1.6 + 700))
+        n = len(people)
+        ws = self.fit_widths(L_["widths"])
         line, lw = L_.get("line") or "SOLID", L_.get("line_width") or "0.12 mm"
         if line == "NONE": line = "SOLID"
         lab_bf = self.border(L_.get("label_fill"), line, lw); val_bf = self.border(L_.get("value_fill"), line, lw)

@@ -2,7 +2,6 @@
 
 <!-- mcp-name: io.github.UpstageAI/press-release-hwpx -->
 
-<!-- TODO: docs/demo.gif 녹화 후 추가(아직 없음) -->
 ![데모: 원고 → 기관 서식 보도자료](https://raw.githubusercontent.com/UpstageAI/press-release-hwpx/main/docs/demo.gif)
 
 [![PyPI](https://img.shields.io/pypi/v/press-release-hwpx)](https://pypi.org/project/press-release-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-press--release--hwpx-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=press-release-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [English](README-EN.md)
