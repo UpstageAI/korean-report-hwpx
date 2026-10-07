@@ -23,10 +23,11 @@ def score(sec, pno):
     return (mid, short, len(lines))
 
 
-def polish(org, doc, dst, max_rounds=12, log=print, **kw):
+def polish(org, doc, dst, max_rounds=12, log=print, build=None, **kw):
+    build = build or C.compose   # 보고서는 report.compose
     override, best, tried = {}, {}, {}
     for r in range(max_rounds):
-        c = C.compose(org, doc, dst, override, **kw)
+        c = build(org, doc, dst, override, **kw)
         sec = hancom.layout(dst)
         todo = 0
         for pno, it in c.items.items():
@@ -47,7 +48,7 @@ def polish(org, doc, dst, max_rounds=12, log=print, **kw):
     final = {p: b[1] for p, b in best.items()}
     for p_, b in best.items():   # 끝까지 단어가 갈리는 문단: 그 문단만 어절 단위 줄 나눔 + 벌어짐 최소 자간
         if b[2][0]: final[p_] = (0, 100, "auto")
-    c = C.compose(org, doc, dst, final, **kw); sec = hancom.layout(dst)
+    c = build(org, doc, dst, final, **kw); sec = hancom.layout(dst)
     remain = {p: score(sec, p) for p in c.items if score(sec, p) and (score(sec, p)[0] or score(sec, p)[1])}
     log(f"[완료] 남은 문제 문단 {len(remain)}개")
     import json

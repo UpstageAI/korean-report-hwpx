@@ -1,27 +1,34 @@
-# press-release-hwpx — Korean Government Press Release HWPX MCP
+# korean-gov-docs — Korean Government Documents MCP (reports and press releases as HWPX)
 
-<!-- mcp-name: io.github.UpstageAI/press-release-hwpx -->
+<!-- mcp-name: io.github.UpstageAI/korean-gov-docs -->
 
-![Demo: manuscript → ministry-format press release](https://raw.githubusercontent.com/UpstageAI/press-release-hwpx/main/docs/demo.gif)
+![Demo: memo → agency-format report and press release](https://raw.githubusercontent.com/UpstageAI/korean-gov-docs/main/docs/demo.gif)
 
-[![PyPI](https://img.shields.io/pypi/v/press-release-hwpx)](https://pypi.org/project/press-release-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-press--release--hwpx-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=press-release-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
+[![PyPI](https://img.shields.io/pypi/v/korean-gov-docs)](https://pypi.org/project/korean-gov-docs/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-gov-docs) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
 
-**Turns a manuscript into a Korean government press release (HWPX, the Hangul word processor format) in a specific ministry's format.** Covers 52 central government agencies. Formatting rules were measured from 2,670 published press releases. Files are drawn from rules: no source documents or logos are bundled.
+**Korean civil-service documents (reports and press releases) as HWPX, in each agency's format.** Give it a memo or draft; Solar decides the document type and structures it, and the server draws a Hangul (HWPX) file from format rules for 52 central government agencies.
+
+> One request — "write this up like an official document" (공문서처럼 써 줘) — produces an outline-style report (□ → ㅇ → -) or a press release in the agency's format. Rules were measured from 2,670 published press releases; no source documents or logos are bundled.
 
 **Try asking**
 
-- "Make this draft into a Ministry of the Interior and Safety (행정안전부) press release HWPX"
-- "National Tax Service (국세청) format — embargo 2026. 10. 8.(Thu) morning papers, contact 김○○ 사무관 044-000-0000"
-- "Does 산림청 use paragraph style or □ outline style? Show its level fonts and sizes"
-- "Rebuild the structure JSON from before with a new subtitle"
-- "Use our agency logo file (logo.png)"
+- "Turn this memo into a Ministry of the Interior and Safety (행안부) report"
+- "These are meeting notes — format them as an official document" (no agency given → common format)
+- "Make this a National Tax Service (국세청) press release — embargo 2026. 10. 8.(Thu) morning papers"
+- "Rebuild the report from before with a new □ sentence in section Ⅲ"
+- "Show the report format rules for 산림청 (marks, fonts, sizes per level)"
 
-**One-line install** — `claude mcp add press-release-hwpx -- uvx press-release-hwpx`
+**One-line install** — `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
 
-- **Per-agency format** — cover, embargo/distribution, title and contact tables; body style (paragraph 37 / □ outline 15)
-- **Computed, not copied** — hanging indent = (spaces before mark × 0.5 + mark width + spaces after × 0.5) × font size; gaps between levels use each agency's measured values
-- **Line-end tidying** — per-paragraph character spacing to avoid short last lines and mid-word breaks
-- **No source files or logos** — a blank HWPX is generated in code; only format numbers are used
+## Document types
+
+| Type | Layout | Agency | Rules |
+|---|---|---|---|
+| **Report (개조식 outline)** | Title box, date/department line (optional), section headings (Ⅰ. Ⅱ.) → □ → ㅇ → - → *, ※ notes, tables, attachment pages (붙임·참고) | Optional — 42 agencies have their own rules; others or none use common rules | `rules_report/` (1,326 report-style sections) |
+| **Press release (보도자료)** | Cover (logo slot), embargo/distribution, title and subtitles, body (paragraph / □ outline), contact table, appendix pages | Required — 52 agencies | `rules/`, `templates/` (2,670 releases) |
+| Draft approval document (기안문) | — | — | Planned for the next version |
+
+With `doc_type="auto"` (default), `write_document` lets Solar decide: public announcement or distribution → press release; internal reporting, plans or reviews → report. The reason is returned with the result.
 
 ## Install
 
@@ -30,90 +37,107 @@ With [uv](https://docs.astral.sh/uv/) it runs without a separate install.
 ```json
 {
   "mcpServers": {
-    "press-release-hwpx": {
+    "korean-gov-docs": {
       "command": "uvx",
-      "args": ["press-release-hwpx"],
-      "env": { "UPSTAGE_API_KEY": "only for make_press_release" }
+      "args": ["korean-gov-docs"],
+      "env": { "UPSTAGE_API_KEY": "only for write_document" }
     }
   }
 }
 ```
 
-Claude Code: `claude mcp add press-release-hwpx -- uvx press-release-hwpx`
+Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
 
-Files are written to `~/press-release-hwpx/` (override with `PRESS_RELEASE_OUT_DIR`).
+- Upstage API key: [console.upstage.ai](https://console.upstage.ai) (default model `solar-pro4`, change with `KOREAN_GOV_DOCS_MODEL`)
+- Files are written to `~/korean-gov-docs/` (override with `KOREAN_GOV_DOCS_OUT_DIR`).
 
 ## Tools
 
 | Tool | What it does | Sends data out |
 |---|---|---|
-| `list_ministries` | Supported agencies and body style (paragraph / □ outline) | No |
-| `get_rules` | Agency format rules (marks, leading spaces, fonts, sizes, line spacing, gaps between levels) | No |
-| `build_from_structure` | Structure JSON (embargo, title, subtitles, body blocks, appendix, contacts) → agency-format HWPX | No |
-| `make_press_release` | Manuscript (text or .hwpx/.hwp/.pdf/.docx/.txt/.md) → structured by Solar → agency-format HWPX | Manuscript is sent to the Solar API |
+| `write_document` | Draft (text or .hwpx/.hwp/.pdf/.docx/.txt/.md) → Solar picks the type and structures it → agency-format HWPX. `doc_type`: auto / report / press_release; `ministry` optional | Draft is sent to the Solar API |
+| `build_from_structure` | Structure JSON → agency-format HWPX (no Solar) | No |
+| `list_ministries` | Supported agencies and support per document type | No |
+| `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header) | No |
+| `make_press_release` | (Backward compatible) same as `write_document(doc_type="press_release")` | Draft is sent to the Solar API |
 
-Block types: `l1` (□) `l2` (ㅇ) `l3` (-) `p` (paragraph) `note` (*) `ref` (※) `h` (subheading) `caption` `table` `box` `image`. If the manuscript has no contact, the contact table is filled with placeholders `○○과 / 김○○ / 044-000-0000` (`placeholder_contact`).
+Solar's report rules: □ states the conclusion first in one sentence, ㅇ gives grounds and details, - lists sub-items, sentences end in noun form (~함, ~임, ~ 예정), and no facts or numbers are invented.
 
-## Agency logos and slogans
+Report structure JSON:
 
-Government emblems and agency logos are not bundled, under the rules on the use of government symbols. Staff of the agency should supply their own logo file.
+```json
+{
+  "title": "○○ 서비스 도입 추진계획(안)", "date": "2026. 10. 7.", "dept": "○○과",
+  "body": [{"type": "h", "text": "Ⅰ. 추진 배경"},
+           {"type": "l1", "text": "..."}, {"type": "l2", "text": "..."}, {"type": "l3", "text": "..."},
+           {"type": "note", "text": "..."}, {"type": "ref", "text": "..."},
+           {"type": "caption", "text": "소요 예산"}, {"type": "table", "rows": [["구분", "금액"], ["가", "100"]]}],
+  "appendix": [{"title": "붙임 1", "heading": "...", "body": [{"type": "l1", "text": "..."}]}]
+}
+```
 
-1. Pass `logo_path` to place the logo in the cover's logo slot (sized per agency). Use `slogan_path` for a slogan image.
-2. Or open the file in Hangul, delete the text in the 「기관 로고」 box and insert the picture.
+Press release structure: `{release, distribute, title, subtitles, body, appendix, contact}` (same block types plus `p` paragraph, `box`, `image`). Without a contact, the contact table is filled with placeholders `○○과 / 김○○ / 044-000-0000` (`placeholder_contact`).
 
 ## Supported agencies (52)
 
-| Agency | Body style | Agency | Body style |
-|---|---|---|---|
-| 개인정보보호위원회 | paragraph | 경찰청 | paragraph |
-| 고용노동부 | paragraph | 공정거래위원회 | paragraph |
-| 과학기술정보통신부 | paragraph | 관세청 | paragraph |
-| 교육부 | paragraph | 국가교육위원회 | paragraph |
-| 국가데이터처 | □ outline | 국가보훈부 | paragraph |
-| 국가유산청 | paragraph | 국무조정실 | □ outline |
-| 국민권익위원회 | □ outline | 국방부 | □ outline |
-| 국세청 | □ outline | 국토교통부 | □ outline |
-| 금융위원회 | paragraph | 기본사회위원회 | □ outline |
-| 기상청 | paragraph | 기획예산처 | paragraph |
-| 기후에너지환경부 | paragraph | 농림축산식품부 | paragraph |
-| 농촌진흥청 | paragraph | 문화체육관광부 | paragraph |
-| 방송미디어통신위원회 | paragraph | 방위사업청 | paragraph |
-| 법무부 | □ outline | 법제처 | paragraph |
-| 병무청 | paragraph | 보건복지부 | paragraph |
-| 산림청 | paragraph | 산업통상부 | paragraph |
-| 새만금개발청 | □ outline | 성평등가족부 | □ outline |
-| 소방청 | □ outline | 식품의약품안전처 | paragraph |
-| 외교부 | paragraph | 우주항공청 | paragraph |
-| 원자력안전위원회 | □ outline | 인구전략위원회 | paragraph |
-| 인사혁신처 | paragraph | 재외동포청 | □ outline |
-| 재정경제부 | paragraph | 조달청 | paragraph |
-| 중소벤처기업부 | paragraph | 지식재산처 | paragraph |
-| 질병관리청 | paragraph | 통일부 | □ outline |
-| 해양경찰청 | □ outline | 해양수산부 | paragraph |
-| 행정안전부 | paragraph | 행정중심복합도시건설청 | paragraph |
+| Agency | Report | Press release | Agency | Report | Press release |
+|---|---|---|---|---|---|
+| 개인정보보호위원회 | agency rules | paragraph | 법무부 | agency rules | □ outline |
+| 경찰청 | agency rules | paragraph | 법제처 | agency rules | paragraph |
+| 고용노동부 | agency rules | paragraph | 병무청 | common rules | paragraph |
+| 공정거래위원회 | agency rules | paragraph | 보건복지부 | agency rules | paragraph |
+| 과학기술정보통신부 | agency rules | paragraph | 산림청 | agency rules | paragraph |
+| 관세청 | agency rules | paragraph | 산업통상부 | agency rules | paragraph |
+| 교육부 | agency rules | paragraph | 새만금개발청 | common rules | □ outline |
+| 국가교육위원회 | agency rules | paragraph | 성평등가족부 | agency rules | □ outline |
+| 국가데이터처 | agency rules | □ outline | 소방청 | common rules | □ outline |
+| 국가보훈부 | agency rules | paragraph | 식품의약품안전처 | agency rules | paragraph |
+| 국가유산청 | agency rules | paragraph | 외교부 | common rules | paragraph |
+| 국무조정실 | agency rules | □ outline | 우주항공청 | agency rules | paragraph |
+| 국민권익위원회 | agency rules | □ outline | 원자력안전위원회 | common rules | □ outline |
+| 국방부 | agency rules | □ outline | 인구전략위원회 | common rules | paragraph |
+| 국세청 | agency rules | □ outline | 인사혁신처 | agency rules | paragraph |
+| 국토교통부 | agency rules | □ outline | 재외동포청 | common rules | □ outline |
+| 금융위원회 | agency rules | paragraph | 재정경제부 | agency rules | paragraph |
+| 기본사회위원회 | common rules | □ outline | 조달청 | agency rules | paragraph |
+| 기상청 | agency rules | paragraph | 중소벤처기업부 | agency rules | paragraph |
+| 기획예산처 | agency rules | paragraph | 지식재산처 | agency rules | paragraph |
+| 기후에너지환경부 | agency rules | paragraph | 질병관리청 | agency rules | paragraph |
+| 농림축산식품부 | agency rules | paragraph | 통일부 | common rules | □ outline |
+| 농촌진흥청 | agency rules | paragraph | 해양경찰청 | common rules | □ outline |
+| 문화체육관광부 | agency rules | paragraph | 해양수산부 | agency rules | paragraph |
+| 방송미디어통신위원회 | agency rules | paragraph | 행정안전부 | agency rules | paragraph |
+| 방위사업청 | agency rules | paragraph | 행정중심복합도시건설청 | agency rules | paragraph |
 
-## Optional: spacing polish
+Report: agency rules = measured from that agency's attachment sections (42 agencies); common rules = most common values across agencies (agency name left blank when none is given). Press release: paragraph = article-style paragraphs; □ outline = □ → ㅇ → -.
 
-`make_press_release(..., polish=True)` works only on **macOS with Hancom Office Hangul** installed. It reads the real line layout from Hangul and re-chooses character spacing per paragraph (Hangul windows open several times; takes minutes). Normal generation does not need Hangul.
+## Agency logos
+
+Government symbols and agency logos are not bundled (usage regulations). Agency staff should supply their own logo file.
+
+- `logo_path` places the logo in the press release cover's logo slot (sized per agency) or above the report title box. `slogan_path` adds a press release slogan image.
+- Without it, press releases get a same-size 「기관 로고」 placeholder; delete the text in Hangul and insert the picture.
 
 ## Data transmission
 
-- Basic generation (`build_from_structure`) sends nothing out; the file is built on your machine.
-- `make_press_release` sends the manuscript to the Upstage API (`api.upstage.ai`). Do not include personal or other sensitive data.
-- On air-gapped networks, set `PRESS_RELEASE_SOLAR_BASE_URL` to an internal Solar endpoint (`PRESS_RELEASE_SOLAR_KEY` for its key, `PRESS_RELEASE_MODEL` for the model name).
+- `build_from_structure` sends nothing out; the file is built on your machine.
+- `write_document` sends the draft to the Upstage API (`api.upstage.ai`). Do not include personal or other sensitive data.
+- On air-gapped networks use on-prem Solar: `KOREAN_GOV_DOCS_SOLAR_BASE_URL` (internal OpenAI-compatible `/v1` endpoint), `KOREAN_GOV_DOCS_SOLAR_KEY`, `KOREAN_GOV_DOCS_MODEL`; `KOREAN_GOV_DOCS_SOLAR_VERIFY=0` for internal certificates.
 
 ## Where the rules come from
 
-- Full parse of **2,670 press release HWPX files (52 central agencies)** from Korea.kr (정책브리핑). Body formatting measured on 2,016 releases: 35,465 paragraphs, 35,434 blank lines, 32,392 table cells.
+- Full parse of **2,670 press release HWPX files (52 central agencies)** from Korea.kr (정책브리핑). Press release body formatting measured on 2,016 releases: 35,465 paragraphs, 35,434 blank lines, 32,392 table cells.
+- Report formatting comes from the **1,326** releases that contain a report-style attachment section (13,757 paragraphs), per agency (42 agencies with 3+ documents). The common skeleton (□ - * ※ marks, one space after the mark, one-row title box, table header in 맑은 고딕 centered bold) agrees across 90%+ of agencies.
 - Official standard: Enforcement Rule of the Regulation on Administrative Business Operation (item numbering).
-- Rule documents: `press_release_hwpx/refs/`. Rule values: `rules/`, `rules_report/`; agency cover/contact table numbers: `templates/`.
+- Rule documents: `korean_gov_docs/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
 - Source releases are published on Korea.kr under KOGL (공공누리). This repository contains no source files, text or images — only format numbers.
 
 ## Notes
 
-- Output is a draft. Check it in Hangul before release.
+- Output is a draft. Check it in Hangul before use.
+- Line ends (e.g. a one- or two-character last line) are fitted from estimated glyph widths, so some may remain. With **macOS + Hancom Office Hangul**, `polish=True` reads the real line layout and re-chooses spacing per paragraph (Hangul windows open several times; takes minutes).
 - Fonts render with whatever is installed; missing fonts (e.g. 휴먼명조, HY헤드라인M) are substituted.
-- Normal generation fits line ends from estimated glyph widths; exact line-end cleanup needs the polish option (macOS + Hangul).
+- Draft approval documents (기안문) are planned for the next version.
 
 ## License
 

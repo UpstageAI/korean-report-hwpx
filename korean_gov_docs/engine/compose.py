@@ -58,13 +58,18 @@ def _img_size(b):
 
 class Composer:
     def __init__(self, org, logo_path=None, slogan_path=None, placeholder_contact=False):
-        self.org = org; self.R = load_rules(org); self.L = load_layout(org); self.cache = {}
+        self.org = org; self.R, self.L = self.load(org); self.cache = {}
         self.override = {}; self.items = {}; self._seq = 7000000  # polish 루프용: 문단 번호 → 자간
         self.header = B.header_xml(); self.base_para = "0"; self.base_char = "0"
         self.images = []   # [(id, ext, bytes)]
         pg = self.L.get("page", {})
         self.text_w = pg.get("width", 59528) - pg.get("left", 5669) - pg.get("right", 5669)
         self.logo_path, self.slogan_path, self.placeholder_contact = logo_path, slogan_path, placeholder_contact
+
+    TH = {"fill": "#DFE6F7", "font": "맑은 고딕", "pt": 11.0, "bold": True}   # 표 머리 행(보고서는 기관 규칙값으로 바꿈)
+
+    def load(self, org):
+        return load_rules(org), load_layout(org)
 
     # ── 규칙값 ──
     def level(self, lv):
@@ -179,7 +184,7 @@ class Composer:
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
             hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
         text = PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), text)
-        m_ref = re.search(r"(?<=[.다\)])\s*(참고|붙임)\s?(\d+)\s*$", text)
+        m_ref = re.search(r"(?<=[.다\)함임됨음정요])\s*(참고|붙임)\s?(\d+)\s*$", text)   # 보고서 명사형 종결(~함·~임) 뒤도
         ref_tag = None
         if m_ref: ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"; text = text[:m_ref.start()]  # 문장 끝 참고 표시
         plain = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
@@ -288,7 +293,8 @@ class Composer:
             room = [ws[c] - mins[c] for c in range(ncol)]
             ws = [ws[c] - extra * room[c] / max(1, sum(room)) for c in range(ncol)]
         ws = [int(w) for w in ws]
-        hb, bb = self.border("#DFE6F7"), self.border(None)
+        th = self.TH; hb, bb = self.border(th.get("fill")), self.border(None)
+        tpt = float(th.get("pt") or 11.0); ppc = int(tpt * 100)   # 글자 한 칸 폭(HWPUNIT) 추정
         trs, H = [], 0
         for ri, r in enumerate(rows):
             tcs, rh = [], 0
@@ -297,11 +303,11 @@ class Composer:
                 is_head = (head and ri == 0) or (label_col and ci == 0)
                 num = bool(re.fullmatch(r"[\d,.%△▲▽+\-~() ]+[^\s]{0,3}", v.strip())) and any(c.isdigit() for c in v)
                 align = "CENTER" if (is_head or len(v) <= 12 or ci == 0) else ("RIGHT" if num else "JUSTIFY")
-                cp = self.char("맑은 고딕", 11.0, -2, is_head)
+                cp = self.char(th.get("font") or "맑은 고딕", tpt if is_head else min(tpt, 11.0), -2, is_head and th.get("bold", True))
                 lines = v.split("\n") or [""]
                 ps = "".join(self.p(self.para_pr(align, 130), [(cp, ln)]) for ln in lines)
-                cw = ws[ci]; per = max(1, int((cw - 1020) / 1100))
-                nl = sum(max(1, -(-len(ln) // per)) for ln in lines); h = int(nl * 1100 * 1.3 + 400 + 282)
+                cw = ws[ci]; per = max(1, int((cw - 1020) / ppc))
+                nl = sum(max(1, -(-len(ln) // per)) for ln in lines); h = int(nl * ppc * 1.3 + 400 + 282)
                 rh = max(rh, h)
                 tcs.append((ps, cw, hb if is_head else bb, ci))
             trs.append((tcs, rh)); H += rh
@@ -346,10 +352,7 @@ class Composer:
                 g = None if lv == "caption" or prev == "caption" or self._after_table else self.gap(prev, lv)
                 if g: out.append(g)
             if t in ("l1", "l2", "l3", "note", "ref", "p", "plain"): out.append(self.item(self.LVMAP[t], b["text"]))
-            elif t == "h":
-                L_ = self.level("l1" if self.R.get("style") == "box" else "p")
-                hc = self.char(L_["font"], L_["pt"] + 1, -2, True)
-                out.append(self.p(self.para_pr("JUSTIFY", L_["line"], keep=True), [(hc, b["text"].strip("* "))]))
+            elif t == "h": out.append(self.heading(b["text"]))
             elif t == "caption": out.append(self.caption(b["text"]))
             elif t == "table": out.append(self.table(b["rows"]))
             elif t == "box": out.append(self.box(b["lines"]))
@@ -359,6 +362,12 @@ class Composer:
                 bid, w, h = self.add_image(b["path"])
                 out.append(self.p_raw(self.para_pr("CENTER", 100), self.char("맑은 고딕", 10.0), self.picture(bid, w, h, min(b.get("width_mm", 150) * HU_MM, self.text_w - 200))))
             prev = "box" if t == "box" else lv
+
+    def heading(self, text):
+        """소제목: 본문 1계층 글꼴 +1pt 굵게, 다음 문단과 같은 쪽."""
+        L_ = self.level("l1" if self.R.get("style") == "box" else "p")
+        hc = self.char(L_["font"], L_["pt"] + 1, -2, True)
+        return self.p(self.para_pr("JUSTIFY", L_["line"], keep=True), [(hc, text.strip("* "))])
 
     # ── 그림 ──
     def add_image(self, path):

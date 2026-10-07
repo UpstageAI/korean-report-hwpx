@@ -92,7 +92,7 @@ def content_hpf(images, title="보도자료"):
 
 
 VERSION = (XML + '<hv:HCFVersion xmlns:hv="http://www.hancom.co.kr/hwpml/2011/version" tagetApplication="WORDPROCESSOR" major="5" minor="1" micro="0" '
-           'buildNumber="1" os="1" xmlVersion="1.31" application="press-release-hwpx" appVersion="0.1.0"/>')
+           'buildNumber="1" os="1" xmlVersion="1.31" application="korean-gov-docs" appVersion="0.1.0"/>')
 CONTAINER = (XML + '<ocf:container xmlns:ocf="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:hpf="http://www.hancom.co.kr/schema/2011/hpf">'
              '<ocf:rootfiles><ocf:rootfile full-path="Contents/content.hpf" media-type="application/hwpml-package+xml"/>'
              '<ocf:rootfile full-path="Preview/PrvText.txt" media-type="text/plain"/></ocf:rootfiles></ocf:container>')
@@ -101,10 +101,10 @@ SETTINGS = (XML + '<ha:HWPApplicationSetting xmlns:ha="http://www.hancom.co.kr/h
             '<ha:CaretPosition listIDRef="0" paraIDRef="0" pos="0"/></ha:HWPApplicationSetting>')
 
 
-def save(dst, header, section, images=(), preview=""):
+def save(dst, header, section, images=(), preview="", title="보도자료"):
     """images: [(id, ext, bytes)]"""
     mt = lambda e: "image/" + {"jpg": "jpg", "jpeg": "jpg", "png": "png", "bmp": "bmp", "gif": "gif"}.get(e, e)
-    hpf = content_hpf([(i, f"BinData/{i}.{e}", mt(e)) for i, e, _ in images])
+    hpf = content_hpf([(i, f"BinData/{i}.{e}", mt(e)) for i, e, _ in images], title)
     with zipfile.ZipFile(dst, "w") as z:
         z.writestr("mimetype", "application/hwp+zip", compress_type=zipfile.ZIP_STORED)
         for n, d in (("version.xml", VERSION), ("Contents/header.xml", header), ("Contents/section0.xml", section),

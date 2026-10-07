@@ -13,3 +13,6 @@ samples/
 !tests/fixtures/*.hwpx
 out_check/
 scripts/hancom_check.py
+out_check_report/
+scripts/calibrate_widths.py
+scripts/make_demo.py
