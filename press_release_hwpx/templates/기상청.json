@@ -1,0 +1,260 @@
+{
+ "org": "기상청",
+ "page": {
+  "width": 59528,
+  "height": 84188,
+  "header": 2834,
+  "footer": 2834,
+  "gutter": 0,
+  "left": 5669,
+  "right": 5669,
+  "top": 4251,
+  "bottom": 4251
+ },
+ "cover": {
+  "width": 47697,
+  "height": 2994,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   13352,
+   19012,
+   15333
+  ],
+  "label_col": 1,
+  "label": "보도자료",
+  "label_char": {
+   "font": "함초롬바탕",
+   "pt": 14.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "logo_col": 0
+ },
+ "release": {
+  "width": 33547,
+  "height": 2797,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "cells": [
+   {
+    "role": "release_label",
+    "label": "보도시점",
+    "w": 4821,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "release",
+    "label": "",
+    "w": 12337,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "distribute_label",
+    "label": "배포",
+    "w": 4100,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "distribute",
+    "label": "",
+    "w": 12289,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   }
+  ]
+ },
+ "title": {
+  "width": 47816,
+  "height": 13050,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "rows": [
+   {
+    "role": "title",
+    "w": 47816,
+    "h": 6888,
+    "char": {
+     "font": "함초롬돋움",
+     "pt": 26.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": -5,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "SOLID",
+      "bottom": "NONE"
+     }
+    }
+   },
+   {
+    "role": "subtitle",
+    "w": 47816,
+    "h": 2348,
+    "char": {
+     "font": "함초롬바탕",
+     "pt": 14.0,
+     "bold": false,
+     "color": "#000000",
+     "spacing": -1,
+     "ratio": 100
+    },
+    "align": "LEFT",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "NONE",
+      "bottom": "SOLID"
+     }
+    }
+   }
+  ]
+ },
+ "contact": {
+  "width": 47980,
+  "height": 3358,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   6519,
+   15167,
+   6647,
+   5082,
+   5082,
+   9483
+  ],
+  "row_h": 1679,
+  "label_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "value_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "value_fill": null,
+  "line": "SOLID",
+  "line_width": "0.12 mm",
+  "labels": {
+   "dept": "담당 부서",
+   "head": "책임자",
+   "staff": "담당자"
+  }
+ },
+ "heading": {
+  "use": false,
+  "form": "1.",
+  "ratio": 0.06
+ }
+}

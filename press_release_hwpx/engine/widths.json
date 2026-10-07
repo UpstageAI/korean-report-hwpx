@@ -1,0 +1,72 @@
+{
+ "바탕": {
+  "hangul": 1.0,
+  "space": 0.5,
+  "digit": 0.6,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.3,
+  "punct": 0.5,
+  "wide": 1.0
+ },
+ "휴먼명조": {
+  "hangul": 1.0,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.35,
+  "punct": 0.4,
+  "wide": 1.0
+ },
+ "함초롬바탕": {
+  "hangul": 0.98,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.35,
+  "punct": 0.5,
+  "wide": 1.0
+ },
+ "바탕체": {
+  "hangul": 1.0,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.5,
+  "punct": 0.4,
+  "wide": 1.0
+ },
+ "맑은 고딕": {
+  "hangul": 0.98,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.5,
+  "punct": 0.4,
+  "wide": 1.0
+ },
+ "한컴바탕": {
+  "hangul": 1.0,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.35,
+  "punct": 0.6,
+  "wide": 1.0
+ },
+ "한양중고딕": {
+  "hangul": 0.98,
+  "space": 0.5,
+  "digit": 0.5,
+  "latin": 0.5,
+  "upper": 0.62,
+  "narrow": 0.3,
+  "punct": 0.6,
+  "wide": 1.0
+ }
+}

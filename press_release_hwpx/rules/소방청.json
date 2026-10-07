@@ -1,0 +1,50 @@
+{
+ "style": "box",
+ "body_share": 0.84,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 67,
+   "lead": 0,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 180,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "○",
+   "n": 114,
+   "lead": 1,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 200,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 34,
+   "lead": 2,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 180,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>l1": {
+   "pt": 15.0,
+   "n": 4,
+   "none": 12
+  },
+  "table>table": {
+   "pt": 3.0,
+   "n": 4,
+   "none": 0
+  }
+ },
+ "spacing_min": -2,
+ "n_paras": 224
+}

@@ -1,0 +1,48 @@
+{
+ "style": "para",
+ "body_share": 0.45,
+ "levels": {
+  "l2": {
+   "mark": "❍",
+   "n": 9,
+   "lead": 0,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 200,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 11,
+   "lead": 0,
+   "gap": 0,
+   "font": "HY헤드라인M",
+   "pt": 14.0,
+   "line": 140,
+   "align": "LEFT"
+  }
+ },
+ "gaps": {},
+ "spacing_min": -5,
+ "n_paras": 21,
+ "n_docs": 6,
+ "title_box": {
+  "n": 6,
+  "shape": "문단",
+  "bracket": "대괄호",
+  "fill": "#1C3D62",
+  "font": "맑은 고딕",
+  "pt": 16.0,
+  "bold": true
+ },
+ "table_head": {
+  "n_tables": 13,
+  "font": "맑은 고딕",
+  "pt": 11.0,
+  "bold": true,
+  "align": "CENTER",
+  "fill": "#ECF2FA",
+  "fill_share": 1.0
+ }
+}

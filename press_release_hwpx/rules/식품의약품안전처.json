@@ -1,0 +1,160 @@
+{
+ "style": "para",
+ "body_share": 0.16,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 21,
+   "lead": 0,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "ㅇ",
+   "n": 60,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 170,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 9,
+   "lead": 3,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 126,
+   "lead": 4,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 9,
+   "lead": 3,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 484,
+   "lead": 1,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>table": {
+   "pt": 3.0,
+   "n": 77,
+   "none": 0
+  },
+  "table>p": {
+   "pt": 7.0,
+   "n": 79,
+   "none": 2
+  },
+  "p>p": {
+   "pt": 7.0,
+   "n": 298,
+   "none": 16
+  },
+  "p>note": {
+   "pt": 3.0,
+   "n": 84,
+   "none": 10
+  },
+  "note>p": {
+   "pt": 7.0,
+   "n": 82,
+   "none": 5
+  },
+  "p>table": {
+   "pt": 7.0,
+   "n": 45,
+   "none": 0
+  },
+  "p>ref": {
+   "pt": 3.0,
+   "n": 5,
+   "none": 0
+  },
+  "ref>p": {
+   "pt": 7.0,
+   "n": 6,
+   "none": 0
+  },
+  "table>l1": {
+   "pt": 13.0,
+   "n": 21,
+   "none": 4
+  },
+  "table>image": {
+   "pt": 7.0,
+   "n": 6,
+   "none": 0
+  },
+  "note>note": {
+   "pt": 3.0,
+   "n": 7,
+   "none": 9
+  },
+  "table>note": {
+   "pt": 7.0,
+   "n": 6,
+   "none": 1
+  },
+  "note>table": {
+   "pt": 14.0,
+   "n": 3,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 11.0,
+   "n": 11,
+   "none": 7
+  },
+  "l2>l2": {
+   "pt": 7.0,
+   "n": 14,
+   "none": 12
+  },
+  "l2>l3": {
+   "pt": 10.0,
+   "n": 7,
+   "none": 0
+  },
+  "l3>l2": {
+   "pt": 14.0,
+   "n": 5,
+   "none": 1
+  },
+  "l2>l1": {
+   "pt": 13.0,
+   "n": 6,
+   "none": 0
+  }
+ },
+ "spacing_min": -5,
+ "n_paras": 731
+}

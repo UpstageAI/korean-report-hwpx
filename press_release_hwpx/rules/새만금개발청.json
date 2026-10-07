@@ -1,0 +1,145 @@
+{
+ "style": "box",
+ "body_share": 0.92,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 73,
+   "lead": 0,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "ㅇ",
+   "n": 63,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 13,
+   "lead": 2,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 153,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 14,
+   "lead": 3,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 13,
+   "lead": 1,
+   "gap": 0,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>table": {
+   "pt": 3.0,
+   "n": 13,
+   "none": 0
+  },
+  "table>l1": {
+   "pt": 15.0,
+   "n": 12,
+   "none": 0
+  },
+  "l1>l1": {
+   "pt": 15.0,
+   "n": 9,
+   "none": 1
+  },
+  "l1>p": {
+   "pt": 15.0,
+   "n": 5,
+   "none": 1
+  },
+  "p>p": {
+   "pt": 6.5,
+   "n": 4,
+   "none": 3
+  },
+  "p>l1": {
+   "pt": 15.0,
+   "n": 3,
+   "none": 1
+  },
+  "l1>table": {
+   "pt": 15.0,
+   "n": 3,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 12.0,
+   "n": 41,
+   "none": 0
+  },
+  "l2>l1": {
+   "pt": 15.0,
+   "n": 30,
+   "none": 5
+  },
+  "l1>note": {
+   "pt": 3.5,
+   "n": 4,
+   "none": 0
+  },
+  "note>l2": {
+   "pt": 12.0,
+   "n": 8,
+   "none": 0
+  },
+  "l2>l2": {
+   "pt": 7.0,
+   "n": 10,
+   "none": 1
+  },
+  "l2>note": {
+   "pt": 3.0,
+   "n": 6,
+   "none": 0
+  },
+  "l3>l3": {
+   "pt": 6.0,
+   "n": 5,
+   "none": 0
+  },
+  "l2>l3": {
+   "pt": 15.0,
+   "n": 3,
+   "none": 0
+  },
+  "note>l1": {
+   "pt": 15.0,
+   "n": 4,
+   "none": 1
+  },
+  "l2>table": {
+   "pt": 15.0,
+   "n": 3,
+   "none": 0
+  }
+ },
+ "spacing_min": -9,
+ "n_paras": 181
+}

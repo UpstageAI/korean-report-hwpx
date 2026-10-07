@@ -1,0 +1,185 @@
+{
+ "style": "para",
+ "body_share": 0.34,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 62,
+   "lead": 0,
+   "gap": 1,
+   "font": "궁서",
+   "pt": 18.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "ㅇ",
+   "n": 105,
+   "lead": 1,
+   "gap": 1,
+   "font": "궁서",
+   "pt": 18.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 17,
+   "lead": 3,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 100,
+   "lead": 4,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 130,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 4,
+   "lead": 1,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 355,
+   "lead": 2,
+   "gap": 0,
+   "font": "휴먼명조",
+   "pt": 14.0,
+   "line": 130,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>p": {
+   "pt": 10.0,
+   "n": 72,
+   "none": 2
+  },
+  "p>note": {
+   "pt": 10.0,
+   "n": 46,
+   "none": 0
+  },
+  "note>p": {
+   "pt": 10.0,
+   "n": 45,
+   "none": 2
+  },
+  "p>p": {
+   "pt": 10.0,
+   "n": 217,
+   "none": 14
+  },
+  "table>l1": {
+   "pt": 10.0,
+   "n": 25,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 10.0,
+   "n": 47,
+   "none": 0
+  },
+  "l2>note": {
+   "pt": 3.0,
+   "n": 26,
+   "none": 4
+  },
+  "note>l2": {
+   "pt": 5.5,
+   "n": 16,
+   "none": 0
+  },
+  "l2>l3": {
+   "pt": 5.0,
+   "n": 6,
+   "none": 0
+  },
+  "l3>l3": {
+   "pt": 6.0,
+   "n": 10,
+   "none": 0
+  },
+  "l3>l2": {
+   "pt": 7.0,
+   "n": 4,
+   "none": 0
+  },
+  "l2>l1": {
+   "pt": 12.0,
+   "n": 22,
+   "none": 0
+  },
+  "l1>table": {
+   "pt": 6.0,
+   "n": 6,
+   "none": 0
+  },
+  "p>table": {
+   "pt": 10.0,
+   "n": 19,
+   "none": 0
+  },
+  "table>table": {
+   "pt": 7.0,
+   "n": 25,
+   "none": 0
+  },
+  "p>l1": {
+   "pt": 12.0,
+   "n": 19,
+   "none": 0
+  },
+  "l1>p": {
+   "pt": 15.0,
+   "n": 9,
+   "none": 1
+  },
+  "l1>l1": {
+   "pt": 12.0,
+   "n": 8,
+   "none": 1
+  },
+  "l2>l2": {
+   "pt": 6.0,
+   "n": 33,
+   "none": 1
+  },
+  "note>l1": {
+   "pt": 12.0,
+   "n": 14,
+   "none": 0
+  },
+  "l2>p": {
+   "pt": 4.0,
+   "n": 3,
+   "none": 0
+  },
+  "l1>note": {
+   "pt": 3.0,
+   "n": 5,
+   "none": 0
+  },
+  "table>image": {
+   "pt": 10.0,
+   "n": 4,
+   "none": 0
+  }
+ },
+ "spacing_min": -10,
+ "n_paras": 652
+}

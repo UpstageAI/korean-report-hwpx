@@ -1,0 +1,174 @@
+{
+ "org": "소방청",
+ "page": {
+  "width": 59528,
+  "height": 84188,
+  "header": 2834,
+  "footer": 2834,
+  "gutter": 0,
+  "left": 5669,
+  "right": 5669,
+  "top": 4251,
+  "bottom": 4251
+ },
+ "cover": {
+  "width": 47697,
+  "height": 3694,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   13352,
+   19012,
+   15333
+  ],
+  "label_col": 1,
+  "label": "보도자료",
+  "label_char": {
+   "font": "함초롬바탕",
+   "pt": 14.0,
+   "bold": true,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "logo_col": 0
+ },
+ "title": {
+  "width": 47816,
+  "height": 16019,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "rows": [
+   {
+    "role": "title",
+    "w": 47816,
+    "h": 8109,
+    "char": {
+     "font": "함초롬돋움",
+     "pt": 24.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": -2,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "SOLID",
+      "bottom": "NONE"
+     }
+    }
+   },
+   {
+    "role": "subtitle",
+    "w": 47816,
+    "h": 7910,
+    "char": {
+     "font": "바탕",
+     "pt": 13.0,
+     "bold": false,
+     "color": "#000000",
+     "spacing": -2,
+     "ratio": 100
+    },
+    "align": "JUSTIFY",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "NONE",
+      "bottom": "SOLID"
+     }
+    }
+   }
+  ]
+ },
+ "contact": {
+  "width": 47980,
+  "height": 20790,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   7651,
+   14035,
+   6647,
+   5082,
+   5082,
+   9483
+  ],
+  "row_h": 17454,
+  "label_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "value_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "value_fill": null,
+  "line": "SOLID",
+  "line_width": "0.12 mm",
+  "labels": {
+   "dept": "담당 부서",
+   "head": "책임자",
+   "staff": "담당자"
+  }
+ },
+ "heading": {
+  "use": false,
+  "form": null,
+  "ratio": 0.0
+ }
+}

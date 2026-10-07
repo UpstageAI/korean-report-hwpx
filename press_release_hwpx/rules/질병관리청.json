@@ -1,0 +1,205 @@
+{
+ "style": "para",
+ "body_share": 0.15,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 14,
+   "lead": 0,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "○",
+   "n": 53,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 170,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 28,
+   "lead": 2,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 170,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 112,
+   "lead": 2,
+   "gap": 1,
+   "font": "한양중고딕",
+   "pt": 13.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 15,
+   "lead": 0,
+   "gap": 1,
+   "font": "한양중고딕",
+   "pt": 13.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 546,
+   "lead": 2,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>p": {
+   "pt": 8.0,
+   "n": 89,
+   "none": 11
+  },
+  "p>p": {
+   "pt": 7.0,
+   "n": 325,
+   "none": 41
+  },
+  "note>p": {
+   "pt": 7.0,
+   "n": 49,
+   "none": 8
+  },
+  "table>table": {
+   "pt": 9.0,
+   "n": 42,
+   "none": 0
+  },
+  "p>table": {
+   "pt": 7.0,
+   "n": 39,
+   "none": 0
+  },
+  "table>l1": {
+   "pt": 9.0,
+   "n": 26,
+   "none": 4
+  },
+  "l1>table": {
+   "pt": 5.0,
+   "n": 5,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 6.0,
+   "n": 23,
+   "none": 3
+  },
+  "l2>l1": {
+   "pt": 10.0,
+   "n": 6,
+   "none": 0
+  },
+  "l2>l2": {
+   "pt": 6.0,
+   "n": 11,
+   "none": 4
+  },
+  "l2>note": {
+   "pt": 3.0,
+   "n": 9,
+   "none": 4
+  },
+  "l2>l3": {
+   "pt": 4.0,
+   "n": 9,
+   "none": 1
+  },
+  "l3>l3": {
+   "pt": 4.0,
+   "n": 10,
+   "none": 1
+  },
+  "l3>p": {
+   "pt": 6.0,
+   "n": 3,
+   "none": 0
+  },
+  "table>l2": {
+   "pt": 6.0,
+   "n": 4,
+   "none": 0
+  },
+  "l2>table": {
+   "pt": 8.0,
+   "n": 3,
+   "none": 0
+  },
+  "p>image": {
+   "pt": 7.0,
+   "n": 4,
+   "none": 0
+  },
+  "image>p": {
+   "pt": 7.0,
+   "n": 6,
+   "none": 0
+  },
+  "note>table": {
+   "pt": 7.0,
+   "n": 6,
+   "none": 0
+  },
+  "l3>l2": {
+   "pt": 6.0,
+   "n": 3,
+   "none": 0
+  },
+  "ref>p": {
+   "pt": 7.0,
+   "n": 3,
+   "none": 1
+  },
+  "p>note": {
+   "pt": 3.0,
+   "n": 7,
+   "none": 65
+  },
+  "note>l1": {
+   "pt": 8.0,
+   "n": 3,
+   "none": 0
+  },
+  "note>l2": {
+   "pt": 5.5,
+   "n": 4,
+   "none": 1
+  },
+  "note>l3": {
+   "pt": 5.5,
+   "n": 4,
+   "none": 1
+  },
+  "table>image": {
+   "pt": 6.0,
+   "n": 4,
+   "none": 0
+  },
+  "ref>table": {
+   "pt": 5.0,
+   "n": 4,
+   "none": 0
+  }
+ },
+ "spacing_min": -10,
+ "n_paras": 808
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.UpstageAI/press-release-hwpx",
+  "title": "Korean Press Release HWPX",
+  "description": "Builds Korean government press releases as HWPX (Hangul) in each ministry's format",
+  "repository": {
+    "url": "https://github.com/UpstageAI/press-release-hwpx",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "press-release-hwpx",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {"name": "UPSTAGE_API_KEY", "description": "Upstage API key — only for make_press_release (manuscript structuring with Solar)", "isRequired": false, "isSecret": true},
+        {"name": "PRESS_RELEASE_SOLAR_BASE_URL", "description": "Internal (on-prem) Solar endpoint for air-gapped networks", "isRequired": false}
+      ]
+    }
+  ]
+}

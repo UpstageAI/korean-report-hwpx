@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/
+.env
+.pytest_cache/
+# 생성 결과·원본 자료는 올리지 않음
+out/
+samples/
+*.hwpx
+!tests/fixtures/*.hwpx

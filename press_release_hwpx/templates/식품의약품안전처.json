@@ -1,0 +1,260 @@
+{
+ "org": "식품의약품안전처",
+ "page": {
+  "width": 59528,
+  "height": 84188,
+  "header": 2834,
+  "footer": 2834,
+  "gutter": 0,
+  "left": 5669,
+  "right": 5669,
+  "top": 4251,
+  "bottom": 4251
+ },
+ "cover": {
+  "width": 47697,
+  "height": 4078,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   13352,
+   19012,
+   15333
+  ],
+  "label_col": 1,
+  "label": "보도자료",
+  "label_char": {
+   "font": "바탕",
+   "pt": 14.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "logo_col": 0
+ },
+ "release": {
+  "width": 40258,
+  "height": 1282,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "cells": [
+   {
+    "role": "release_label",
+    "label": "보도시점",
+    "w": 5228,
+    "h": 1282,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#FF0000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "RIGHT"
+   },
+   {
+    "role": "release",
+    "label": "",
+    "w": 17875,
+    "h": 1282,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#FF0000",
+     "spacing": -13,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "RIGHT"
+   },
+   {
+    "role": "distribute_label",
+    "label": "배포",
+    "w": 3107,
+    "h": 1282,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "RIGHT"
+   },
+   {
+    "role": "distribute",
+    "label": "",
+    "w": 14048,
+    "h": 1282,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": -8,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "RIGHT"
+   }
+  ]
+ },
+ "title": {
+  "width": 48004,
+  "height": 11607,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "rows": [
+   {
+    "role": "title",
+    "w": 48004,
+    "h": 5436,
+    "char": {
+     "font": "함초롬돋움",
+     "pt": 26.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": -6,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "SOLID",
+      "bottom": "NONE"
+     }
+    }
+   },
+   {
+    "role": "subtitle",
+    "w": 48004,
+    "h": 6171,
+    "char": {
+     "font": "한컴 윤고딕 230",
+     "pt": 14.0,
+     "bold": false,
+     "color": "#000000",
+     "spacing": -8,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "NONE",
+      "bottom": "SOLID"
+     }
+    }
+   }
+  ]
+ },
+ "contact": {
+  "width": 47697,
+  "height": 9600,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   6236,
+   15167,
+   6081,
+   5605,
+   5605,
+   9003
+  ],
+  "row_h": 9600,
+  "label_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "value_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "value_fill": null,
+  "line": "SOLID",
+  "line_width": "0.12 mm",
+  "labels": {
+   "dept": "담당 부서",
+   "head": "책임자",
+   "staff": "담당자"
+  }
+ },
+ "heading": {
+  "use": false,
+  "form": "1.",
+  "ratio": 0.2
+ }
+}

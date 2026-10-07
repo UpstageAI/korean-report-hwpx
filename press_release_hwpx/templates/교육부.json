@@ -1,0 +1,243 @@
+{
+ "org": "교육부",
+ "page": {
+  "width": 59528,
+  "height": 84188,
+  "header": 2834,
+  "footer": 2834,
+  "gutter": 0,
+  "left": 5669,
+  "right": 5669,
+  "top": 4251,
+  "bottom": 4252
+ },
+ "cover": {
+  "width": 47980,
+  "height": 3505,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   17314,
+   13069,
+   17597
+  ],
+  "label_col": 1,
+  "label": "보도자료",
+  "label_char": {
+   "font": "나눔스퀘어 Light",
+   "pt": 14.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "logo_col": 0
+ },
+ "release": {
+  "width": 42259,
+  "height": 2882,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "cells": [
+   {
+    "role": "distribute_label",
+    "label": "배포",
+    "w": 3817,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "distribute",
+    "label": "",
+    "w": 12229,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "blank",
+    "label": "",
+    "w": 1414,
+    "h": 2797,
+    "char": null,
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "release_label",
+    "label": "보도시점",
+    "w": 4821,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "release",
+    "label": "",
+    "w": 19978,
+    "h": 2797,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "LEFT"
+   }
+  ]
+ },
+ "title": {
+  "width": 36864,
+  "height": 12284,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "rows": [
+   {
+    "role": "title",
+    "w": 36864,
+    "h": 7524,
+    "char": {
+     "font": "신명 순명조",
+     "pt": 32.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "NONE",
+      "bottom": "SOLID"
+     }
+    }
+   }
+  ]
+ },
+ "contact": {
+  "width": 47980,
+  "height": 7848,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   6350,
+   13742,
+   6764,
+   6019,
+   4887,
+   10218
+  ],
+  "row_h": 3924,
+  "label_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "value_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "value_fill": null,
+  "line": "SOLID",
+  "line_width": "0.12 mm",
+  "labels": {
+   "dept": "담당 부서",
+   "head": "책임자",
+   "staff": "담당자"
+  }
+ },
+ "heading": {
+  "use": true,
+  "form": "1.",
+  "ratio": 0.41
+ }
+}

@@ -1,0 +1,50 @@
+{
+ "style": "para",
+ "body_share": 0.11,
+ "levels": {
+  "l2": {
+   "mark": "◦",
+   "n": 4,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 210,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 32,
+   "lead": 2,
+   "gap": 0,
+   "font": "한양신명조",
+   "pt": 14.0,
+   "line": 170,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>table": {
+   "pt": 3.0,
+   "n": 3,
+   "none": 0
+  },
+  "table>p": {
+   "pt": 13.5,
+   "n": 4,
+   "none": 0
+  },
+  "p>p": {
+   "pt": 14.0,
+   "n": 25,
+   "none": 6
+  },
+  "p>table": {
+   "pt": 10.0,
+   "n": 3,
+   "none": 0
+  }
+ },
+ "spacing_min": -5,
+ "n_paras": 46
+}

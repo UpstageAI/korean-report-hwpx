@@ -1,0 +1,170 @@
+{
+ "style": "para",
+ "body_share": 0.17,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 5,
+   "lead": 0,
+   "gap": 1,
+   "font": "HY헤드라인M",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "○",
+   "n": 34,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 18,
+   "lead": 2,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 80,
+   "lead": 2,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 18,
+   "lead": 2,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 275,
+   "lead": 2,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "p>note": {
+   "pt": 5.0,
+   "n": 42,
+   "none": 9
+  },
+  "note>p": {
+   "pt": 10.0,
+   "n": 37,
+   "none": 6
+  },
+  "p>p": {
+   "pt": 10.0,
+   "n": 132,
+   "none": 21
+  },
+  "p>table": {
+   "pt": 10.0,
+   "n": 23,
+   "none": 0
+  },
+  "table>p": {
+   "pt": 10.0,
+   "n": 30,
+   "none": 5
+  },
+  "note>table": {
+   "pt": 12.0,
+   "n": 7,
+   "none": 0
+  },
+  "p>ref": {
+   "pt": 4.0,
+   "n": 8,
+   "none": 3
+  },
+  "ref>p": {
+   "pt": 10.0,
+   "n": 11,
+   "none": 1
+  },
+  "table>table": {
+   "pt": 7.0,
+   "n": 28,
+   "none": 0
+  },
+  "table>l1": {
+   "pt": 7.5,
+   "n": 10,
+   "none": 1
+  },
+  "note>l1": {
+   "pt": 10.0,
+   "n": 3,
+   "none": 0
+  },
+  "note>note": {
+   "pt": 3.0,
+   "n": 10,
+   "none": 4
+  },
+  "l3>note": {
+   "pt": 3.0,
+   "n": 5,
+   "none": 1
+  },
+  "note>l3": {
+   "pt": 5.0,
+   "n": 4,
+   "none": 0
+  },
+  "l3>l3": {
+   "pt": 4.0,
+   "n": 5,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 5.0,
+   "n": 9,
+   "none": 2
+  },
+  "l2>l2": {
+   "pt": 5.0,
+   "n": 13,
+   "none": 0
+  },
+  "l2>l3": {
+   "pt": 4.0,
+   "n": 5,
+   "none": 1
+  },
+  "table>l2": {
+   "pt": 4.5,
+   "n": 4,
+   "none": 2
+  },
+  "l2>ref": {
+   "pt": 4.0,
+   "n": 3,
+   "none": 1
+  }
+ },
+ "spacing_min": -8,
+ "n_paras": 455
+}

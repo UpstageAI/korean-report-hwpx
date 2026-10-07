@@ -1,0 +1,154 @@
+{
+ "style": "box",
+ "body_share": 0.79,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 26,
+   "lead": 0,
+   "gap": 1,
+   "font": "HY헤드라인M",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "◦",
+   "n": 181,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 23,
+   "lead": 4,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 180,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 31,
+   "lead": 4,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 28,
+   "lead": 4,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 61,
+   "lead": 0,
+   "gap": 0,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 180,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "l2>l1": {
+   "pt": 9.0,
+   "n": 12,
+   "none": 3
+  },
+  "table>table": {
+   "pt": 11.0,
+   "n": 8,
+   "none": 0
+  },
+  "table>l1": {
+   "pt": 12.0,
+   "n": 25,
+   "none": 10
+  },
+  "l1>l2": {
+   "pt": 7.5,
+   "n": 10,
+   "none": 31
+  },
+  "l2>l2": {
+   "pt": 7.5,
+   "n": 12,
+   "none": 67
+  },
+  "l2>note": {
+   "pt": 4.0,
+   "n": 3,
+   "none": 16
+  },
+  "note>l2": {
+   "pt": 8.0,
+   "n": 3,
+   "none": 8
+  },
+  "l2>table": {
+   "pt": 3.0,
+   "n": 3,
+   "none": 0
+  },
+  "table>l2": {
+   "pt": 10.0,
+   "n": 9,
+   "none": 14
+  },
+  "l2>p": {
+   "pt": 10.0,
+   "n": 6,
+   "none": 4
+  },
+  "p>p": {
+   "pt": 12.0,
+   "n": 11,
+   "none": 14
+  },
+  "table>p": {
+   "pt": 8.5,
+   "n": 4,
+   "none": 10
+  },
+  "table>ref": {
+   "pt": 6.0,
+   "n": 4,
+   "none": 11
+  }
+ },
+ "spacing_min": -10,
+ "n_paras": 378,
+ "n_docs": 34,
+ "title_box": {
+  "n": 79,
+  "shape": "표1x3",
+  "bracket": "plain",
+  "fill": "#000080",
+  "font": "HY헤드라인M",
+  "pt": 16.0,
+  "bold": false
+ },
+ "table_head": {
+  "n_tables": 131,
+  "font": "맑은 고딕",
+  "pt": 12.0,
+  "bold": true,
+  "align": "CENTER",
+  "fill": "#DFE6F7",
+  "fill_share": 0.91
+ }
+}

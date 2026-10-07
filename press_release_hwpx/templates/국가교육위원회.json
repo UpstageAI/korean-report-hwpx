@@ -1,0 +1,243 @@
+{
+ "org": "국가교육위원회",
+ "page": {
+  "width": 59528,
+  "height": 84188,
+  "header": 2834,
+  "footer": 2834,
+  "gutter": 0,
+  "left": 5669,
+  "right": 5669,
+  "top": 4251,
+  "bottom": 4251
+ },
+ "cover": {
+  "width": 47697,
+  "height": 4692,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   13352,
+   19012,
+   15333
+  ],
+  "label_col": 1,
+  "label": "보도자료",
+  "label_char": {
+   "font": "함초롬바탕",
+   "pt": 20.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "logo_col": 0
+ },
+ "release": {
+  "width": 40905,
+  "height": 3500,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "cells": [
+   {
+    "role": "distribute_label",
+    "label": "배포",
+    "w": 3817,
+    "h": 3500,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "distribute",
+    "label": "",
+    "w": 12512,
+    "h": 3500,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "blank",
+    "label": "",
+    "w": 4022,
+    "h": 3500,
+    "char": null,
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "release_label",
+    "label": "보도시점",
+    "w": 4821,
+    "h": 3500,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "CENTER"
+   },
+   {
+    "role": "release",
+    "label": "",
+    "w": 15733,
+    "h": 1750,
+    "char": {
+     "font": "돋움체",
+     "pt": 10.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 4,
+     "ratio": 100
+    },
+    "fill": null,
+    "line": "NONE",
+    "align": "JUSTIFY"
+   }
+  ]
+ },
+ "title": {
+  "width": 47816,
+  "height": 5146,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "rows": [
+   {
+    "role": "title",
+    "w": 47816,
+    "h": 5146,
+    "char": {
+     "font": "함초롬돋움",
+     "pt": 26.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": -8,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000",
+     "sides": {
+      "left": "SOLID",
+      "right": "SOLID",
+      "top": "SOLID",
+      "bottom": "SOLID"
+     }
+    }
+   }
+  ]
+ },
+ "contact": {
+  "width": 47707,
+  "height": 14953,
+  "border": {
+   "fill": null,
+   "line": "SOLID",
+   "width": "0.12 mm",
+   "color": "#000000",
+   "sides": {
+    "left": "SOLID",
+    "right": "SOLID",
+    "top": "SOLID",
+    "bottom": "SOLID"
+   }
+  },
+  "widths": [
+   9349,
+   10922,
+   5798,
+   6171,
+   4473,
+   8720
+  ],
+  "row_h": 4280,
+  "label_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "label_fill": null,
+  "value_char": {
+   "font": "돋움체",
+   "pt": 10.0,
+   "bold": false,
+   "color": "#000000",
+   "spacing": 0,
+   "ratio": 100
+  },
+  "value_fill": null,
+  "line": "SOLID",
+  "line_width": "0.12 mm",
+  "labels": {
+   "dept": "담당 부서",
+   "head": "책임자",
+   "staff": "담당자"
+  }
+ },
+ "heading": {
+  "use": false,
+  "form": null,
+  "ratio": 0.0
+ }
+}

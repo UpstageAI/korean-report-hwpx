@@ -1,0 +1,109 @@
+{
+ "style": "box",
+ "body_share": 0.87,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 18,
+   "lead": 0,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "ㅇ",
+   "n": 54,
+   "lead": 1,
+   "gap": 0,
+   "font": "함초롬바탕",
+   "pt": 15.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 22,
+   "lead": 2,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 19,
+   "lead": 3,
+   "gap": 0,
+   "font": "맑은 고딕",
+   "pt": 13.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 14,
+   "lead": 0,
+   "gap": 0,
+   "font": "맑은 고딕",
+   "pt": 13.0,
+   "line": 175,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "table>table": {
+   "pt": 14.0,
+   "n": 3,
+   "none": 0
+  },
+  "l2>l2": {
+   "pt": 8.0,
+   "n": 5,
+   "none": 11
+  },
+  "table>l1": {
+   "pt": 13.0,
+   "n": 7,
+   "none": 6
+  },
+  "l2>l3": {
+   "pt": 8.0,
+   "n": 3,
+   "none": 3
+  },
+  "l1>p": {
+   "pt": 8.0,
+   "n": 4,
+   "none": 12
+  },
+  "l1>l2": {
+   "pt": 8.0,
+   "n": 4,
+   "none": 6
+  }
+ },
+ "spacing_min": -10,
+ "n_paras": 153,
+ "n_docs": 9,
+ "title_box": {
+  "n": 36,
+  "shape": "표1x3",
+  "bracket": "plain",
+  "fill": "#3E57A5",
+  "font": "HY헤드라인M",
+  "pt": 16.0,
+  "bold": false
+ },
+ "table_head": {
+  "n_tables": 33,
+  "font": "맑은 고딕",
+  "pt": 13.0,
+  "bold": true,
+  "align": "CENTER",
+  "fill": "#E7E7E7",
+  "fill_share": 0.78
+ }
+}

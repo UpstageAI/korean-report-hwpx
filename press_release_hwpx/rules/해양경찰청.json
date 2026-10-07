@@ -1,0 +1,75 @@
+{
+ "style": "box",
+ "body_share": 0.57,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 4,
+   "lead": 0,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "ㅇ",
+   "n": 12,
+   "lead": 1,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 4,
+   "lead": 3,
+   "gap": 1,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "p": {
+   "mark": "",
+   "n": 15,
+   "lead": 2,
+   "gap": 0,
+   "font": "바탕",
+   "pt": 14.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  }
+ },
+ "gaps": {
+  "p>p": {
+   "pt": 14.0,
+   "n": 7,
+   "none": 6
+  },
+  "l1>l2": {
+   "pt": 11.0,
+   "n": 4,
+   "none": 0
+  },
+  "l2>l3": {
+   "pt": 10.0,
+   "n": 4,
+   "none": 0
+  },
+  "l3>l2": {
+   "pt": 14.0,
+   "n": 3,
+   "none": 1
+  },
+  "l2>l2": {
+   "pt": 14.0,
+   "n": 4,
+   "none": 0
+  }
+ },
+ "spacing_min": -9,
+ "n_paras": 40
+}

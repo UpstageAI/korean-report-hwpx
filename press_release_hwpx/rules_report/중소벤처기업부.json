@@ -1,0 +1,154 @@
+{
+ "style": "box",
+ "body_share": 0.94,
+ "levels": {
+  "l1": {
+   "mark": "□",
+   "n": 21,
+   "lead": 0,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 155,
+   "align": "JUSTIFY"
+  },
+  "l2": {
+   "mark": "◦",
+   "n": 87,
+   "lead": 1,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "l3": {
+   "mark": "-",
+   "n": 5,
+   "lead": 3,
+   "gap": 1,
+   "font": "휴먼명조",
+   "pt": 15.0,
+   "line": 150,
+   "align": "JUSTIFY"
+  },
+  "note": {
+   "mark": "*",
+   "n": 25,
+   "lead": 5,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 160,
+   "align": "JUSTIFY"
+  },
+  "ref": {
+   "mark": "※",
+   "n": 3,
+   "lead": 0,
+   "gap": 1,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 155,
+   "align": "RIGHT"
+  },
+  "p": {
+   "mark": "",
+   "n": 7,
+   "lead": 0,
+   "gap": 0,
+   "font": "맑은 고딕",
+   "pt": 12.0,
+   "line": 153,
+   "align": "CENTER"
+  }
+ },
+ "gaps": {
+  "table>l1": {
+   "pt": 10.0,
+   "n": 25,
+   "none": 0
+  },
+  "l1>l2": {
+   "pt": 8.0,
+   "n": 33,
+   "none": 0
+  },
+  "l2>l2": {
+   "pt": 8.0,
+   "n": 35,
+   "none": 3
+  },
+  "l2>l1": {
+   "pt": 10.0,
+   "n": 24,
+   "none": 0
+  },
+  "l2>table": {
+   "pt": 3.0,
+   "n": 3,
+   "none": 0
+  },
+  "l1>note": {
+   "pt": 4.0,
+   "n": 4,
+   "none": 0
+  },
+  "note>l1": {
+   "pt": 10.0,
+   "n": 5,
+   "none": 0
+  },
+  "l1>table": {
+   "pt": 4.0,
+   "n": 6,
+   "none": 0
+  },
+  "table>table": {
+   "pt": 10.0,
+   "n": 7,
+   "none": 0
+  },
+  "l1>l1": {
+   "pt": 10.0,
+   "n": 6,
+   "none": 0
+  },
+  "note>l2": {
+   "pt": 8.0,
+   "n": 8,
+   "none": 0
+  },
+  "l2>note": {
+   "pt": 4.0,
+   "n": 12,
+   "none": 1
+  },
+  "p>l2": {
+   "pt": 8.0,
+   "n": 3,
+   "none": 0
+  }
+ },
+ "spacing_min": -8,
+ "n_paras": 156,
+ "n_docs": 23,
+ "title_box": {
+  "n": 34,
+  "shape": "표1x3",
+  "bracket": "plain",
+  "fill": "#3A3C84",
+  "font": "HY헤드라인M",
+  "pt": 16.0,
+  "bold": false
+ },
+ "table_head": {
+  "n_tables": 37,
+  "font": "맑은 고딕",
+  "pt": 11.0,
+  "bold": true,
+  "align": "CENTER",
+  "fill": "#DFE6F7",
+  "fill_share": 0.88
+ }
+}
