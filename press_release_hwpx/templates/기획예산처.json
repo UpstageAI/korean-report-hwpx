@@ -45,16 +45,30 @@
   "logo_col": 0
  },
  "title": {
-  "para": true,
-  "char": {
-   "font": "함초롬바탕",
-   "pt": 15.0,
-   "bold": true,
-   "color": "#000000",
-   "spacing": 0,
-   "ratio": 100
-  },
-  "align": "JUSTIFY"
+  "width": 47816,
+  "rows": [
+   {
+    "role": "title",
+    "w": 47816,
+    "h": 4500,
+    "char": {
+     "font": "함초롬바탕",
+     "pt": 20.0,
+     "bold": true,
+     "color": "#000000",
+     "spacing": 0,
+     "ratio": 100
+    },
+    "align": "CENTER",
+    "fill": null,
+    "border": {
+     "fill": null,
+     "line": "SOLID",
+     "width": "0.12 mm",
+     "color": "#000000"
+    }
+   }
+  ]
  },
  "contact": {
   "width": 47697,

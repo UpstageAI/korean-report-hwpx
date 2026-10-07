@@ -132,6 +132,7 @@ Claude Code: `claude mcp add press-release-hwpx -- uvx press-release-hwpx`
 
 - 결과물은 초안입니다. 배포 전 한글에서 확인하세요.
 - 글꼴은 사용하는 컴퓨터에 설치된 글꼴로 표시됩니다(휴먼명조·HY헤드라인M 등 미설치 시 대체 글꼴).
+- 기본 생성은 글자 폭 추정으로 줄 끝을 맞추며, 정확한 줄 끝 정리는 polish 옵션(맥+한글 필요)으로 합니다.
 
 ## 라이선스
 
