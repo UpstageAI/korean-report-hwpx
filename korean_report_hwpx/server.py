@@ -57,7 +57,7 @@ COMMON_RULES = """[공통 규칙]
 - 날짜는 '2026. 10. 7.(수)', 시각은 '14:00'."""
 
 REPORT_RULES = """[보고서(개조식) 규칙]
-- title: 보고서 제목 한 줄(예: '○○ 추진계획(안)', '○○ 현황 보고'). date: 원고에 작성일이 있으면 '2026. 10. 7.', 없으면 "". dept: 작성 부서, 없으면 "".
+- title: 보고서 제목 한 줄(예: '○○ 추진계획(안)', '○○ 현황 보고'). date: 원고에 작성일이 명시된 경우에만 '2026. 10. 7.' 형식으로 넣고, 없으면 ""(서버가 오늘 날짜로 채움). 날짜를 추정해 지어내지 않는다. dept: 작성 부서, 없으면 "".
 - body 블록 type:
   "h": 소제목('Ⅰ. 추진 배경', 'Ⅱ. 현황 및 문제점', 'Ⅲ. 추진 방안'처럼 로마 숫자. 짧은 원고면 생략)
   "l1": □ 대항목 — 두괄식 한 문장으로 핵심 결론을 먼저(두 문장 이상 금지)
@@ -238,8 +238,16 @@ def _check_ministry(ministry, doc_type):
         raise ValueError(f"지원하지 않는 기관: {ministry} (list_ministries 참고, 비우면 공통 서식)")
 
 
+def _today():
+    import datetime
+    d = datetime.date.today()
+    return f"{d.year}. {d.month}. {d.day}."
+
+
 def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placeholder_contact=True, polish=False):
     if doc_type == "report":
+        if not str(doc.get("date") or "").strip():
+            doc["date"] = _today()  # 작성일 미기재 시 오늘 날짜
         if polish:
             import polish as PL
             PL.polish(ministry, doc, dst, log=lambda m: None, build=RP.compose, logo_path=logo_path or None)

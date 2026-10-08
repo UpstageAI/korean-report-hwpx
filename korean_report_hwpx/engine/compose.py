@@ -350,6 +350,10 @@ class Composer:
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
 
+    def gap_fixed(self, pt):
+        L_ = self.level("p" if self.R.get("style") == "para" else "l1")
+        return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
+
     def caption(self, text):
         return self.p(self.para_pr("CENTER", 160, keep=True), [(self.char("맑은 고딕", 13.0, -2, True), f"< {text.strip('<> ')} >")])
 
@@ -424,7 +428,10 @@ class Composer:
             t = b["type"]; lv = self.LVMAP.get(t, "p")
             self._after_table = prev in ("table",) and lv in ("note", "ref")
             if prev is not None:
-                g = None if lv == "caption" or prev == "caption" or self._after_table else self.gap(prev, lv)
+                if lv == "caption":  # 표 제목 앞은 윗글과 한 줄 띄움
+                    g = None if prev == "caption" else self.gap_fixed(10.0)
+                else:
+                    g = None if prev == "caption" or self._after_table else self.gap(prev, lv)
                 if g: out.append(g)
             if t in ("l1", "l2", "l3", "note", "ref", "p", "plain"): out.append(self.item(self.LVMAP[t], b["text"]))
             elif t == "h": out.append(self.heading(b["text"]))
