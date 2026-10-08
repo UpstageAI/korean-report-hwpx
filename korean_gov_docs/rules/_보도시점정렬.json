@@ -1,0 +1,466 @@
+{
+ "_설명": "보도시점·배포 칸 정렬 실측. layout: split=이름표·값 별도 칸, inline=한 칸 '보도시점 : 값', stacked=한 칸 두 문단. 값은 비율(공통) 또는 최빈값(기관).",
+ "common": {
+  "n_docs": 21713,
+  "layout": {
+   "split": 0.957,
+   "inline": 0.043,
+   "stacked": 0.0
+  },
+  "보도_label": {
+   "CENTER": 0.978,
+   "RIGHT": 0.018,
+   "LEFT": 0.003,
+   "JUSTIFY": 0.001
+  },
+  "보도_value": {
+   "CENTER": 0.867,
+   "LEFT": 0.066,
+   "JUSTIFY": 0.062,
+   "RIGHT": 0.005
+  },
+  "배포_label": {
+   "CENTER": 0.991,
+   "RIGHT": 0.007,
+   "LEFT": 0.001,
+   "JUSTIFY": 0.001
+  },
+  "배포_value": {
+   "CENTER": 0.941,
+   "LEFT": 0.053,
+   "RIGHT": 0.004,
+   "JUSTIFY": 0.002
+  },
+  "inline": {
+   "RIGHT": 0.791,
+   "CENTER": 0.196,
+   "JUSTIFY": 0.012,
+   "LEFT": 0.001
+  }
+ },
+ "orgs": {
+  "개인정보보호위원회": {
+   "n": 253,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "경찰청": {
+   "n": 310,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "고용노동부": {
+   "n": 1182,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "공정거래위원회": {
+   "n": 381,
+   "layout": "split",
+   "보도_label": "RIGHT",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "과학기술정보통신부": {
+   "n": 1351,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "관세청": {
+   "n": 451,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "교육부": {
+   "n": 406,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "JUSTIFY",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국가교육위원회": {
+   "n": 12,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국가데이터처": {
+   "n": 205,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국가보훈부": {
+   "n": 209,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국가유산청": {
+   "n": 610,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "LEFT",
+   "배포_label": "CENTER",
+   "배포_value": "LEFT"
+  },
+  "국무조정실": {
+   "n": 664,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국민권익위원회": {
+   "n": 29,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국방부": {
+   "n": 310,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국세청": {
+   "n": 153,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "국토교통부": {
+   "n": 904,
+   "layout": "inline",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "금융위원회": {
+   "n": 228,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "기상청": {
+   "n": 160,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "기획예산처": {
+   "n": 24,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "기획재정부": {
+   "n": 55,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "기후에너지환경부": {
+   "n": 915,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "농림축산식품부": {
+   "n": 1207,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "농촌진흥청": {
+   "n": 1133,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "문화체육관광부": {
+   "n": 585,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "방송미디어통신위원회": {
+   "n": 228,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "방위사업청": {
+   "n": 175,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "법무부": {
+   "n": 431,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "법제처": {
+   "n": 159,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "병무청": {
+   "n": 63,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "보건복지부": {
+   "n": 1081,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "산림청": {
+   "n": 1248,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "산업통상부": {
+   "n": 242,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "새만금개발청": {
+   "n": 126,
+   "layout": "inline",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER",
+   "배포_inline": "CENTER"
+  },
+  "성평등가족부": {
+   "n": 108,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "식품의약품안전처": {
+   "n": 899,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "외교부": {
+   "n": 969,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "우주항공청": {
+   "n": 201,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "원자력안전위원회": {
+   "n": 83,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "인구전략위원회": {
+   "n": 5,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "인사혁신처": {
+   "n": 187,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER"
+  },
+  "재외동포청": {
+   "n": 19,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "재정경제부": {
+   "n": 110,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "저출산고령사회위원회": {
+   "n": 16,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "조달청": {
+   "n": 444,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "중소벤처기업부": {
+   "n": 581,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "LEFT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "지식재산처": {
+   "n": 358,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "질병관리청": {
+   "n": 334,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "통일부": {
+   "n": 29,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "해양경찰청": {
+   "n": 13,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "해양수산부": {
+   "n": 658,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "보도_inline": "RIGHT",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "행정안전부": {
+   "n": 1117,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "JUSTIFY",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  },
+  "행정중심복합도시건설청": {
+   "n": 78,
+   "layout": "split",
+   "보도_label": "CENTER",
+   "보도_value": "CENTER",
+   "배포_label": "CENTER",
+   "배포_value": "CENTER"
+  }
+ }
+}

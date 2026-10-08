@@ -75,7 +75,7 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "RIGHT"
+    "align": "CENTER"
    },
    {
     "role": "release",
@@ -92,7 +92,7 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "RIGHT"
+    "align": "CENTER"
    },
    {
     "role": "distribute_label",
@@ -109,7 +109,7 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "RIGHT"
+    "align": "CENTER"
    },
    {
     "role": "distribute",
@@ -126,9 +126,10 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "RIGHT"
+    "align": "CENTER"
    }
-  ]
+  ],
+  "align_source": "실측 108건 최빈값"
  },
  "title": {
   "width": 48004,
