@@ -11,6 +11,6 @@ if [ -z "$T" ]; then
     *) echo "키체인에 토큰이 없고 클립보드도 pypi- 토큰이 아닙니다 — PyPI에서 새 토큰을 만들고 Copy token 후 다시 실행"; exit 1;;
   esac
 fi
-PY=.venv/bin/python; [ -x "$PY" ] || PY=../korean-tax-calc-mcp/.venv/bin/python
+PY=.venv/bin/python; "$PY" -c "import twine,truststore" 2>/dev/null || PY=../korean-tax-calc-mcp/.venv/bin/python
 V=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
 TWINE_USERNAME=__token__ TWINE_PASSWORD="$T" "$PY" -c "import truststore,sys;truststore.inject_into_ssl();from twine.__main__ import main;sys.argv=['twine','upload','--non-interactive','--skip-existing','dist/korean_report_hwpx-$V-py3-none-any.whl','dist/korean_report_hwpx-$V.tar.gz'];sys.exit(main())" >/dev/null && echo "업로드완료 $V"
