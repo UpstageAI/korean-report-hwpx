@@ -14,7 +14,7 @@
 
 **Try asking**
 
-- "Turn this memo into a Ministry of the Interior and Safety (행안부) report"
+- "Turn this memo into a report for <agency name>"
 - "These are meeting notes — format them as an official document" (no agency given → common format)
 - "Make this a National Tax Service (국세청) press release — embargo 2026. 10. 8.(Thu) morning papers"
 - "Rebuild the report from before with a new □ sentence in section Ⅲ"
@@ -30,7 +30,7 @@
 | **Press release (보도자료)** | Cover (logo slot), embargo/distribution, title and subtitles, body (paragraph / □ outline), contact table, appendix pages | Required — 52 agencies | `rules/`, `templates/` (2,670 releases) |
 | Draft approval document (기안문) | — | — | Planned for the next version |
 
-**Flow** — ask your AI "turn this memo into a 행안부 report" → it reads `get_writing_guide` → writes the structure JSON → calls `build_document` → if `warnings` come back, it fixes the structure and builds again.
+**Flow** — ask your AI "turn this memo into a <agency name> report" → it reads `get_writing_guide` → writes the structure JSON → calls `build_document` → if `warnings` come back, it fixes the structure and builds again.
 
 Type choice (in the guide): public announcement or distribution → press release; internal reporting, plans or reviews → report.
 
@@ -132,10 +132,6 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 - Measurement: 2,670 Korea.kr press releases from 52 agencies (1,326 with a report section), from which per-agency marks, fonts, blank lines and cover-table values were derived.
 - Rule documents: `korean_report_hwpx/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
 - Source releases are published on Korea.kr under KOGL (공공누리). This repository contains no source files, text or images — only format numbers.
-
-## Relation to kordoc
-
-For document parsing, government standard forms, draft documents (기안문) and form filling, we recommend [kordoc](https://github.com/chrisryugj/kordoc) (chrisryugj/kordoc, MIT). This tool is an independent implementation in Python that focuses on reproducing each ministry's actual press release and report formats (marks, fonts, blank lines, cover tables) from measured rules. Used together, you can read documents with kordoc and write ministry-format documents with this tool. The two projects share or borrow no code.
 
 ## Notes
 
