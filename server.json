@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.UpstageAI/korean-gov-docs",
+  "name": "io.github.UpstageAI/korean-report-hwpx",
   "title": "Korean Government Documents (HWPX)",
   "description": "Turns a draft into a Korean government report or press release as HWPX in each ministry's format",
   "repository": {
-    "url": "https://github.com/UpstageAI/korean-gov-docs",
+    "url": "https://github.com/UpstageAI/korean-report-hwpx",
     "source": "github"
   },
   "version": "0.1.0",
   "packages": [
     {
       "registryType": "pypi",
-      "identifier": "korean-gov-docs",
+      "identifier": "korean-report-hwpx",
       "version": "0.1.0",
       "transport": {
         "type": "stdio"

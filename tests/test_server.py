@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from korean_gov_docs import server as SV  # noqa: E402
+from korean_report_hwpx import server as SV  # noqa: E402
 from sample_release import SAMPLE  # noqa: E402
 from sample_report import SAMPLE_REPORT  # noqa: E402
 

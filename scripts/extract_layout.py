@@ -9,7 +9,7 @@
 import json, re, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "korean_gov_docs" / "engine"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "korean_report_hwpx" / "engine"))
 from hwpx_doc import Hwpx, first_tbl, cells_of, rows_of, tcs_of, paras_of  # noqa: E402
 
 RELEASE_LABEL = re.compile(r"^[/\s]*(보도\s*(시점|일시)|배\s*포(\s*(일시|시점))?)\s*[:：]?\s*$")

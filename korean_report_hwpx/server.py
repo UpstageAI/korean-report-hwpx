@@ -1,4 +1,4 @@
-"""korean-gov-docs — 한국 공문서(보고서·보도자료) 기관 서식 HWPX 생성 MCP 서버. 작성 Mia(윤승미)
+"""korean-report-hwpx — 한국 공문서(보고서·보도자료) 기관 서식 HWPX 생성 MCP 서버. 작성 Mia(윤승미)
 
 외부 API 없이 로컬에서 동작한다. 원고 정리·구조화는 사용자 쪽 AI(Claude·ChatGPT 등)가 하고,
 이 서버는 작성 규칙(get_writing_guide)을 알려 주고, 구조를 점검(check_structure)한 뒤 기관 서식 HWPX로 그린다(build_document).
@@ -30,7 +30,7 @@ DOC_TYPES = ("report", "press_release")
 LABEL = {"report": "보고서", "press_release": "보도자료"}
 
 mcp = MCPServer(
-    "korean-gov-docs", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료)",
+    "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료)",
     instructions="사용자가 '공문서처럼 써 줘', '보고서로 만들어 줘', '보도자료로 만들어 줘'처럼 한국 공무원 문서 양식의 HWPX(한글 파일)를 원할 때 쓴다. "
                  "외부 API 없이 로컬에서 동작한다. 순서: get_writing_guide로 작성 규칙과 구조 스키마 확인 → 원고를 구조 JSON으로 정리 "
                  "→ (선택) check_structure → build_document. 결과의 warnings가 있으면 구조를 고쳐 다시 build_document. "
@@ -38,7 +38,7 @@ mcp = MCPServer(
 
 
 def out_dir():
-    d = Path(os.environ.get("KOREAN_GOV_DOCS_OUT_DIR") or Path.home() / "korean-gov-docs")
+    d = Path(os.environ.get("KOREAN_REPORT_HWPX_OUT_DIR") or os.environ.get("KOREAN_GOV_DOCS_OUT_DIR") or Path.home() / "korean-report-hwpx")
     d.mkdir(parents=True, exist_ok=True); return d
 
 
@@ -310,7 +310,7 @@ def build_from_structure(structure: dict, doc_type: str = "report", ministry: st
 
 def main():
     import argparse
-    p = argparse.ArgumentParser(prog="korean-gov-docs", description="한국 공문서(보고서·보도자료) 기관 서식 HWPX 생성 MCP 서버")
+    p = argparse.ArgumentParser(prog="korean-report-hwpx", description="한국 공문서(보고서·보도자료) 기관 서식 HWPX 생성 MCP 서버")
     p.add_argument("--http", action="store_true"); p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8002)))
     a = p.parse_args()

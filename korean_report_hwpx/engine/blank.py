@@ -92,7 +92,7 @@ def content_hpf(images, title="보도자료"):
 
 
 VERSION = (XML + '<hv:HCFVersion xmlns:hv="http://www.hancom.co.kr/hwpml/2011/version" tagetApplication="WORDPROCESSOR" major="5" minor="1" micro="0" '
-           'buildNumber="1" os="1" xmlVersion="1.31" application="korean-gov-docs" appVersion="0.1.0"/>')
+           'buildNumber="1" os="1" xmlVersion="1.31" application="korean-report-hwpx" appVersion="0.1.0"/>')
 CONTAINER = (XML + '<ocf:container xmlns:ocf="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:hpf="http://www.hancom.co.kr/schema/2011/hpf">'
              '<ocf:rootfiles><ocf:rootfile full-path="Contents/content.hpf" media-type="application/hwpml-package+xml"/>'
              '<ocf:rootfile full-path="Preview/PrvText.txt" media-type="text/plain"/></ocf:rootfiles></ocf:container>')

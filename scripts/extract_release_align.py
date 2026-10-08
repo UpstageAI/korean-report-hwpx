@@ -12,7 +12,7 @@ import json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "korean_gov_docs" / "engine"))
+sys.path.insert(0, str(ROOT / "korean_report_hwpx" / "engine"))
 from hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
 
 LABEL = re.compile(r"^[/\s]*(보도\s*(시점|일시)|배\s*포(\s*(일시|시점))?)\s*[:：]?\s*$")
@@ -81,14 +81,14 @@ def main(src, write):
                    **{f"{k}_{r}": pick(r, k)[0] for k in ("보도", "배포") for r in ("label", "value", "inline") if pick(r, k)[0]}}
     out = {"_설명": "보도시점·배포 칸 정렬 실측. layout: split=이름표·값 별도 칸, inline=한 칸 '보도시점 : 값', stacked=한 칸 두 문단. 값은 비율(공통) 또는 최빈값(기관).",
            "common": common, "orgs": orgs}
-    (ROOT / "korean_gov_docs/rules/_보도시점정렬.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), "utf-8")
+    (ROOT / "korean_report_hwpx/rules/_보도시점정렬.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), "utf-8")
     print(json.dumps(common, ensure_ascii=False))
     for o, s in orgs.items(): print(o, s)
     if write:
         ROLE = {"release_label": ("보도", "label"), "release": ("보도", "value"), "distribute_label": ("배포", "label"),
                 "distribute": ("배포", "value"), "release_inline": ("보도", "inline")}
         top = lambda k: max(common[k], key=common[k].get) if common[k] else "CENTER"
-        for f in sorted((ROOT / "korean_gov_docs/templates").glob("*.json")):
+        for f in sorted((ROOT / "korean_report_hwpx/templates").glob("*.json")):
             t = json.loads(f.read_text("utf-8")); r = t.get("release")
             if not r: continue
             s = orgs.get(t["org"], {}); ch = 0

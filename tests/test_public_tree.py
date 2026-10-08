@@ -3,7 +3,7 @@ import json, re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PKG = ROOT / "korean_gov_docs"
+PKG = ROOT / "korean_report_hwpx"
 SKIP = {".git", ".venv", "out_check", "out_check_report", "dist", "build", "__pycache__", ".pytest_cache"}
 TEMPLATE_KEYS = {"org", "page", "cover", "release", "title", "contact", "heading"}
 

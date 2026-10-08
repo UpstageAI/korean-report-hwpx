@@ -1,10 +1,10 @@
-# korean-gov-docs — Korean Government Documents MCP (reports and press releases as HWPX)
+# korean-report-hwpx — Korean Government Documents MCP (reports and press releases as HWPX)
 
-<!-- mcp-name: io.github.UpstageAI/korean-gov-docs -->
+<!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![Demo: memo → agency-format report and press release](https://raw.githubusercontent.com/UpstageAI/korean-gov-docs/main/docs/demo.gif)
+![Demo: memo → agency-format report and press release](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
-[![PyPI](https://img.shields.io/pypi/v/korean-gov-docs)](https://pypi.org/project/korean-gov-docs/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-gov-docs) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
+[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
 
 **Korean civil-service documents (reports and press releases) as HWPX, in each agency's format.** Your own AI (Claude, ChatGPT, …) structures the memo or draft, and the server draws a Hangul (HWPX) file from format rules for 52 central government agencies.
 
@@ -20,7 +20,7 @@
 - "Rebuild the report from before with a new □ sentence in section Ⅲ"
 - "Show the report format rules for 산림청 (marks, fonts, sizes per level)"
 
-**One-line install** — `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
+**One-line install** — `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 ## Document types
 
@@ -41,18 +41,18 @@ With [uv](https://docs.astral.sh/uv/) it runs without a separate install.
 ```json
 {
   "mcpServers": {
-    "korean-gov-docs": {
+    "korean-report-hwpx": {
       "command": "uvx",
-      "args": ["korean-gov-docs"]
+      "args": ["korean-report-hwpx"]
     }
   }
 }
 ```
 
-Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
+Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 - No API key or environment variables required.
-- Files are written to `~/korean-gov-docs/` (override with `KOREAN_GOV_DOCS_OUT_DIR`).
+- Files are written to `~/korean-report-hwpx/` (override with `KOREAN_REPORT_HWPX_OUT_DIR`; the old `KOREAN_GOV_DOCS_OUT_DIR` is also read).
 
 ## Tools
 
@@ -124,13 +124,18 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 - Everything is local. This server calls no external API and sends neither drafts nor output files anywhere.
 - Structuring the draft is done by the AI you use; check that service's own data policy.
 
-## Where the rules come from
+## Basis
 
 - Full parse of **2,670 press release HWPX files (52 central agencies)** from Korea.kr (정책브리핑). Press release body formatting measured on 2,016 releases: 35,465 paragraphs, 35,434 blank lines, 32,392 table cells.
 - Report formatting comes from the **1,326** releases that contain a report-style attachment section (13,757 paragraphs), per agency (42 agencies with 3+ documents). The common skeleton (□ - * ※ marks, one space after the mark, one-row title box, table header in 맑은 고딕 centered bold) agrees across 90%+ of agencies.
-- Official standard: Enforcement Rule of the Regulation on Administrative Business Operation (item numbering).
-- Rule documents: `korean_gov_docs/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
+- Official standards: item numbering in the Enforcement Rule of the Regulation on Administrative Business Operation and Innovation (1. → 가. → 1) → 가) …), and Gyeonggi Provincial Office of Education's guide 「한 곳에 정리한 공문서 작성법」 (wrapped lines align to the item's first character, one space after the mark, sub-items indented by two spaces, etc.).
+- Measurement: 2,670 Korea.kr press releases from 52 agencies (1,326 with a report section), from which per-agency marks, fonts, blank lines and cover-table values were derived.
+- Rule documents: `korean_report_hwpx/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
 - Source releases are published on Korea.kr under KOGL (공공누리). This repository contains no source files, text or images — only format numbers.
+
+## Relation to kordoc
+
+For document parsing, government standard forms, draft documents (기안문) and form filling, we recommend [kordoc](https://github.com/chrisryugj/kordoc) (chrisryugj/kordoc, MIT). This tool is an independent implementation in Python that focuses on reproducing each ministry's actual press release and report formats (marks, fonts, blank lines, cover tables) from measured rules. Used together, you can read documents with kordoc and write ministry-format documents with this tool. The two projects share or borrow no code.
 
 ## Notes
 
