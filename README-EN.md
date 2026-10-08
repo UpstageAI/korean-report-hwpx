@@ -6,7 +6,9 @@
 
 [![PyPI](https://img.shields.io/pypi/v/korean-gov-docs)](https://pypi.org/project/korean-gov-docs/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-gov-docs) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
 
-**Korean civil-service documents (reports and press releases) as HWPX, in each agency's format.** Give it a memo or draft; Solar decides the document type and structures it, and the server draws a Hangul (HWPX) file from format rules for 52 central government agencies.
+**Korean civil-service documents (reports and press releases) as HWPX, in each agency's format.** Your own AI (Claude, ChatGPT, …) structures the memo or draft, and the server draws a Hangul (HWPX) file from format rules for 52 central government agencies.
+
+**Nothing leaves your machine · no API key** — everything runs locally; the draft is never sent anywhere by this server.
 
 > One request — "write this up like an official document" (공문서처럼 써 줘) — produces an outline-style report (□ → ㅇ → -) or a press release in the agency's format. Rules were measured from 2,670 published press releases; no source documents or logos are bundled.
 
@@ -28,7 +30,9 @@
 | **Press release (보도자료)** | Cover (logo slot), embargo/distribution, title and subtitles, body (paragraph / □ outline), contact table, appendix pages | Required — 52 agencies | `rules/`, `templates/` (2,670 releases) |
 | Draft approval document (기안문) | — | — | Planned for the next version |
 
-With `doc_type="auto"` (default), `write_document` lets Solar decide: public announcement or distribution → press release; internal reporting, plans or reviews → report. The reason is returned with the result.
+**Flow** — ask your AI "turn this memo into a 행안부 report" → it reads `get_writing_guide` → writes the structure JSON → calls `build_document` → if `warnings` come back, it fixes the structure and builds again.
+
+Type choice (in the guide): public announcement or distribution → press release; internal reporting, plans or reviews → report.
 
 ## Install
 
@@ -39,8 +43,7 @@ With [uv](https://docs.astral.sh/uv/) it runs without a separate install.
   "mcpServers": {
     "korean-gov-docs": {
       "command": "uvx",
-      "args": ["korean-gov-docs"],
-      "env": { "UPSTAGE_API_KEY": "only for write_document" }
+      "args": ["korean-gov-docs"]
     }
   }
 }
@@ -48,20 +51,18 @@ With [uv](https://docs.astral.sh/uv/) it runs without a separate install.
 
 Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
 
-- Upstage API key: [console.upstage.ai](https://console.upstage.ai) (default model `solar-pro4`, change with `KOREAN_GOV_DOCS_MODEL`)
+- No API key or environment variables required.
 - Files are written to `~/korean-gov-docs/` (override with `KOREAN_GOV_DOCS_OUT_DIR`).
 
 ## Tools
 
-| Tool | What it does | Sends data out |
-|---|---|---|
-| `write_document` | Draft (text or .hwpx/.hwp/.pdf/.docx/.txt/.md) → Solar picks the type and structures it → agency-format HWPX. `doc_type`: auto / report / press_release; `ministry` optional | Draft is sent to the Solar API |
-| `build_from_structure` | Structure JSON → agency-format HWPX (no Solar) | No |
-| `list_ministries` | Supported agencies and support per document type | No |
-| `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header) | No |
-| `make_press_release` | (Backward compatible) same as `write_document(doc_type="press_release")` | Draft is sent to the Solar API |
-
-Solar's report rules: □ states the conclusion first in one sentence, ㅇ gives grounds and details, - lists sub-items, sentences end in noun form (~함, ~임, ~ 예정), and no facts or numbers are invented.
+| Tool | What it does |
+|---|---|
+| `get_writing_guide` | Type-choice criteria, writing rules (□ one-sentence conclusion first, ㅇ grounds, - details, noun-form endings, no invented facts or numbers, no marks inside text, appendix structure), structure JSON schema and examples. Also exposed as MCP prompt `writing_guide` |
+| `check_structure` | Pre-build check: required fields, marks inside text, skipped levels, multi-sentence □, non-noun-form endings, long titles |
+| `build_document` | Structure JSON → agency-format HWPX; normalizes input (strips marks, dashes, leading spaces) and returns `warnings` to fix. `build_from_structure` is an alias |
+| `list_ministries` | Supported agencies and support per document type |
+| `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header) |
 
 Report structure JSON:
 
@@ -120,9 +121,8 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 
 ## Data transmission
 
-- `build_from_structure` sends nothing out; the file is built on your machine.
-- `write_document` sends the draft to the Upstage API (`api.upstage.ai`). Do not include personal or other sensitive data.
-- On air-gapped networks use on-prem Solar: `KOREAN_GOV_DOCS_SOLAR_BASE_URL` (internal OpenAI-compatible `/v1` endpoint), `KOREAN_GOV_DOCS_SOLAR_KEY`, `KOREAN_GOV_DOCS_MODEL`; `KOREAN_GOV_DOCS_SOLAR_VERIFY=0` for internal certificates.
+- Everything is local. This server calls no external API and sends neither drafts nor output files anywhere.
+- Structuring the draft is done by the AI you use; check that service's own data policy.
 
 ## Where the rules come from
 
