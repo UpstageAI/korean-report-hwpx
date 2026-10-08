@@ -28,6 +28,9 @@ UNIT = r"(?:\d|원|명|건|%|개|억|만|천|곳|대|종|배|년|월|일|시간|
 NUM_UNIT = re.compile(r"(\d[\d,.]*[천만억조]*)[ \t]+(?=" + UNIT + ")")
 
 
+HEAD_LABEL = re.compile(r"[(\[〔][^()\[\]〔〕\s][^()\[\]〔〕]{1,5}[)\]〕] ?")   # 문단 앞머리 라벨 2~6자: (목적) [대상] 〔일정〕
+
+
 def normalize(text, lv=None):
     """원고 텍스트 정리: 대시류 → '-', 계층 문단 앞에 붙은 기호·공백 제거, 숫자와 단위 사이 빈칸 → 묶음 빈칸(줄 끝에서 안 떨어짐)."""
     text = DASHES.sub("-", text or "").strip()
@@ -207,11 +210,17 @@ class Composer:
         ov = self.override.get(pno)
         ov = list(ov) if isinstance(ov, (tuple, list)) else ([ov, 100] if ov is not None else None)
         tail = ("\u3000" + "가" * -(-3386 // int(L_["pt"] * 100))) if ref_tag else ""   # 참고 표시 자리(빈칸+상자 폭)
-        sp, ra, word = (ov + [True])[:3] if ov else (self.pick_spacing(prefix + plain + tail, L_, hang), 100, True)
-        if word == "auto": sp = self.pick_spacing_word(prefix + plain, L_, hang); word = True
-        self.items[pno] = {"lv": lv, "text": prefix + plain, "sp": (sp, ra, word)}
+        m_lab = HEAD_LABEL.match(text)   # 문단 앞머리 라벨 '(목적)' 등: 기호처럼 자간 0·장평 100 고정
+        label = m_lab.group(0) if m_lab else ""
+        if label: text = text[len(label):]; plain = plain[len(label):]
+        fixed = prefix + label
+        if ov: sp, ra, word = (ov + [True])[:3]
+        else: (sp, ra), word = self.pick_spacing(plain + tail, L_, hang, fixed), True
+        if word == "auto": sp = self.pick_spacing_word(prefix + label + plain, L_, hang); ra = 100; word = True
+        self.items[pno] = {"lv": lv, "text": prefix + label + plain, "sp": (sp, ra, word)}
         n = self.char(L_["font"], L_["pt"], sp, ratio=ra); b = self.char(L_["font"], L_["pt"], sp, True, ratio=ra)
         segs = [(self.char(L_["font"], L_["pt"], 0), prefix)] if prefix else []   # 접두(공백·기호)는 자간 0: 같은 계층 기호 위치를 문단 자간과 무관하게 맞춤
+        if label: segs.append((self.char(L_["font"], L_["pt"], 0), label))   # 앞머리 라벨도 자간 0·장평 100: 같은 글자 수 라벨은 폭이 같음
         sup = self.char(L_["font"], L_["pt"], sp, ratio=ra, sup=True)
         for k, part in enumerate(re.split(r"\*\*(.+?)\*\*", text)):
             if not part: continue
@@ -223,23 +232,30 @@ class Composer:
             para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n0}"><hp:t><hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="{n0}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
         return para_xml
 
-    def pick_spacing(self, txt, L_, hang):
+    RATIOS = (100, 98, 96, 95)   # 장평 후보(공무원 관행: 한 줄 맞춤에 장평도 씀)
+
+    def pick_spacing(self, txt, L_, hang, fixed=""):
+        """문단 자간·장평 고르기 → (자간, 장평). fixed(기호·라벨 접두)는 자간 0·장평 100 고정 폭으로 첫 줄에서 뺀다.
+        ① 줄 수 최소(1~3자 넘치는 문단은 한 줄로) ② 마지막 줄 1~2자·30% 미만 방지 ③ 추정 오차(±2.5%)에도 안정
+        ④ 장평 100 우선, 그다음 자간 0에 가까운 값. 장평 하한: 규칙 ratio_min 또는 95%."""
         w = WIDTHS.get(L_["font"]) or WIDTHS.get("바탕")
-        first, rest = self.text_w, self.text_w - hang
+        fw = F.width(fixed, L_["pt"], 0, 100, w) if fixed else 0
+        first, rest = self.text_w - fw, self.text_w - hang
         lo = self.R.get("spacing_min", -8)
+        rmin = max(95, int(self.R.get("ratio_min", 95)))
         best = None
-        def short(ls, sp):
+        def short(ls, sp, ra):
             last = ls[-1].strip()
-            fill = F.width(last, L_["pt"], sp, 100, w) / (rest if len(ls) > 1 else first)
+            fill = F.width(last, L_["pt"], sp, ra, w) / (rest if len(ls) > 1 else first)
             return len(ls) > 1 and (fill < 0.3 or len(last.replace(" ", "")) <= 2)
-        for sp in range(0, max(lo - 3, -10) - 1, -1):   # 규칙 하한에서 안 되면 3%p까지 더 조임
-            ls = F.wrap(txt, L_["pt"], sp, first, rest, 100, w, True)  # 어절 단위 줄 나눔
-            # 글자 폭 추정 오차(±2.5%, calibrate_widths 실측 기준)에서도 줄 수가 같고 마지막 줄이 짧지 않은지
-            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, True) for k in (0.975, 1.025)]
-            risky = sum(len(a) != len(ls) or short(a, sp) for a in alt)
-            mid = sum(1 for a, c in zip(ls, ls[1:]) if a and c and not a.endswith(" ") and a[-1].isalnum() and c[0].isalnum())
-            key = (len(ls) + (risky > 0) * 1.5, short(ls, sp), risky, sp < lo, mid, -sp)
-            if best is None or key < best[0]: best = (key, sp)
+        for ra in [r for r in self.RATIOS if r >= rmin]:
+            for sp in range(0, max(lo - 3, -10) - 1, -1):   # 규칙 하한에서 안 되면 3%p까지 더 조임
+                ls = F.wrap(txt, L_["pt"], sp, first, rest, ra, w, True)  # 어절 단위 줄 나눔
+                alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, ra, w, True) for k in (0.975, 1.025)]
+                risky = sum(len(a) != len(ls) or short(a, sp, ra) for a in alt)
+                mid = sum(1 for a, c in zip(ls, ls[1:]) if a and c and not a.endswith(" ") and a[-1].isalnum() and c[0].isalnum())
+                key = (len(ls) + (risky > 0) * 1.5, short(ls, sp, ra), risky, sp < lo, mid, 100 - ra, -sp)
+                if best is None or key < best[0]: best = (key, (sp, ra))
         return best[1]
 
     def pick_spacing_word(self, txt, L_, hang):
