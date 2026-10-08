@@ -142,7 +142,7 @@ class ReportComposer(C.Composer):
         out.append(self.title_box(doc))
         bl = self.byline(doc)
         out += [self.spacer(4.0), bl] if bl else []
-        out.append(self.spacer(12.0))
+        out.append(self.title_gap())
         sec = B.sec_pr(self.L.get("page", {}))
         out[0] = re.sub(r"(<hp:p\b[^>]*>)", lambda m: m.group(1) + f'<hp:run charPrIDRef="0">{sec}</hp:run>', out[0], count=1)
         self.blocks(doc.get("body", []), out)
@@ -150,7 +150,7 @@ class ReportComposer(C.Composer):
             self.blocks([{"type": "appx_h", "text": a.get("title") or f"붙임 {k}", "heading": a.get("heading", "")}] + a.get("body", []), out)
         out = [o for o in out if o]
         section = B.section_xml(out)
-        prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
+        prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x.replace("<hp:nbSpace/>", " ")) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
         import html
         B.save(dst, self.header, section, self.images, html.unescape(prv)[:1000], "보고서")
         return dst

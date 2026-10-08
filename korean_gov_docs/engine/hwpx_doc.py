@@ -38,7 +38,7 @@ class Hwpx:
     @staticmethod
     def text(p, tables=False):
         body = p if tables else re.sub(r"<hp:tbl\b.*?</hp:tbl>", "", p, flags=re.S)
-        return "".join(html.unescape(re.sub(r"<[^>]+>", "", m.group(1) or "")) for m in T_RE.finditer(body))
+        return "".join(html.unescape(re.sub(r"<[^>]+>", "", (m.group(1) or "").replace("<hp:nbSpace/>", " "))) for m in T_RE.finditer(body))
 
     # ── 모양 ──
     def char(self, cid):

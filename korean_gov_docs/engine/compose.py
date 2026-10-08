@@ -21,7 +21,18 @@ WIDTHS = json.loads((Path(__file__).parent / "widths.json").read_text("utf-8"))
 MARK_W = {"□": 1.0, "■": 1.0, "ㅇ": 1.0, "○": 1.0, "◦": 1.0, "❍": 1.0, "※": 1.0, "-": 0.5, "*": 0.5, "": 0}
 LANGS = ("hangul", "latin", "hanja", "japanese", "other", "symbol", "user")
 HU_MM = 283.465
-esc = lambda s: html.escape(s, quote=False)
+esc = lambda s: html.escape(s, quote=False).replace("\u00a0", "<hp:nbSpace/>")   # 묶음 빈칸
+DASHES = re.compile("[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]")
+LEAD_MARK = re.compile(r"^[\s\u00a0\u3000\-·•∙ㅇ○◦❍□■▪◇◆]+")
+UNIT = r"(?:\d|원|명|건|%|개|억|만|천|곳|대|종|배|년|월|일|시간|회|가구|세대|kg|km|㎡|㎞)"
+NUM_UNIT = re.compile(r"(\d[\d,.]*[천만억조]*)[ \t]+(?=" + UNIT + ")")
+
+
+def normalize(text, lv=None):
+    """원고 텍스트 정리: 대시류 → '-', 계층 문단 앞에 붙은 기호·공백 제거, 숫자와 단위 사이 빈칸 → 묶음 빈칸(줄 끝에서 안 떨어짐)."""
+    text = DASHES.sub("-", text or "").strip()
+    if lv in ("l1", "l2", "l3"): text = LEAD_MARK.sub("", text)
+    return NUM_UNIT.sub(lambda m: m.group(1) + "\u00a0", text)
 PLACEHOLDER_CONTACT = {"dept": "○○과", "people": [["책임자", "과장", "이○○", "(044-000-0000)"], ["담당자", "사무관", "김○○", "(044-000-0000)"]]}
 DEFAULT_CHAR = {"font": "돋움", "pt": 10.0, "bold": True, "color": "#000000", "spacing": 0, "ratio": 100}
 
@@ -138,7 +149,7 @@ class Composer:
         if sup: el = el.replace("</hh:charPr>", "<hh:supscript/></hh:charPr>")
         self.cache[key] = self._add("charProperties", "charPr", el); return self.cache[key]
 
-    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=False, keep=False):
+    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False):
         key = ("p", align, line, indent, left, prev, nxt, word, keep)
         if key in self.cache: return self.cache[key]
         el = re.search(r'<hh:paraPr id="%s".*?</hh:paraPr>' % self.base_para, self.header, re.S).group(0)
@@ -155,7 +166,7 @@ class Composer:
         else: el = mg(el, 1)
         el = re.sub(r'<hh:border borderFillIDRef="\d+"', '<hh:border borderFillIDRef="1"', el)
         el = re.sub(r'keepWithNext="\d"', 'keepWithNext="%d"' % keep, el)  # 소제목·표 제목은 다음 문단과 같은 쪽에
-        # 줄 나눔: 한글 글자 단위(HWPX 값 KEEP_WORD, 공무원 문서 다수) — 단어 중간 끊김은 자간 조정 루프(polish)로 없앰
+        # 줄 나눔: 한글 어절 단위(HWPX 값 BREAK_WORD = 한글 '어절', KEEP_WORD = '글자' — 한글 기본 문서가 KEEP_WORD·글자)
         el = re.sub(r'breakNonLatinWord="\w+"', 'breakNonLatinWord="%s"' % ("BREAK_WORD" if word else "KEEP_WORD"), el)
         el = re.sub(r'widowOrphan="\d"', 'widowOrphan="1"', el)
         self.cache[key] = self._add("paraProperties", "paraPr", el); return self.cache[key]
@@ -183,7 +194,7 @@ class Composer:
         else:
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
             hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
-        text = PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), text)
+        text = normalize(PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), text), lv)
         m_ref = re.search(r"(?<=[.다\)함임됨음정요])\s*(참고|붙임)\s?(\d+)\s*$", text)   # 보고서 명사형 종결(~함·~임) 뒤도
         ref_tag = None
         if m_ref: ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"; text = text[:m_ref.start()]  # 문장 끝 참고 표시
@@ -192,17 +203,17 @@ class Composer:
         ov = self.override.get(pno)
         ov = list(ov) if isinstance(ov, (tuple, list)) else ([ov, 100] if ov is not None else None)
         tail = ("\u3000" + "가" * -(-3386 // int(L_["pt"] * 100))) if ref_tag else ""   # 참고 표시 자리(빈칸+상자 폭)
-        sp, ra, word = (ov + [False])[:3] if ov else (self.pick_spacing(prefix + plain + tail, L_, hang), 100, False)
+        sp, ra, word = (ov + [True])[:3] if ov else (self.pick_spacing(prefix + plain + tail, L_, hang), 100, True)
         if word == "auto": sp = self.pick_spacing_word(prefix + plain, L_, hang); word = True
         self.items[pno] = {"lv": lv, "text": prefix + plain, "sp": (sp, ra, word)}
         n = self.char(L_["font"], L_["pt"], sp, ratio=ra); b = self.char(L_["font"], L_["pt"], sp, True, ratio=ra)
-        segs = [(n, prefix)] if prefix else []
+        segs = [(self.char(L_["font"], L_["pt"], 0), prefix)] if prefix else []   # 접두(공백·기호)는 자간 0: 같은 계층 기호 위치를 문단 자간과 무관하게 맞춤
         sup = self.char(L_["font"], L_["pt"], sp, ratio=ra, sup=True)
         for k, part in enumerate(re.split(r"\*\*(.+?)\*\*", text)):
             if not part: continue
             for j, bit in enumerate(re.split(r"(?<=\S)(\*{1,3})(?=[\s),.]|$)", part)):  # 문장 속 각주 표시 → 위첨자
                 if bit: segs.append((sup if j % 2 else (b if k % 2 else n), bit))
-        para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=bool(word), prev=300 if lv in ("note", "ref") and getattr(self, "_after_table", False) else 0), segs, pno)
+        para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=word is not False, prev=300 if lv in ("note", "ref") and getattr(self, "_after_table", False) else 0), segs, pno)
         if ref_tag:  # 앞 글자와 빈칸 1칸(묶음 빈칸: 줄 끝에서 앞 어절과 떨어지지 않음), 자간 0으로 겹침 방지
             n0 = self.char(L_["font"], L_["pt"], 0, ratio=100)
             para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n0}"><hp:t><hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="{n0}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
@@ -218,9 +229,9 @@ class Composer:
             fill = F.width(last, L_["pt"], sp, 100, w) / (rest if len(ls) > 1 else first)
             return len(ls) > 1 and (fill < 0.3 or len(last.replace(" ", "")) <= 2)
         for sp in range(0, max(lo - 3, -10) - 1, -1):   # 규칙 하한에서 안 되면 3%p까지 더 조임
-            ls = F.wrap(txt, L_["pt"], sp, first, rest, 100, w, False)  # 글자 단위 줄 나눔
+            ls = F.wrap(txt, L_["pt"], sp, first, rest, 100, w, True)  # 어절 단위 줄 나눔
             # 글자 폭 추정 오차(±2.5%, calibrate_widths 실측 기준)에서도 줄 수가 같고 마지막 줄이 짧지 않은지
-            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, False) for k in (0.975, 1.025)]
+            alt = [F.wrap(txt, L_["pt"], sp, first * k, rest * k, 100, w, True) for k in (0.975, 1.025)]
             risky = sum(len(a) != len(ls) or short(a, sp) for a in alt)
             mid = sum(1 for a, c in zip(ls, ls[1:]) if a and c and not a.endswith(" ") and a[-1].isalnum() and c[0].isalnum())
             key = (len(ls) + (risky > 0) * 1.5, short(ls, sp), risky, sp < lo, mid, -sp)
@@ -418,6 +429,11 @@ class Composer:
         tot = sum(ws); lim = self.text_w - 200
         return [int(w * lim / tot) for w in ws] if tot > lim else [int(w) for w in ws]
 
+    def title_gap(self):
+        """제목 → 첫 문단 빈 줄: 본문 첫 계층(□) 크기 한 줄(최소 12pt, 줄 간격 160%) — 6~12pt 빈 줄은 제목에 붙어 보임."""
+        L_ = self.level("p" if self.R.get("style") == "para" else "l1")
+        return self.p(self.para_pr("JUSTIFY", 160), [(self.char("바탕", max(12.0, float(L_["pt"]))), "")])
+
     def spacer(self, pt=6.0):
         return self.p(self.para_pr("JUSTIFY", 100), [(self.char("바탕", pt), "")])
 
@@ -584,7 +600,7 @@ class Composer:
 
     # ── 조립 ──
     def build(self, doc, dst):
-        out = [self.cover(doc), self.spacer(), self.release(doc), self.spacer(8.0)] + self.title(doc) + [self.spacer(10.0)]
+        out = [self.cover(doc), self.spacer(), self.release(doc), self.spacer(8.0)] + self.title(doc) + [self.title_gap()]
         sec = B.sec_pr(self.L.get("page", {}))
         out[0] = re.sub(r"(<hp:p\b[^>]*>)", lambda m: m.group(1) + f'<hp:run charPrIDRef="0">{sec}</hp:run>', out[0], count=1)
         body = doc.get("body", [])
@@ -601,7 +617,7 @@ class Composer:
             self.blocks([{"type": "appx_h", "text": a.get("title") or f"참고 {k}", "heading": a.get("heading", "")}] + a.get("body", []), out)
         out = [o for o in out if o]
         section = B.section_xml(out)
-        prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
+        prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x.replace("<hp:nbSpace/>", " ")) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
         B.save(dst, self.header, section, self.images, html.unescape(prv)[:1000])
         return dst
 
