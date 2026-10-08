@@ -136,9 +136,10 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "JUSTIFY"
+    "align": "CENTER"
    }
-  ]
+  ],
+  "align_source": "실측 12건 최빈값"
  },
  "title": {
   "width": 47816,

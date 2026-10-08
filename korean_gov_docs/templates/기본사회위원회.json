@@ -92,9 +92,10 @@
     },
     "fill": null,
     "line": "NONE",
-    "align": "JUSTIFY"
+    "align": "CENTER"
    }
-  ]
+  ],
+  "align_source": "공통 최빈값(기관 표본 5건 미만)"
  },
  "title": {
   "width": 47816,

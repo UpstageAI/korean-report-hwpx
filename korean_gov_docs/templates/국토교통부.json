@@ -77,7 +77,8 @@
     "line": "NONE",
     "align": "RIGHT"
    }
-  ]
+  ],
+  "align_source": "실측 904건 최빈값"
  },
  "title": {
   "width": 47816,

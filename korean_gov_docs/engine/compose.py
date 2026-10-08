@@ -3,6 +3,7 @@
 - 기관 서식 수치: templates/<기관>.json (쪽 여백, 표지·보도시점·제목·담당 표의 칸 폭·글꼴·크기·색)
 - 본문 규칙값: rules/<기관>.json (계층별 기호·기호 앞 공백·글꼴·크기·줄 간격, 계층 사이 빈 줄) — refs/보도자료_서식_규칙.md
 - 내어쓰기 = (기호 앞 공백×0.5 + 기호 폭 + 기호 뒤 공백×0.5) × 글자 크기  (항목 둘째 줄을 내용 첫 글자에 맞춤)
+  앞머리 라벨 '(방식) ' 문단은 + 라벨 폭(뒤 공백 포함): 둘째 줄을 라벨 뒤 첫 글자에 맞춤
 - 빈 줄 = 앞뒤 계층 쌍별 실측 크기(기관값→전체값), 붙여 쓰는 쌍은 빈 줄 없음
 - 자간 = 문단별로 0~하한 사이에서 짧은 마지막 줄·어절 중간 끊김을 피하도록 선택
 - 표 = 머리행 굵게·음영·가운데, 숫자 오른쪽, 짧은 글 가운데, 긴 글 양쪽
@@ -213,6 +214,8 @@ class Composer:
         m_lab = HEAD_LABEL.match(text)   # 문단 앞머리 라벨 '(목적)' 등: 기호처럼 자간 0·장평 100 고정
         label = m_lab.group(0) if m_lab else ""
         if label: text = text[len(label):]; plain = plain[len(label):]
+        if label and lv != "p":   # 라벨 문단: 둘째 줄을 라벨 뒤 첫 글자에 맞춤(한글 Shift+Tab을 라벨 뒤에서 누른 것과 같음)
+            hang += self.label_w(label, L_)
         fixed = prefix + label
         if ov: sp, ra, word = (ov + [True])[:3]
         else: (sp, ra), word = self.pick_spacing(plain + tail, L_, hang, fixed), True
@@ -231,6 +234,10 @@ class Composer:
             n0 = self.char(L_["font"], L_["pt"], 0, ratio=100)
             para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n0}"><hp:t><hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="{n0}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
         return para_xml
+
+    def label_w(self, label, L_):
+        """앞머리 라벨(뒤 공백 포함) 폭(HWPUNIT). 라벨은 자간 0·장평 100 고정이라 글자 수로 정확히 정해짐."""
+        return int(round(F.width(label, L_["pt"], 0, 100, WIDTHS.get(L_["font"]) or WIDTHS.get("바탕"))))
 
     RATIOS = (100, 98, 96, 95)   # 장평 후보(공무원 관행: 한 줄 맞춤에 장평도 씀)
 
