@@ -1,4 +1,4 @@
-"""앞머리 라벨 문단 내어쓰기: 둘째 줄을 라벨 뒤 첫 글자에 맞춤(한글 Shift+Tab). 라벨 없는 문단은 기호 뒤 첫 글자(기존 규칙)."""
+"""내어쓰기: 둘째 줄은 항상 기호 뒤 첫 글자(괄호면 괄호)에 맞춤. 앞머리 라벨 문단도 라벨 없는 같은 계층 문단과 같음."""
 import json, re
 
 import pytest
@@ -21,12 +21,10 @@ def base_hang(L_):
 @pytest.mark.parametrize("mk", [lambda: C.Composer("행정안전부"), lambda: R.ReportComposer("")])
 @pytest.mark.parametrize("lv", ["l1", "l2"])
 @pytest.mark.parametrize("label", ["(방식) ", "〔일정〕 ", "[대상자] "])
-def test_label_hang_is_label_end(mk, lv, label):
+def test_label_hang_equals_plain(mk, lv, label):
     c = mk(); L_ = c.level(lv)
-    xml = c.item(lv, label + "누리집·모바일 앱·무인민원발급기 등 여러 경로로 신청할 수 있도록 접수 창구를 넓히고 처리 결과를 문자로 알림")
-    w = F.width(label, L_["pt"], 0, 100, C.WIDTHS.get(L_["font"]) or C.WIDTHS.get("바탕"))
-    assert intent(c, xml) == base_hang(L_) + int(round(w))
-    assert intent(c, xml) > base_hang(L_)
+    body = "누리집·모바일 앱·무인민원발급기 등 여러 경로로 신청할 수 있도록 접수 창구를 넓히고 처리 결과를 문자로 알림"
+    assert intent(c, c.item(lv, label + body)) == intent(c, c.item(lv, body)) == base_hang(L_)
 
 
 @pytest.mark.parametrize("mk", [lambda: C.Composer("행정안전부"), lambda: R.ReportComposer("")])
