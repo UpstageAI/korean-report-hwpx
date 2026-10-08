@@ -88,6 +88,8 @@ class Composer:
         d = {"l1": ("□", 0, 1), "l2": ("ㅇ", 1, 1), "l3": ("-", 3, 1), "note": ("*", 2, 1), "ref": ("※", 1, 1), "p": ("", 2, 0)}[lv]
         out = {"mark": L_.get("mark") if L_.get("mark") is not None else d[0], "lead": L_.get("lead", d[1]), "gap": L_.get("gap", d[2]),
                "font": L_.get("font") or "바탕", "pt": L_.get("pt") or 14.0, "line": L_.get("line") or 160}
+        base_lv = self.R["_base"]["levels"].get(lv) or {}
+        if (L_.get("n") or 0) < 5 and base_lv.get("pt"): out["pt"] = base_lv["pt"]   # 표본이 적은 계층의 크기는 공통값
         if lv in ("l2", "l3"):  # 하위 항목은 상위 항목보다 오른쪽(공식: 2타씩) — 기관값이 이를 어기면 보정
             prev = self.level("l1" if lv == "l2" else "l2")
             min_lead = prev["lead"] + (1 if lv == "l2" else 2)
@@ -96,8 +98,10 @@ class Composer:
         if lv in ("l1", "l2", "l3", "p"):  # 본문 계층은 같은 본문 글꼴 계열로 (기관 실측의 이상값 방지)
             body = self.R["levels"].get("p" if self.R.get("style") == "para" else "l1") or {}
             if out["font"] in ("HY헤드라인M", "HY울릉도M", "궁서", "맑은 고딕", "돋움") and body.get("font") not in (None, out["font"]):
-                out["font"], out["pt"] = body["font"], body.get("pt", out["pt"])
+                out["font"] = body["font"]   # 서체만 본문 계열로, 크기는 그 계층 실측값 유지(□가 ㅇ보다 작아지는 역전 방지)
             if out["font"] in ("궁서", "HY헤드라인M", "HY울릉도M", "HY견명조"): out["font"] = "바탕"  # 본문은 일반 서체
+        if lv in ("l2", "l3"):  # 하위 계층 글자는 상위보다 크지 않게(□ ≥ ㅇ ≥ -)
+            out["pt"] = min(out["pt"], self.level("l1" if lv == "l2" else "l2")["pt"])
         return out
 
     def box_gap_pt(self, b):
@@ -249,20 +253,63 @@ class Composer:
             if best is None or key < best[0]: best = (key, sp)
         return best[1]
 
+    def appx_rule(self):
+        """참고·붙임 쪽 머리 규칙: rules_report/_참고머리.json(원본 보도자료 참고 구간 첫 표 실측) 공통값 + 기관값."""
+        d = json.loads((ROOT / "rules_report/_참고머리.json").read_text("utf-8"))
+        r = json.loads(json.dumps(d["common"])); o = d["orgs"].get((self.org or "").strip()) or {}
+        for k in ("cols", "ratio"):
+            if k in o: r[k] = o[k]
+        for part in ("label", "heading"): r[part].update(o.get(part) or {})
+        return r
+
+    def border_sides(self, sides, width="0.4 mm", color="#000000", fill=None):
+        """지정한 변에만 선이 있는 테두리. sides: 변 이름 묶음 또는 {변: 'mm 값' | ('mm 값', 색)}."""
+        ws = dict(sides) if isinstance(sides, dict) else {s: width for s in sides}
+        key = ("bs", tuple(sorted(ws.items())), color, fill)
+        if key in self.cache: return self.cache[key]
+        f = f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else ""
+        wc = lambda s: ws[s] if isinstance(ws[s], tuple) else (ws[s], color)   # 변별 (굵기, 색)
+        side = lambda s: (f'<hh:{s}Border type="SOLID" width="{wc(s)[0]}" color="{wc(s)[1]}"/>' if s in ws
+                          else f'<hh:{s}Border type="NONE" width="0.1 mm" color="#000000"/>')
+        el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/>'
+              '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>' + "".join(side(s) for s in ("left", "right", "top", "bottom")) +
+              '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>' + f + "</hh:borderFill>")
+        self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
+
+    HEAD_LINES = {"box": ("left", "right", "top", "bottom"), "topbottom": ("top", "bottom"), "bottom": ("bottom",), "none": ()}
+
+    @classmethod
+    def head_lines(cls, v):
+        """제목 칸 선 규칙값 → 변 목록(box·topbottom·bottom·none 또는 'bottom+left' 같은 변 조합)."""
+        v = v or "box"
+        return cls.HEAD_LINES.get(v) or tuple(s for s in v.split("+") if s in ("left", "right", "top", "bottom"))
+
     def appx_head(self, label, heading=""):
-        """참고·붙임 쪽 머리: 새 쪽에서 「참고 1」 작은 음영 칸 + 제목(굵게)."""
-        bf = self.border("#DFE6F7"); cp = self.char("맑은 고딕", 12.0, 0, True)
-        L_ = self.level("l1" if self.R.get("style") == "box" else "p"); hp = self.char(L_["font"], L_["pt"] + 2, -3, True)
-        w1, h = 5200, 1800
-        cell = lambda w, bfid, para: (f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bfid}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{para}</hp:subList>')
-        tw = self.text_w - 200
-        c1 = cell(w1, bf, self.p(self.para_pr("CENTER", 100), [(cp, label)])) + f'<hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{w1}" height="{h}"/><hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>'
-        c2 = cell(tw - w1, self.border(None, "NONE"), self.p(self.para_pr("LEFT", 100), [(hp, heading)])) + f'<hp:cellAddr colAddr="1" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{tw - w1}" height="{h}"/><hp:cellMargin left="566" right="141" top="141" bottom="141"/></hp:tc>'
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="0" rowCnt="1" colCnt="2" cellSpacing="0" borderFillIDRef="{self.border(None, "NONE")}" noAdjust="0">'
-               f'<hp:sz width="{tw}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
-               f'<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="141" right="141" top="141" bottom="141"/><hp:tr>{c1}{c2}</hp:tr></hp:tbl>')
-        return (f'<hp:p id="0" paraPrIDRef="{self.para_pr("LEFT", 100, keep=True)}" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="{cp}">{tbl}<hp:t/></hp:run></hp:p>'
-                + self.p(self.para_pr("JUSTIFY", 160), [(self.char(L_["font"], 10.0), "")]))
+        """참고·붙임 쪽 머리(원본 실측 형태): 1행 3칸 표 = 라벨 칸(기관 색 바탕·흰 글자) | 좁은 간격 칸(위아래 선 없음) | 제목 칸.
+        제목 칸 선은 기관 실측(공통: 네 변 가는 선, 과기정통부 등: 위아래만, 관세청 등: 아래만). 간격 칸이 라벨과 제목을 떼어 놓는다."""
+        A = self.appx_rule(); lb, hd = A["label"], A["heading"]
+        tw = self.text_w - 200; ratio = A["ratio"] if A.get("cols", 3) == 3 else [A["ratio"][0], 0.016, 1 - A["ratio"][0] - 0.016]
+        mm = lambda v: f"{float(v):g} mm"
+        fill = lb.get("fill"); lpt = float(lb.get("pt") or 16.0); lfont = lb.get("font") or "HY헤드라인M"
+        wd = WIDTHS.get(lfont) or WIDTHS["바탕"]
+        w1 = max(int(tw * ratio[0]), int(F.width(label, lpt, 0, 100, wd) * 1.15 + 600))   # 라벨이 한 줄에 들어가게
+        w2 = max(400, int(tw * ratio[1])); w3 = tw - w1 - w2
+        h = int(max(lpt, float(hd.get("pt") or 16.0)) * 100 * 1.25 + 800)
+        lab_cp = self.char(lfont, lpt, 0, bool(lb.get("bold")), (lb.get("color") or "#FFFFFF") if fill else "#000000")
+        head_spec, _ = self.fit_title(heading, {"font": hd.get("font") or "HY헤드라인M", "pt": float(hd.get("pt") or 16.0), "bold": bool(hd.get("bold"))}, w3 - 900)
+        head_cp = self.ch(head_spec)
+        lw = mm(lb.get("line") or 0.12) if lb.get("line") else None
+        bf1 = self.border_sides({s: lw for s in ("left", "right", "top", "bottom")}, color=fill or "#000000", fill=fill) if lw else self.border(fill, "NONE")
+        hs = self.head_lines(hd.get("lines")); hw = mm(hd.get("line") or 0.12)
+        bf3 = self.border_sides({s: hw for s in hs})
+        bf2 = self.border_sides({**({"left": (lw, fill or "#000000")} if lw else {}), **({"right": (hw, "#000000")} if "left" in hs else {})}) if (lw or "left" in hs) else self.border(None, "NONE")
+        c1 = self.cell(0, 0, w1, h, self.p(self.para_pr("CENTER", 100), [(lab_cp, label)]), bf1)
+        c2 = self.cell(1, 0, w2, h, self.p(self.para_pr("CENTER", 100), [(self.char("바탕", 10.0), "")]), bf2, margin=(0, 0, 0, 0))
+        c3 = self.cell(2, 0, w3, h, self.p(self.para_pr("LEFT", 100), [(head_cp, heading)]), bf3, margin=(566, 141, 141, 141))
+        tbl = self.tbl_para([c1 + c2 + c3], 1, 3, tw, h, self.border(None, "NONE"), align="LEFT")
+        tbl = re.sub(r'(<hp:p\b[^>]*?)pageBreak="0"', r'\1pageBreak="1"', tbl, count=1)   # 새 쪽에서 시작
+        L_ = self.level("l1" if self.R.get("style") == "box" else "p")
+        return tbl + self.p(self.para_pr("JUSTIFY", 160), [(self.char(L_["font"], 10.0), "")])
 
     def ref_box(self, label):
         """문장 끝 「참고 1」 표시: 연베이지 바탕·테두리 글상자, 글자처럼 취급(국세청 등 실물과 같은 방식)."""
