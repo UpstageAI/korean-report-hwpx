@@ -87,20 +87,3 @@ def test_unlisted_org_uses_common_with_name(tmp_path):
     org = next(o for o in C.ministries() if o not in R.ministries())
     c = R.compose(org, S, tmp_path / "x.hwpx")
     assert c.rule_key == R.COMMON and org in Hwpx.text(zipfile.ZipFile(tmp_path / "x.hwpx").read("Contents/section0.xml").decode(), True)
-
-
-def test_write_document_auto(monkeypatch, tmp_path):
-    """Solar 응답을 흉내 내어 auto 판단 → 보고서 생성 흐름 확인(네트워크 없음)."""
-    from korean_gov_docs import server as SV
-    calls = []
-    def fake(prompt, **kw):
-        calls.append(prompt)
-        return {"doc_type": "report", "reason": "내부 추진계획 메모"} if len(calls) == 1 else dict(S)
-    monkeypatch.setattr(SV.solar, "chat_json", fake)
-    r = SV.write_document(text="메모", out_path=str(tmp_path / "a.hwpx"))
-    assert r["doc_type"] == "report" and r["판단근거"] and (tmp_path / "a.hwpx").exists() and r["기관"] == "공통(미지정)"
-    assert "명사형" in calls[1] and "지어내지" in calls[1]
-    # 보도자료로 판단됐는데 기관이 없으면 보고서로
-    calls.clear()
-    monkeypatch.setattr(SV.solar, "chat_json", lambda p, **k: {"doc_type": "press_release", "reason": "대외 발표"} if "판단" in p[:80] else dict(S))
-    assert SV.write_document(text="발표문", out_path=str(tmp_path / "b.hwpx"))["doc_type"] == "report"

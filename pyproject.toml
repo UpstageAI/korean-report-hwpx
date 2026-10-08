@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Upstage" }]
 dependencies = ["mcp>=2.2", "uvicorn>=0.30"]
-keywords = ["mcp", "mcp-server", "korea", "hwpx", "hwp", "hangul", "government", "report", "press-release", "solar", "공문서", "보고서", "보도자료", "한글"]
+keywords = ["mcp", "mcp-server", "korea", "hwpx", "hwp", "hangul", "government", "report", "press-release", "공문서", "보고서", "보도자료", "한글"]
 
 [project.urls]
 Repository = "https://github.com/UpstageAI/korean-gov-docs"

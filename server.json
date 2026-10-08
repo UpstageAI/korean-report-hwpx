@@ -15,12 +15,7 @@
       "version": "0.1.0",
       "transport": {
         "type": "stdio"
-      },
-      "environmentVariables": [
-        {"name": "UPSTAGE_API_KEY", "description": "Upstage API key — only for write_document (draft structuring with Solar)", "isRequired": false, "isSecret": true},
-        {"name": "KOREAN_GOV_DOCS_SOLAR_BASE_URL", "description": "Internal (on-prem) Solar endpoint for air-gapped networks", "isRequired": false},
-        {"name": "KOREAN_GOV_DOCS_MODEL", "description": "Solar model name (default solar-pro4)", "isRequired": false}
-      ]
+      }
     }
   ]
 }

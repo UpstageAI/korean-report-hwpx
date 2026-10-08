@@ -6,7 +6,9 @@
 
 [![PyPI](https://img.shields.io/pypi/v/korean-gov-docs)](https://pypi.org/project/korean-gov-docs/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-gov-docs) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [English](README-EN.md)
 
-**공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 메모나 초안을 주면 Solar가 문서 종류를 판단해 정리하고, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다. → [English README](README-EN.md)
+**공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다.
+
+**외부 전송 없음 · API 키 불필요** — 모든 처리는 설치한 컴퓨터 안에서 끝납니다. 원고는 이 서버 밖으로 나가지 않습니다. → [English README](README-EN.md)
 
 ---
 
@@ -30,7 +32,9 @@
 | **보도자료** | 표지(로고 자리·보도자료), 보도시점·배포, 제목·부제, 본문(문단식/□식), 담당 표, 참고 쪽 | 필수 — 52개 기관 | `rules/`·`templates/` (보도자료 2,670건) |
 | 기안문 | — | — | 다음 버전 예정 |
 
-`write_document`의 `doc_type="auto"`(기본)는 Solar가 원고 성격으로 고릅니다 — 언론·국민 대상 발표·배포용이면 보도자료, 내부 보고·계획·검토면 보고서. 판단 근거를 결과에 함께 돌려줍니다.
+**사용 흐름** — AI에게 "이 메모를 행안부 보고서로 만들어 줘" → AI가 `get_writing_guide`로 작성 규칙 확인 → 원고를 구조 JSON으로 작성 → `build_document` → 결과의 `warnings`(고칠 점)가 있으면 AI가 고쳐 다시 생성.
+
+문서 종류 판단 기준(가이드에 포함): 언론·국민 대상 발표·배포용이면 보도자료, 내부 보고·계획·검토면 보고서.
 
 ## 설치
 
@@ -41,8 +45,7 @@
   "mcpServers": {
     "korean-gov-docs": {
       "command": "uvx",
-      "args": ["korean-gov-docs"],
-      "env": { "UPSTAGE_API_KEY": "write_document를 쓸 때만" }
+      "args": ["korean-gov-docs"]
     }
   }
 }
@@ -50,20 +53,18 @@
 
 Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
 
-- Upstage API 키: [console.upstage.ai](https://console.upstage.ai) (기본 모델 `solar-pro4`, `KOREAN_GOV_DOCS_MODEL`로 변경)
+- API 키·환경변수 필요 없음.
 - 만든 파일은 `~/korean-gov-docs/`에 저장됩니다(`KOREAN_GOV_DOCS_OUT_DIR`로 변경).
 
 ## 도구
 
-| 도구 | 하는 일 | 외부 전송 |
-|---|---|---|
-| `write_document` | 원고(글 또는 .hwpx/.hwp/.pdf/.docx/.txt/.md) → Solar로 문서 종류 판단·구조화 → 기관 서식 HWPX. `doc_type`: auto·report·press_release, `ministry` 선택 | 원고가 Solar API로 전송 |
-| `build_from_structure` | 구조 JSON → 기관 서식 HWPX (Solar 없이) | 없음 |
-| `list_ministries` | 지원 기관과 문서 종류별 지원 여부(보고서: 기관 규칙/공통 규칙, 보도자료: 본문 방식) | 없음 |
-| `get_rules` | 기관·문서 종류별 서식 규칙값(계층별 기호·글꼴·크기·내어쓰기·빈 줄, 제목 상자·표 머리) | 없음 |
-| `make_press_release` | (하위호환) `write_document(doc_type="press_release")`와 같음 | 원고가 Solar API로 전송 |
-
-Solar 정리 원칙(보고서): □는 두괄식 한 문장, ㅇ는 근거·세부, -는 소항목, 명사형 종결(~함·~임·~ 예정), 사실·숫자는 원고에 있는 것만(창작 금지).
+| 도구 | 하는 일 |
+|---|---|
+| `get_writing_guide` | 문서 종류 판단 기준, 작성 규칙(□ 두괄식 한 문장·ㅇ 근거·- 세부, 명사형 종결, 사실·숫자 창작 금지, 기호는 텍스트에 넣지 않음, 참고·붙임 구조), 구조 JSON 스키마·예시. MCP prompt `writing_guide`로도 제공 |
+| `check_structure` | 생성 전 점검: 필수 필드, text 속 기호, 계층 건너뜀, □ 두 문장 이상, 명사형 종결 아닌 문장, 긴 제목 |
+| `build_document` | 구조 JSON → 기관 서식 HWPX. 입력 정규화(기호·대시·앞 공백 제거) + 고칠 점(`warnings`) 반환. `build_from_structure`는 별칭 |
+| `list_ministries` | 지원 기관과 문서 종류별 지원 여부(보고서: 기관 규칙/공통 규칙, 보도자료: 본문 방식) |
+| `get_rules` | 기관·문서 종류별 서식 규칙값(계층별 기호·글꼴·크기·내어쓰기·빈 줄, 제목 상자·표 머리) |
 
 보고서 구조 JSON 예:
 
@@ -122,9 +123,8 @@ Solar 정리 원칙(보고서): □는 두괄식 한 문장, ㅇ는 근거·세�
 
 ## 데이터 전송 안내
 
-- `build_from_structure`는 외부 전송 없음 — 설치한 컴퓨터 안에서 파일을 만듭니다.
-- `write_document`는 원고가 Upstage API(`api.upstage.ai`)로 전송됩니다. 개인정보·비공개 정보 등 민감정보를 넣지 마세요.
-- 망분리 환경에서는 온프렘 Solar를 쓰세요: `KOREAN_GOV_DOCS_SOLAR_BASE_URL`(내부 주소, OpenAI 호환 `/v1`), `KOREAN_GOV_DOCS_SOLAR_KEY`, `KOREAN_GOV_DOCS_MODEL`. 사내 인증서면 `KOREAN_GOV_DOCS_SOLAR_VERIFY=0`.
+- 모든 처리는 로컬입니다. 이 서버는 외부 API를 부르지 않고, 원고·결과 파일을 어디로도 보내지 않습니다.
+- 원고를 구조로 정리하는 일은 사용자가 쓰는 AI가 합니다. 그 AI 서비스의 데이터 정책은 별도로 확인하세요.
 
 ## 규칙 근거
 
