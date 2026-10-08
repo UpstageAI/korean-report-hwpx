@@ -1,0 +1,8 @@
+- insert:
+    - id: korean-report-hwpx
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: korean-report-hwpx
+        transport: stdio
+        command: uvx
+        args: ['korean-report-hwpx']
