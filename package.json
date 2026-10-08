@@ -1,0 +1,10 @@
+{
+  "name": "korean-report-hwpx",
+  "version": "0.1.0",
+  "description": "Solar Work plugin: Korean government-style report and press release HWPX generator (MCP)",
+  "dsh": {
+    "bundle": {
+      "patch": "./plugin.patch.yml"
+    }
+  }
+}
