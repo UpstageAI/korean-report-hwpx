@@ -14,7 +14,7 @@ import json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "korean_gov_docs" / "engine"))
+sys.path.insert(0, str(ROOT / "korean_report_hwpx" / "engine"))
 from hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
 
 APPX = re.compile(r"^[\s<〈《\[［【(「]*(참\s*고|붙\s*임|별\s*첨)\s*(\d{0,2})\s*[>〉》\]］】)」.:：]?")
@@ -122,4 +122,4 @@ def main(src, dst):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else ROOT / "korean_gov_docs/rules_report/_참고머리.json")
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else ROOT / "korean_report_hwpx/rules_report/_참고머리.json")

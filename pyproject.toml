@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "korean-gov-docs"
+name = "korean-report-hwpx"
 version = "0.1.0"
 description = "Korean government documents MCP server — turns a draft into a ministry-format report (개조식 보고서) or press release (보도자료) as HWPX (Hangul). 공무원 공문서 HWPX 생성 MCP"
 readme = "README.md"
@@ -14,16 +14,16 @@ dependencies = ["mcp>=2.2", "uvicorn>=0.30"]
 keywords = ["mcp", "mcp-server", "korea", "hwpx", "hwp", "hangul", "government", "report", "press-release", "공문서", "보고서", "보도자료", "한글"]
 
 [project.urls]
-Repository = "https://github.com/UpstageAI/korean-gov-docs"
+Repository = "https://github.com/UpstageAI/korean-report-hwpx"
 
 [project.scripts]
-korean-gov-docs = "korean_gov_docs.server:main"
+korean-report-hwpx = "korean_report_hwpx.server:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8", "lxml>=5"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["korean_gov_docs"]
+packages = ["korean_report_hwpx"]
 exclude = ["**/__pycache__"]
 
 [tool.hatch.build.targets.sdist]

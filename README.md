@@ -1,10 +1,10 @@
-# korean-gov-docs — 한국 공문서 MCP (보고서·보도자료 HWPX)
+# korean-report-hwpx — 한국 공문서 MCP (보고서·보도자료 HWPX)
 
-<!-- mcp-name: io.github.UpstageAI/korean-gov-docs -->
+<!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![데모: 메모 원고 → 기관 서식 보고서·보도자료](https://raw.githubusercontent.com/UpstageAI/korean-gov-docs/main/docs/demo.gif)
+![데모: 메모 원고 → 기관 서식 보고서·보도자료](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
-[![PyPI](https://img.shields.io/pypi/v/korean-gov-docs)](https://pypi.org/project/korean-gov-docs/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-gov-docs) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [English](README-EN.md)
+[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [English](README-EN.md)
 
 **공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다.
 
@@ -22,7 +22,7 @@
 - "아까 만든 보고서 구조에서 Ⅲ장 □ 문장만 바꿔서 다시 만들어 줘"
 - "산림청 보고서 서식 규칙(계층별 기호·글꼴·크기) 보여 줘"
 
-**설치 한 줄** — `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
+**설치 한 줄** — `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 ## 문서 종류
 
@@ -43,18 +43,18 @@
 ```json
 {
   "mcpServers": {
-    "korean-gov-docs": {
+    "korean-report-hwpx": {
       "command": "uvx",
-      "args": ["korean-gov-docs"]
+      "args": ["korean-report-hwpx"]
     }
   }
 }
 ```
 
-Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
+Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 - API 키·환경변수 필요 없음.
-- 만든 파일은 `~/korean-gov-docs/`에 저장됩니다(`KOREAN_GOV_DOCS_OUT_DIR`로 변경).
+- 만든 파일은 `~/korean-report-hwpx/`에 저장됩니다(`KOREAN_REPORT_HWPX_OUT_DIR`로 변경, 이전 이름 `KOREAN_GOV_DOCS_OUT_DIR`도 인식).
 
 ## 도구
 
@@ -126,13 +126,18 @@ Claude Code: `claude mcp add korean-gov-docs -- uvx korean-gov-docs`
 - 모든 처리는 로컬입니다. 이 서버는 외부 API를 부르지 않고, 원고·결과 파일을 어디로도 보내지 않습니다.
 - 원고를 구조로 정리하는 일은 사용자가 쓰는 AI가 합니다. 그 AI 서비스의 데이터 정책은 별도로 확인하세요.
 
-## 규칙 근거
+## 근거
 
 - 정책브리핑(korea.kr) 보도자료 HWPX **2,670건(52개 중앙행정기관)** 전수 파싱. 보도자료 본문 서식은 2,016건의 문단 35,465개·빈 줄 35,434개·표 칸 32,392개 실측.
 - 보고서 서식은 같은 자료 중 「참고·붙임」 보고서형 구간이 있는 **1,326건**(문단 13,757개)에서 기관별로 산출(42개 기관, 3건 이상). 공통 골격(□·-·*·※ 기호, 기호 뒤 1타, 1행 제목 상자, 표 머리 맑은 고딕·가운데·굵게)은 기관 간 90% 이상 일치.
-- 공식 기준: 행정업무의 운영 및 혁신에 관한 규정 시행규칙(항목 구분).
-- 규칙 문서: [보도자료 서식 규칙](korean_gov_docs/refs/보도자료_서식_규칙.md), [보고서 서식 규칙](korean_gov_docs/refs/보고서_서식_규칙.md). 규칙값: `rules/`, `rules_report/`, 보도자료 표지·담당 표 수치: `templates/`.
+- 공식 기준: 「행정업무의 운영 및 혁신에 관한 규정 시행규칙」의 항목 구분(1. → 가. → 1) → 가) …), 경기도교육청 「한 곳에 정리한 공문서 작성법」(둘째 줄은 항목 첫 글자에 맞춤, 기호 뒤 1타, 하위 항목 2타 들여쓰기 등).
+- 실측: 정책브리핑 보도자료 2,670건·52개 기관(보고서 구간 1,326건)에서 기관별 기호·글꼴·빈 줄·표지 표 수치를 산출.
+- 규칙 문서: [보도자료 서식 규칙](korean_report_hwpx/refs/보도자료_서식_규칙.md), [보고서 서식 규칙](korean_report_hwpx/refs/보고서_서식_규칙.md). 규칙값: `rules/`, `rules_report/`, 보도자료 표지·담당 표 수치: `templates/`.
 - 원자료는 정책브리핑에 공공누리로 공개된 보도자료이며, 이 저장소에는 원본 파일·본문·그림을 포함하지 않고 서식 수치만 담았습니다.
+
+## kordoc과의 관계
+
+문서 파싱·정부 표준 양식·기안문·양식 채우기는 [kordoc](https://github.com/chrisryugj/kordoc)(chrisryugj/kordoc, MIT)을 추천합니다. 이 도구는 독립 구현(Python)으로, 부처별 실제 보도자료·보고서 서식(기호·글꼴·빈 줄·표지 표)을 실측 규칙으로 재현하는 데 집중합니다. 함께 쓰면 kordoc으로 읽고 이 도구로 부처 서식 문서를 쓸 수 있습니다. 두 프로젝트는 코드를 공유하거나 차용하지 않습니다.
 
 ## 유의
 
