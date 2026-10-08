@@ -74,18 +74,6 @@ class ReportComposer(C.Composer):
         tb = self.R["title_box"]
         return self.ch({"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0), "bold": bool(tb.get("bold")), **kw})
 
-    def border_sides(self, sides, width="0.4 mm", color="#000000", fill=None):
-        """지정한 변에만 선이 있는 테두리(sides: 'top','bottom','left','right' 중)."""
-        key = ("bs", tuple(sides), width, color, fill)
-        if key in self.cache: return self.cache[key]
-        f = f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else ""
-        side = lambda s: (f'<hh:{s}Border type="SOLID" width="{width}" color="{color}"/>' if s in sides
-                          else f'<hh:{s}Border type="NONE" width="0.1 mm" color="#000000"/>')
-        el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/>'
-              '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>' + "".join(side(s) for s in ("left", "right", "top", "bottom")) +
-              '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>' + f + "</hh:borderFill>")
-        self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
-
     def title_box(self, doc):
         """제목 상자: 1행 1칸 표, 위·아래 굵은 선(기관 상자 색), 제목 서체(상자 라벨 서체) +4pt 가운데."""
         tb = self.R["title_box"]; width = self.text_w - 200
@@ -105,27 +93,6 @@ class ReportComposer(C.Composer):
         L_ = self.level("l2")
         txt = "  ".join(p.strip() for p in parts if p.strip())
         return self.p(self.para_pr("RIGHT", 130), [(self.char(L_["font"], 12.0, -2), txt)])
-
-    def appx_head(self, label, heading=""):
-        """붙임·참고 쪽 머리: 1행 3칸 표(라벨 칸 기관 색 바탕·흰 글자 | 간격 칸 | 제목 칸 아래 선), 서체는 상자 규칙값."""
-        tb = self.R["title_box"]; fill = tb.get("fill") or "#000080"
-        br = tb.get("bracket") or "plain"
-        lab = {"꺾쇠": f"< {label} >", "대괄호": f"[{label}]"}.get(br, label)
-        tw = self.text_w - 200; w2 = 400; h = 2000
-        pt = float(tb.get("pt") or 16.0); wd = C.WIDTHS.get(tb.get("font")) or C.WIDTHS["바탕"]
-        w1 = max(5400, int(C.F.width(lab, pt, 0, 100, wd) * 1.25 + 1400))   # 라벨이 한 줄에 들어가게
-        rgb = [int(fill.lstrip("#")[k:k + 2], 16) for k in (0, 2, 4)]
-        light = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] > 150   # 연한 바탕이면 검은 글자
-        lab_cp = self.box_char(color="#000000" if light else "#FFFFFF")
-        head_spec, _ = self.fit_title(heading, {"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0), "bold": bool(tb.get("bold"))}, tw - w1 - w2 - 700)
-        head_cp = self.ch(head_spec)
-        c1 = self.cell(0, 0, w1, h, self.p(self.para_pr("CENTER", 100), [(lab_cp, lab)]), self.border(fill, "SOLID", "0.12 mm", fill))
-        c2 = self.cell(1, 0, w2, h, self.p(self.para_pr("CENTER", 100), [(self.char("바탕", 10.0), "")]), self.border(None, "NONE"))
-        c3 = self.cell(2, 0, tw - w1 - w2, h, self.p(self.para_pr("LEFT", 100), [(head_cp, heading)]),
-                       self.border_sides(("bottom",), "0.4 mm", fill), margin=(400, 141, 141, 141))
-        tbl = self.tbl_para([c1 + c2 + c3], 1, 3, tw, h, self.border(None, "NONE"), align="LEFT")
-        tbl = re.sub(r'(<hp:p\b[^>]*?)pageBreak="0"', r'\1pageBreak="1"', tbl, count=1)   # 새 쪽에서 시작
-        return tbl + self.spacer(10.0)
 
     def heading(self, text):
         """소제목(Ⅰ. 추진 배경 등): 상자 서체, □ 크기 +1pt, 다음 문단과 같은 쪽."""

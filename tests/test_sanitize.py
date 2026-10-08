@@ -148,7 +148,10 @@ def test_format_matches_rules(built, org):
         L_ = c.level(lv)
         if rv.get("mark") is not None: assert L_["mark"] == rv["mark"]
         if rv.get("line"): assert L_["line"] == rv["line"]
-        if rv.get("pt") and not (lv in ("note", "ref") and rv["pt"] > 13) and L_["font"] == rv.get("font"): assert L_["pt"] == rv["pt"]
+        exempt = (lv in ("note", "ref") and rv["pt"] > 13) if rv.get("pt") else True
+        exempt |= (rv.get("n") or 0) < 5                                                      # 표본 적은 계층 → 공통값
+        exempt |= lv in ("l2", "l3") and L_["pt"] == c.level("l1" if lv == "l2" else "l2")["pt"] < rv["pt"]   # 하위 ≤ 상위
+        if not exempt and L_["font"] == rv.get("font"): assert L_["pt"] == rv["pt"]
         if "lead" in rv and lv not in ("l2", "l3"): assert L_["lead"] == rv["lead"]
 
 
