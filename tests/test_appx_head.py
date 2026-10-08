@@ -119,3 +119,51 @@ def test_inline_ref_not_attached(tmp_path):
     C.compose("행정안전부", SAMPLE, tmp_path / "a.hwpx")
     sec = zipfile.ZipFile(tmp_path / "a.hwpx").read("Contents/section0.xml").decode()
     assert re.search(r'<hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="\d+"><hp:rect\b', sec)
+
+
+# ── 문단 앞머리 라벨·장평 ──
+def _label_runs(path):
+    from hwpx_doc import Hwpx
+    d = Hwpx(path); out = []
+    for *_, p in d.paragraphs():
+        if "<hp:tbl" in p: continue
+        runs = re.findall(r'<hp:run charPrIDRef="(\d+)"[^>]*><hp:t>(.*?)</hp:t></hp:run>', p, re.S)
+        if len(runs) >= 2 and re.fullmatch(r"\s*[□ㅇ○◦❍-]\s+", runs[0][1]) and C.HEAD_LABEL.fullmatch(runs[1][1]):
+            out.append((runs[0][1].strip(), runs[1][1], d.char(runs[1][0]), runs[1][0]))
+    return out
+
+
+@pytest.mark.parametrize("org", ["행정안전부", "국세청", ""])
+def test_head_label_fixed_width(org, tmp_path):
+    """(목적)·(대상) 같은 앞머리 라벨: 자간 0·장평 100 고정 → 같은 계층·같은 글자 수 라벨은 같은 글자 모양(같은 폭)."""
+    files = [tmp_path / "r.hwpx"]; R.compose(org, SAMPLE_REPORT, files[0])
+    if org: files.append(tmp_path / "p.hwpx"); C.compose(org, SAMPLE, files[1])
+    found = 0
+    for f in files:
+        labs = _label_runs(f); found += len(labs)
+        for mk, lab, ch, cid in labs: assert ch["spacing"] == 0 and ch["ratio"] == 100, (lab, ch)
+        by = {}
+        for mk, lab, ch, cid in labs: by.setdefault((mk, len(lab)), set()).add(cid)
+        assert all(len(v) == 1 for v in by.values()), by
+    assert found >= 4
+
+
+@pytest.mark.parametrize("org", ["행정안전부", "국세청", "과학기술정보통신부", ""])
+def test_ratio_range(org, tmp_path):
+    """본문 문단 장평은 95~100%, 기호·라벨 조각은 100%."""
+    c = R.compose(org, SAMPLE_REPORT, tmp_path / "r.hwpx")
+    assert all(95 <= it["sp"][1] <= 100 for it in c.items.values())
+    if org:
+        c = C.compose(org, SAMPLE, tmp_path / "p.hwpx")
+        assert all(95 <= it["sp"][1] <= 100 for it in c.items.values())
+
+
+def test_ratio_used_when_it_saves_a_line():
+    """한 줄을 조금 넘는 문단은 장평·자간으로 한 줄에 들어감."""
+    c = C.Composer("행정안전부"); L_ = c.level("l2")
+    w = C.WIDTHS.get(L_["font"]) or C.WIDTHS["바탕"]
+    base = "가" * int(c.text_w / (L_["pt"] * 100 * w.get("hangul", 1.0)))
+    txt = base[:-2] + " 나다라마"   # 1줄 + 2~3자 넘침
+    sp, ra = c.pick_spacing(txt, L_, 0)
+    from fit import wrap
+    assert len(wrap(txt, L_["pt"], sp, c.text_w, c.text_w, ra, w, True)) == 1 and 95 <= ra <= 100
