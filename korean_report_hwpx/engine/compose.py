@@ -363,15 +363,38 @@ class Composer:
         if head is None: head = len(rows) > 1 and all(len(c.replace("\n", "")) <= 12 for c in rows[0]) and not all(len(r[0]) <= 8 and len(r) == 2 and len(r[1]) > 20 for r in rows)
         label_col = (not head) and max(len(r) for r in rows) >= 2 and all(len(r[0].replace("\n", "")) <= 8 for r in rows)
         ncol = max(len(r) for r in rows); total = self.text_w - 200
-        lens = [max(len(str(r[c])) if c < len(r) else 0 for r in rows) + 3 for c in range(ncol)]
-        word = [max([len(t) for r in rows if c < len(r) for t in re.split(r"\s+", str(r[c])) if t] or [2]) for c in range(ncol)]
-        mins = [min(total * 0.45, word[c] * 1100 + 1300) for c in range(ncol)]  # 어절이 칸 안에서 갈리지 않게
-        ws = [max(mins[c], total * lens[c] / sum(lens)) for c in range(ncol)]
-        extra = sum(ws) - total
-        if extra > 0:  # 넘치면 최소 폭을 넘는 열에서만 덜어냄
-            room = [ws[c] - mins[c] for c in range(ncol)]
-            ws = [ws[c] - extra * room[c] / max(1, sum(room)) for c in range(ncol)]
+        # 칸 폭: 짧은 칸(날짜·법원·구분)은 내용 한 줄 폭만 주고, 남는 폭을 긴 글 칸에 글자 수 비례로 나눈다
+        ppc_ = int(float(self.TH.get("pt") or 11.0) * 100); pad = 1100
+        cells = [[str(r[c]) if c < len(r) else "" for r in rows] for c in range(ncol)]
+        vlen = lambda t: sum(0.5 if ord(ch) < 0x1100 else 1.0 for ch in t)   # 숫자·영문·기호는 한글의 약 절반 폭
+        maxlen = [max(max((vlen(ln) for ln in v.split("\n")), default=0) for v in col) for col in cells]
+        word = [max([vlen(t) for v in col for t in re.split(r"[\s\-·/]+", v) if t] or [2]) for col in cells]
+        short = [maxlen[c] <= 12 for c in range(ncol)]
+        ws = [maxlen[c] * ppc_ + pad if short[c] else 0 for c in range(ncol)]
+        flex = [c for c in range(ncol) if not short[c]]
+        avg = {c: sum(vlen(v) for v in cells[c][1:]) / max(1, len(cells[c]) - 1) for c in flex}
+        top = max(flex, key=lambda c: avg[c]) if flex else None
+        fmin = {c: min(word[c], 12 if c == top else 6) * ppc_ + pad for c in flex}  # 가장 긴 글 칸만 넉넉한 최소 폭
+        need = sum(ws) + sum(fmin.values())
+        if need > total:  # 짧은 칸부터 어절 폭까지 줄인다
+            room = [ws[c] - (min(word[c], maxlen[c]) * ppc_ + pad) if short[c] else 0 for c in range(ncol)]
+            cut = min(need - total, sum(room))
+            ws = [ws[c] - cut * room[c] / max(1, sum(room)) for c in range(ncol)]
+        rest = total - sum(ws)
+        if flex:
+            weight = {c: avg[c] ** 1.5 for c in flex}  # 평균 글 길이가 긴 칸에 남는 폭을 더 몰아줌
+            if sum(fmin.values()) >= rest:  # 최소 폭도 다 못 주면 최소 폭 비율로 나눔(한 칸만 깎이지 않게)
+                alloc = {c: rest * fmin[c] / sum(fmin.values()) for c in flex}
+            else:  # 최소 폭을 먼저 주고 남는 폭을 글자 수 비례로
+                extra = rest - sum(fmin.values())
+                alloc = {c: fmin[c] + extra * weight[c] / max(1, sum(weight.values())) for c in flex}
+            for c in flex: ws[c] = alloc[c]
+        else:
+            k = total / max(1, sum(ws)); ws = [w * k for w in ws]
+        if sum(ws) > total:
+            k = total / sum(ws); ws = [w * k for w in ws]
         ws = [int(w) for w in ws]
+        ws[-1] += total - sum(ws)
         th = self.TH; hb, bb = self.border(th.get("fill")), self.border(None)
         tpt = float(th.get("pt") or 11.0); ppc = int(tpt * 100)   # 글자 한 칸 폭(HWPUNIT) 추정
         trs, H = [], 0
@@ -398,10 +421,10 @@ class Composer:
                 f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{cw}" height="{rh}"/>'
                 f'<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>' for ps, cw, bf, ci in tcs)
             out.append(f"<hp:tr>{cells}</hp:tr>")
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
+        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="TABLE" repeatHeader="1" '
                f'rowCnt="{len(rows)}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bb}" noAdjust="0"><hp:sz width="{sum(ws)}" widthRelTo="ABSOLUTE" height="{H}" heightRelTo="ABSOLUTE" protect="0"/>'
-               '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(out) + "</hp:tbl>")
+               '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
+               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(out) + "</hp:tbl>")  # 글자처럼 취급 끔: 긴 표가 쪽을 넘겨 이어지게
         return f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>'
 
     def box(self, lines):

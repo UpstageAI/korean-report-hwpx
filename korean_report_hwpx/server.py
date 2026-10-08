@@ -65,6 +65,7 @@ REPORT_RULES = """[보고서(개조식) 규칙]
   "l3": - 소항목 — ㅇ의 하위 나열
   "note": * 각주, "ref": ※ 참고·유의 사항
   "caption": 표 제목(꺾쇠 없이), "table": rows 2차원 배열(첫 행 머리) — 예산·일정·현황 수치는 표로
+  표는 가능하면 4열 이하. 긴 설명은 '요지' 한 칸에 모으고, 법원·일자처럼 짧은 정보는 문서번호 칸에 함께 적는다. 표마다 앞에 caption을 둔다
 - 계층을 건너뛰지 않는다(□ 다음 바로 - 금지).
 - 문장은 명사형으로 끝낸다(~함, ~임, ~됨, ~ 예정, ~ 필요). '~합니다·~했다' 금지.
 - 세부 자료는 appendix: [{"title":"붙임 1","heading":"제목","body":[블록...]}]."""
@@ -177,8 +178,21 @@ def _normalize(structure, t):
             if not b.get("lines"): w.append(f"{where}: box.lines가 비어 있음")
         elif typ == "image":
             if not b.get("path") or not Path(str(b["path"])).expanduser().exists(): w.append(f"{where}: image.path 파일이 없음")
-    for a, ap in enumerate(s.get("appendix") or []):
+    apps = s.get("appendix") or []
+    for a, ap in enumerate(apps):
         if not ap.get("heading"): w.append(f"appendix[{a}]: heading(참고·붙임 제목)이 비어 있음")
+    titles = [str(ap.get("title") or "") for ap in apps]
+    if len(set(titles)) < len(titles):  # 붙임·참고 번호가 겹치면 순서대로 다시 매김
+        word = "참고" if t == "press_release" else "붙임"
+        for a, ap in enumerate(apps): ap["title"] = f"{word} {a + 1}"
+        w.append(f"appendix: {word} 번호가 겹쳐 {word} 1~{len(apps)}로 다시 매김 — 같은 내용을 두 번 넣지 않았는지 확인")
+    for a, ap in enumerate(apps):  # 표 제목 없이 표부터 나오면 경고
+        body = ap.get("body") or []
+        for k, b in enumerate(body):
+            if b.get("type") == "table" and not (k > 0 and body[k - 1].get("type") == "caption"):
+                w.append(f"appendix[{a}].body[{k}]: 표 앞에 caption(표 제목)이 없음 — 표 제목 블록을 앞에 넣을 것")
+    heads = [str(ap.get("heading") or "") for ap in apps]
+    if len(set(heads)) < len(heads): w.append("appendix: heading이 같은 붙임이 둘 이상 — 중복 여부 확인")
     if t == "press_release":
         if not s.get("release"): w.append("release(보도시점)가 비어 있음 — 원고에 없으면 그대로 두어도 됨")
     return s, w
