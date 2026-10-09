@@ -4,7 +4,9 @@
 
 ![데모: 메모 원고 → 기관 서식 보고서·보도자료](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
-[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [English](README-EN.md)
+[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
+
+> **0.2.0부터 업스테이지 Solar Pro 4로 개발합니다.** 간소화 모드(행안부 AI 친화적 보고서)·마크다운 출력·내부 결재 보고서는 Solar Pro 4(Solar Code CLI)가 코드를 작성하고, Claude가 결과를 검증했습니다.
 
 **공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다.
 
@@ -88,8 +90,6 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 ### 내부 결재 보고서 (report_kind="internal")
 
 정보공개포털 내부 결재 보고서 실물 표본 측정값 반영: 라벨 칸 없는 제목, 작성일·부서 줄 `'26. 10. 9.(금) / 과·팀명`, 줄 간격 150%, 문단 위 10pt(□)·5pt(ㅇ·-).
-
-> 0.2.0의 간소화 모드·마크다운 출력·내부 결재 보고서는 업스테이지 **Solar Pro 4**(Solar Code CLI)로 개발했고, 결과 검증은 Claude가 맡았습니다.
 
 **예시**:
 ```json
