@@ -72,11 +72,19 @@ def _img_size(b):
 
 
 class Composer:
-    def __init__(self, org, logo_path=None, slogan_path=None, placeholder_contact=False):
+    def __init__(self, org, logo_path=None, slogan_path=None, placeholder_contact=False, style="standard",
+                 line_spacing=None, para_space_before=None):
+        """간격 옵션:
+        - line_spacing: 본문 줄 간격(%). None이면 규칙값 사용.
+        - para_space_before: 본문 문단 위 간격(pt). None이면 규칙값 사용.
+        """
         self.org = org; self.R, self.L = self.load(org); self.cache = {}
         self.override = {}; self.items = {}; self._seq = 7000000  # polish 루프용: 문단 번호 → 자간
         self.header = B.header_xml(); self.base_para = "0"; self.base_char = "0"
         self.images = []   # [(id, ext, bytes)]
+        self.style = style   # "standard" 또는 "simplified" (보고서 간소화 모드)
+        self.line_spacing = line_spacing      # 본문 줄 간격 옵션 (%)
+        self.para_space_before = para_space_before  # 본문 문단 위 간격 옵션 (pt)
         pg = self.L.get("page", {})
         self.text_w = pg.get("width", 59528) - pg.get("left", 5669) - pg.get("right", 5669)
         self.logo_path, self.slogan_path, self.placeholder_contact = logo_path, slogan_path, placeholder_contact
@@ -157,8 +165,9 @@ class Composer:
         if sup: el = el.replace("</hh:charPr>", "<hh:supscript/></hh:charPr>")
         self.cache[key] = self._add("charProperties", "charPr", el); return self.cache[key]
 
-    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False):
-        key = ("p", align, line, indent, left, prev, nxt, word, keep)
+    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False, heading_level=None):
+        """문단 모양 생성. heading_level 지정 시 HWPX 개요(outline) heading level 설정 (간소화 모드)."""
+        key = ("p", align, line, indent, left, prev, nxt, word, keep, heading_level)
         if key in self.cache: return self.cache[key]
         el = re.search(r'<hh:paraPr id="%s".*?</hh:paraPr>' % self.base_para, self.header, re.S).group(0)
         el = re.sub(r'horizontal="\w+"', f'horizontal="{align}"', el, count=1)
@@ -177,6 +186,10 @@ class Composer:
         # 줄 나눔: 한글 어절 단위(HWPX 값 BREAK_WORD = 한글 '어절', KEEP_WORD = '글자' — 한글 기본 문서가 KEEP_WORD·글자)
         el = re.sub(r'breakNonLatinWord="\w+"', 'breakNonLatinWord="%s"' % ("BREAK_WORD" if word else "KEEP_WORD"), el)
         el = re.sub(r'widowOrphan="\d"', 'widowOrphan="1"', el)
+        # 간소화 모드: heading 타입과 level 지정 (항목 3)
+        if heading_level is not None:
+            el = re.sub(r'<hh:heading type="NONE" idRef="0" level="0"/>',
+                        f'<hh:heading type="OUTLINE" idRef="0" level="{heading_level}"/>', el)
         self.cache[key] = self._add("paraProperties", "paraPr", el); return self.cache[key]
 
     def border(self, fill=None, line="SOLID", width="0.12 mm", color="#000000"):
@@ -190,15 +203,25 @@ class Composer:
         self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
 
     # ── 문단 ──
-    def p(self, pid, segs, pno="0"):
-        return f'<hp:p id="{pno}" paraPrIDRef="{pid}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">' + \
+    def p(self, pid, segs, pno="0", outline_level=None):
+        """문단 생성. outline_level 지정 시 HWPX 문단 요소에 outlineLevel 속성 추가 (간소화 모드 개요 수준 지정)."""
+        attrs = f' id="{pno}" paraPrIDRef="{pid}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"'
+        if outline_level is not None:
+            attrs += f' outlineLevel="{outline_level}"'
+        return f'<hp:p{attrs}>' + \
                "".join(f'<hp:run charPrIDRef="{c}"><hp:t>{esc(t)}</hp:t></hp:run>' for c, t in segs) + "</hp:p>"
 
     def item(self, lv, text):
-        """계층 문단: 기호·공백 접두 + 본문(**굵게** 지원), 내어쓰기 = 접두 폭, 자간 자동."""
+        """계층 문단: 기호·공백 접두 + 본문(**굵게** 지원), 내어쓰기 = 접두 폭, 자간 자동.
+        간소화 모드(style="simplified"): 항목 기호(□ ㅇ ○ - 등) 없이 번호만 표시, 들여쓰기는 lead+gap으로 유지."""
         L_ = self.level(lv)
+        simplified = getattr(self, "style", "standard") == "simplified"
         if lv == "p":
             prefix = " " * L_["lead"]; hang = 0
+        elif simplified:
+            # 간소화 모드: 기호(mark) 제외, lead+gap 공백으로만 들여쓰기
+            prefix = " " * L_["lead"] + " " * max(1, L_["gap"])
+            hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
         else:
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
             hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
@@ -227,7 +250,21 @@ class Composer:
             if not part: continue
             for j, bit in enumerate(re.split(r"(?<=\S)(\*{1,3})(?=[\s),.]|$)", part)):  # 문장 속 각주 표시 → 위첨자
                 if bit: segs.append((sup if j % 2 else (b if k % 2 else n), bit))
-        para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=word is not False, prev=300 if lv in ("note", "ref") and getattr(self, "_after_table", False) else 0), segs, pno)
+        # 간소화 모드: 개요(outline) 수준 지정 안 함 (6차 수정)
+        simplified = getattr(self, "style", "standard") == "simplified"
+        internal = getattr(self, "report_kind", "standard") == "internal"
+        outline_level = None
+        heading_level = None
+        # 간소화·내부결재 모드 문단 위 간격: l1은 10pt(1000), l2/l3/note/ref는 5pt(500) — 간격은 문단 위로만 (빈 gap 문단 미사용)
+        if (simplified or internal) and lv in ("l1", "l2", "l3", "note", "ref"):
+            prev = 1000 if lv == "l1" else 500
+        elif lv in ("note", "ref") and getattr(self, "_after_table", False) and not (simplified or internal):
+            prev = 300
+        else:
+            prev = 0
+        para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=word is not False,
+                                        prev=prev,
+                                        heading_level=heading_level), segs, pno, outline_level=outline_level)
         if ref_tag:  # 앞 글자와 빈칸 1칸(묶음 빈칸: 줄 끝에서 앞 어절과 떨어지지 않음), 자간 0으로 겹침 방지
             n0 = self.char(L_["font"], L_["pt"], 0, ratio=100)
             para_xml = para_xml.replace("</hp:p>", f'<hp:run charPrIDRef="{n0}"><hp:t><hp:nbSpace/></hp:t></hp:run><hp:run charPrIDRef="{n0}">{self.ref_box(ref_tag)}<hp:t/></hp:run></hp:p>')
@@ -350,12 +387,25 @@ class Composer:
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
 
-    def gap_fixed(self, pt):
+    def gap_fixed(self, pt, prev=None):
+        """고정 pt 간격의 빈 문단. prev 지정 시 해당 prev 값의 paraPr 사용 (간격 조정용)."""
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
-        return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
+        pid = self.para_pr("JUSTIFY", L_["line"], prev=prev) if prev is not None else self.para_pr("JUSTIFY", L_["line"])
+        return self.p(pid, [(self.char(L_["font"], pt), "")])
 
-    def caption(self, text):
-        return self.p(self.para_pr("CENTER", 160, keep=True), [(self.char("맑은 고딕", 13.0, -2, True), f"< {text.strip('<> ')} >")])
+    def caption(self, text, prev=None):
+        """표 제목: 간소화 모드는 〈표 N〉 제목 형식(텍스트에 이미 prefix 포함), 표준 모드는 < 제목 > 형식.
+        prev 지정 시 해당 prev 값의 paraPr 사용 (간소화 모드에서 표 제목 위 10pt를 prev로 처리)."""
+        simplified = getattr(self, "style", "standard") == "simplified"
+        # prev가 None이면 기본 paraPr 사용 (간격 없음), 지정 시 해당 prev 값의 paraPr 사용
+        if prev is not None:
+            pp = self.para_pr("CENTER", 160, keep=True, prev=prev)
+        else:
+            pp = self.para_pr("CENTER", 160, keep=True)
+        if simplified:
+            return self.p(pp, [(self.char("맑은 고딕", 13.0, -2, True), text)])
+        t = text.strip('<> ')
+        return self.p(pp, [(self.char("맑은 고딕", 13.0, -2, True), f"< {t} >")])
 
     # ── 표 ──
     def table(self, rows, head=None):
@@ -451,14 +501,30 @@ class Composer:
             t = b["type"]; lv = self.LVMAP.get(t, "p")
             self._after_table = prev in ("table",) and lv in ("note", "ref")
             if prev is not None:
-                if lv == "caption":  # 표 제목 앞은 윗글과 한 줄 띄움
-                    g = None if prev == "caption" else self.gap_fixed(10.0)
+                internal = hasattr(self, "report_kind") and self.report_kind == "internal"
+                if lv == "caption":  # 표 제목 앞은 윗글과 한 줄 띄움 (internal도 유지)
+                    # 간소화 모드: caption 자체의 prev=1000(10pt)로 처리, gap 문단 생성 안 함
+                    # 표준/내부결재 모드: gap_fixed(10.0)로 빈 문단 생성
+                    if self.style == "simplified":
+                        g = None  # caption 앞 gap 없음 (caption의 prev로 처리)
+                    else:
+                        g = None if prev == "caption" else self.gap_fixed(10.0)
+                elif internal:
+                    # 내부결재: 항목 사이 빈 gap 문단 없이 문단 위(prev)로만 간격 처리
+                    g = None
                 else:
                     g = None if prev == "caption" or self._after_table else self.gap(prev, lv)
+                    # 간소화 모드: 항목 사이 빈 gap 문단 없이 항목 자체의 prev(문단 위)로만 간격 처리
+                    # (l1=10pt/prev=1000, l2/l3/note/ref=5pt/prev=500 — item()에서 이미 설정됨)
+                    if self.style == "simplified" and lv != "caption":
+                        g = None
                 if g: out.append(g)
             if t in ("l1", "l2", "l3", "note", "ref", "p", "plain"): out.append(self.item(self.LVMAP[t], b["text"]))
             elif t == "h": out.append(self.heading(b["text"]))
-            elif t == "caption": out.append(self.caption(b["text"]))
+            elif t == "caption":
+                # 간소화 모드: caption 앞 10pt를 caption 자체의 prev로 처리
+                prev_pt = 1000 if self.style == "simplified" else None
+                out.append(self.caption(b["text"], prev=prev_pt))
             elif t == "table": out.append(self.table(b["rows"]))
             elif t == "box": out.append(self.box(b["lines"]))
             elif t == "appx_h":

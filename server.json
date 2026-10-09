@@ -7,12 +7,12 @@
     "url": "https://github.com/UpstageAI/korean-report-hwpx",
     "source": "github"
   },
-  "version": "0.1.2",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "korean-report-hwpx",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       }
