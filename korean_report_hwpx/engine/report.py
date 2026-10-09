@@ -129,8 +129,8 @@ class ReportComposer(C.Composer):
         src = self.R["levels"].get(lv) or {}
         if lv == "l1" and src.get("font") == "HY헤드라인M":   # 보고서 □는 제목 서체를 쓰는 기관이 많음(9/31) — 그대로 둠
             out["font"], out["pt"] = "HY헤드라인M", src.get("pt") or out["pt"]
-        # 간소화 모드 / 내부 결재 보고서: 본문 줄 간격 (line_spacing 옵션 우선, 없으면 150%)
-        if (self.style == "simplified" or self.report_kind == "internal") and lv in ("l1", "l2", "l3", "p"):
+        # 14차 Fix: 줄 간격 150%를 standard를 포함한 모든 서식에 적용 (line_spacing 옵션 우선)
+        if lv in ("l1", "l2", "l3", "p"):
             out["line"] = self.line_spacing if self.line_spacing is not None else 150
         return out
 
@@ -145,8 +145,10 @@ class ReportComposer(C.Composer):
         if self.style == "simplified":
             if b == "caption":
                 pt = 10.0  # 표 제목 위 10pt (고정)
-            elif b in ("l1", "l2", "l3", "note", "ref", "p"):
+            elif b in ("l1", "l2", "l3", "p"):
                 pt = self.para_space_before if self.para_space_before is not None else 5.0
+            elif b in ("note", "ref"):
+                pt = 3.0  # 간소화 각주·참고는 3pt (고정)
             elif b == "h":
                 pt = 10.0  # 소제목 위 10pt (고정)
             else:
@@ -239,12 +241,18 @@ class ReportComposer(C.Composer):
         weekday = ["월", "화", "수", "목", "금", "토", "일"][wd]
         return f"'{short_year}. {month}. {day}.({weekday})"
 
-    def heading(self, text):
-        """소제목(Ⅰ. 추진 배경 등): 상자 서체, □ 크기 +1pt, 다음 문단과 같은 쪽."""
+    def heading(self, text, prev=None):
+        """소제목(Ⅰ. 추진 배경 등): 상자 서체, □ 크기 +1pt, 다음 문단과 같은 쪽.
+        prev 지정 시 해당 문단 위(prev) 값을 사용 (표 다음 소제목 간격용 — Fix 2).
+        prev 미지정 시 간소화 모드는 10pt(1000), 표준은 0."""
         L_ = self.level("l1"); tb = self.R["title_box"]
         hc = self.char(tb.get("font") or "HY헤드라인M", L_["pt"] + 1, -2, bool(tb.get("bold")))
+        # 간소화 모드: 소제목 문단 위 10pt(prev=1000) 적용 (첫 소제목 포함)
+        # Fix 2: 표 다음 소제목은 prev 파라미터로 지정된 값 사용, 그 외는 기본 간소화/표준 값
+        if prev is None:
+            prev = 1000 if self.style == "simplified" else 0
         # 간소화 모드: 개요 수준 지정 안 함 (6차 수정)
-        return self.p(self.para_pr("JUSTIFY", L_["line"], keep=True, heading_level=None),
+        return self.p(self.para_pr("JUSTIFY", L_["line"], keep=True, prev=prev, heading_level=None),
                       [(hc, text.strip("* "))], outline_level=None)
 
     # ── 조립 ──
@@ -340,9 +348,32 @@ class ReportComposer(C.Composer):
         return result
 
 
+# 기존 번호 접두사 제거용 정규식: 텍스트 앞에 이미 붙은 번호(Ⅰ. 1. 가. 1) 가) 등)를 제거
+_EXISTING_NUMBER_RE = re.compile(
+    r"^\s*"  # 선행 공백
+    r"(?:"  # 번호 패턴 그룹 시작
+    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\."  # 로마 숫자: Ⅰ. Ⅱ. 등
+    r"|[1-9][0-9]?\."  # 아라비아 숫자: 1. 2. 10. 등
+    r"|[가-힣]\."  # 한글 자음: 가. 나. 등
+    r"|[1-9][0-9]?\)"  # 괄호 숫자: 1) 2) 등
+    r"|[가-힣]\)"  # 괄호 한글: 가) 나) 등
+    r")"
+    r"\s*"  # 번호 뒤 공백
+)
+
+
+def _strip_existing_number(text):
+    """텍스트 앞에 이미 붙은 번호 접두사(Ⅰ. 1. 가. 1) 가) 등)를 제거.
+    간소화 모드에서 자동 번호 부여 시 중복을 방지하기 위해 사용."""
+    if not text:
+        return text
+    return _EXISTING_NUMBER_RE.sub("", text, count=1)
+
+
 def _simplify_numbers(s):
     """구조 JSON의 body와 appendix에 간소화 모드 번호(Ⅰ. 1. 가. 1) 가))를 자동 부여.
-    level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음."""
+    level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음.
+    텍스트에 이미 붙은 번호 접두사는 정규화로 제거한 후 자동 번호를 부여한다."""
     counters = [0, 0, 0, 0, 0]  # Ⅰ., 1., 가., 1), 가) 카운터
 
     def _number_for_level(level):
@@ -383,7 +414,9 @@ def _simplify_numbers(s):
                     counters[3] = 0; counters[4] = 0  # l3, l4 리셋
                 elif typ == "l3":
                     counters[4] = 0  # l4 리셋
-                new_b["text"] = _number_for_level(level) + b.get("text", "")
+                # 기존 번호 접두사 제거 후 자동 번호 부여 (항목 1: 번호 이중화 방지)
+                text = _strip_existing_number(b.get("text", ""))
+                new_b["text"] = _number_for_level(level) + text
             elif typ in ("note", "ref"):
                 # note/ref는 현재 l1 수준 유지
                 pass
@@ -394,7 +427,12 @@ def _simplify_numbers(s):
 
     s = dict(s)
     s["body"] = _process_body(s.get("body") or [])
-    s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
+    # 붙임(appendix)마다 번호 카운터 초기화: 각 붙임마다 1. 가. 1) 체계로 1부터 시작
+    orig_appendix = s.get("appendix") or []
+    s["appendix"] = []
+    for a in orig_appendix:
+        counters[0] = 0; counters[1] = 0; counters[2] = 0; counters[3] = 0; counters[4] = 0
+        s["appendix"].append(dict(a, body=_process_body(a.get("body") or [])))
     return s
 
 

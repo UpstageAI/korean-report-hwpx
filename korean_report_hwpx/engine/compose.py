@@ -33,9 +33,17 @@ HEAD_LABEL = re.compile(r"[(\[〔][^()\[\]〔〕\s][^()\[\]〔〕]{1,5}[)\]〕] 
 
 
 def normalize(text, lv=None):
-    """원고 텍스트 정리: 대시류 → '-', 계층 문단 앞에 붙은 기호·공백 제거, 숫자와 단위 사이 빈칸 → 묶음 빈칸(줄 끝에서 안 떨어짐)."""
+    """원고 텍스트 정리: 대시류 → '-', 계층 문단 앞에 붙은 기호·공백 제거, 숫자와 단위 사이 빈칸 → 묶음 빈칸(줄 끝에서 안 떨어짐).
+    ref/lv='note'는 LEAD_MARK 기호(※, *)를 보존 — item()에서 마크 렌더링 시 중복 방지 위해 normalize 단계에서 유지."""
     text = DASHES.sub("-", text or "").strip()
     if lv in ("l1", "l2", "l3"): text = LEAD_MARK.sub("", text)
+    elif lv in ("note", "ref") and text:   # Fix 3: ref/note 기호(※/*) 보존 — mark+공백 형식 유지, 그 외는 단순 strip
+        if text[0] in ("※", "*") and len(text) > 1 and text[1] == " ":
+            text = text[0] + text[2:].lstrip()   # "※  내용" → "※ 내용" (과도한 공백만 정리)
+        elif text[0] in ("※", "*"):
+            text = text  # "※내용" 형식(공백 없음)은 그대로 보존 — item()에서 처리
+        else:
+            text = text.lstrip()
     return NUM_UNIT.sub(lambda m: m.group(1) + "\u00a0", text)
 PLACEHOLDER_CONTACT = {"dept": "○○과", "people": [["책임자", "과장", "이○○", "(044-000-0000)"], ["담당자", "사무관", "김○○", "(044-000-0000)"]]}
 DEFAULT_CHAR = {"font": "돋움", "pt": 10.0, "bold": True, "color": "#000000", "spacing": 0, "ratio": 100}
@@ -125,7 +133,7 @@ class Composer:
         return 10.0
 
     def gap_pt(self, a, b):
-        if b == "h": return 14.0          # 소제목 앞은 한 줄
+        if b == "h": return 10.0          # 소제목 앞 간격 10pt 통일 (12차 Fix 4)
         if a == "h": return 6.0
         for src in (self.R, self.R["_base"]):
             g = src.get("gaps", {}).get(f"{a}>{b}")
@@ -213,19 +221,28 @@ class Composer:
 
     def item(self, lv, text):
         """계층 문단: 기호·공백 접두 + 본문(**굵게** 지원), 내어쓰기 = 접두 폭, 자간 자동.
-        간소화 모드(style="simplified"): 항목 기호(□ ㅇ ○ - 등) 없이 번호만 표시, 들여쓰기는 lead+gap으로 유지."""
+        간소화 모드(style="simplified"): 항목 기호(□ ㅇ ○ - 등) 없이 번호만 표시, 들여쓰기는 lead+gap으로 유지.
+        단, note 유형은 간소화 모드에서도 "*" 기호를 유지(정식 서식과 동일)."""
         L_ = self.level(lv)
         simplified = getattr(self, "style", "standard") == "simplified"
         if lv == "p":
             prefix = " " * L_["lead"]; hang = 0
-        elif simplified:
-            # 간소화 모드: 기호(mark) 제외, lead+gap 공백으로만 들여쓰기
+        elif simplified and lv not in ("note", "ref"):
+            # 간소화 모드: note/ref 제외, 기호(mark) 제외, lead+gap 공백으로만 들여쓰기
             prefix = " " * L_["lead"] + " " * max(1, L_["gap"])
             hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+        elif simplified and lv in ("note", "ref"):
+            # 간소화 모드의 note/ref: prefix에 mark 포함, indent는 mark 폭 포함 (표준 모드와 동일 공식)
+            prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
+            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
         else:
+            # 표준 모드(또는 내부결재): prefix에 mark 포함
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
             hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
         text = normalize(PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), text), lv)
+        # Fix 3: 간소 모드 note/ref — prefix에 이미 mark가 있으므로 text 앞 mark 제거 (중복 방지)
+        if simplified and lv in ("note", "ref") and text and text[0] in ("※", "*"):
+            text = text[1:].lstrip()
         m_ref = re.search(r"(?<=[.다\)함임됨음정요])\s*(참고|붙임)\s?(\d+)\s*$", text)   # 보고서 명사형 종결(~함·~임) 뒤도
         ref_tag = None
         if m_ref: ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"; text = text[:m_ref.start()]  # 문장 끝 참고 표시
@@ -255,11 +272,15 @@ class Composer:
         internal = getattr(self, "report_kind", "standard") == "internal"
         outline_level = None
         heading_level = None
-        # 간소화·내부결재 모드 문단 위 간격: l1은 10pt(1000), l2/l3/note/ref는 5pt(500) — 간격은 문단 위로만 (빈 gap 문단 미사용)
-        if (simplified or internal) and lv in ("l1", "l2", "l3", "note", "ref"):
-            prev = 1000 if lv == "l1" else 500
-        elif lv in ("note", "ref") and getattr(self, "_after_table", False) and not (simplified or internal):
-            prev = 300
+        # 14차 Fix: prev 결정을 세 서식 공통으로
+        # l1(□ / 1.) = 1000, l2·l3 = 500, note·ref = 300
+        if lv in ("l1", "l2", "l3", "note", "ref"):
+            if lv == "l1":
+                prev = 1000
+            elif lv in ("note", "ref"):
+                prev = 300
+            else:
+                prev = 500
         else:
             prev = 0
         para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=word is not False,
@@ -362,8 +383,7 @@ class Composer:
         c3 = self.cell(2, 0, w3, h, self.p(self.para_pr("LEFT", 100), [(head_cp, heading)]), bf3, margin=(566, 141, 141, 141))
         tbl = self.tbl_para([c1 + c2 + c3], 1, 3, tw, h, self.border(None, "NONE"), align="LEFT")
         tbl = re.sub(r'(<hp:p\b[^>]*?)pageBreak="0"', r'\1pageBreak="1"', tbl, count=1)   # 새 쪽에서 시작
-        L_ = self.level("l1" if self.R.get("style") == "box" else "p")
-        return tbl + self.p(self.para_pr("JUSTIFY", 160), [(self.char(L_["font"], 10.0), "")])
+        return tbl + self._tiny_gap()  # 15차 Fix: appx_head 뒤 5pt 빈 문단 추가
 
     def ref_box(self, label):
         """문장 끝 「참고 1」 표시: 연베이지 바탕·테두리 글상자, 글자처럼 취급(국세청 등 실물과 같은 방식)."""
@@ -392,6 +412,12 @@ class Composer:
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         pid = self.para_pr("JUSTIFY", L_["line"], prev=prev) if prev is not None else self.para_pr("JUSTIFY", L_["line"])
         return self.p(pid, [(self.char(L_["font"], pt), "")])
+
+    def _tiny_gap(self):
+        """표·상자 뒤 5pt 빈 문단: 글자 크기 5pt, 줄 간격 100%, 문단 위·아래 0. (15차 Fix)"""
+        pid = self.para_pr("JUSTIFY", 100, prev=0, nxt=0)
+        cp = self.char("바탕", 5.0)
+        return self.p(pid, [(cp, "")])
 
     def caption(self, text, prev=None):
         """표 제목: 간소화 모드는 〈표 N〉 제목 형식(텍스트에 이미 prefix 포함), 표준 모드는 < 제목 > 형식.
@@ -445,11 +471,27 @@ class Composer:
             k = total / sum(ws); ws = [w * k for w in ws]
         ws = [int(w) for w in ws]
         ws[-1] += total - sum(ws)
+        # 최소 칸 너비 보장: 한 칸이 전체 너비의 12% 미만이면 조정
+        min_w = total * 0.12
+        for i in range(ncol):
+            if ws[i] < min_w:
+                ws[i] = int(min_w)
+        # 최소 폭 적용 후 합계가 total을 초과하면 비례하여 축소
+        if sum(ws) > total:
+            k = total / sum(ws)
+            ws = [int(w * k) for w in ws]
+            ws[-1] += total - sum(ws)
         th = self.TH; hb, bb = self.border(th.get("fill")), self.border(None)
         tpt = float(th.get("pt") or 11.0); ppc = int(tpt * 100)   # 글자 한 칸 폭(HWPUNIT) 추정
-        trs, H = [], 0
+        # 1번: 행 높이 = 셀 위·아래 여백(cellMargin top+bottom) + 글자 크기 × 줄 간격 × 줄 수
+        # 한 줄 기준 높이: tpt*100*1.3(줄간격130%) + 141(top) + 141(bottom)
+        line_h = int(tpt * 100 * 1.3) + 141 + 141   # 한 줄 셀 높이 (글자 높이 + 상하 여백)
+        cm = '<hp:cellMargin left="510" right="510" top="141" bottom="141"/>'   # 모든 행 동일 셀 여백
+        trs = []
+        H = 0
         for ri, r in enumerate(rows):
-            tcs, rh = [], 0
+            max_cell_h = 0
+            tcs = []
             for ci in range(ncol):
                 v = str(r[ci]) if ci < len(r) else ""
                 is_head = (head and ri == 0) or (label_col and ci == 0)
@@ -457,25 +499,31 @@ class Composer:
                 align = "CENTER" if (is_head or len(v) <= 12 or ci == 0) else ("RIGHT" if num else "JUSTIFY")
                 cp = self.char(th.get("font") or "맑은 고딕", tpt if is_head else min(tpt, 11.0), -2, is_head and th.get("bold", True))
                 lines = v.split("\n") or [""]
+                n_lines = len(lines)
+                # 셀 높이 = 셀 여백 + 글자 높이 × 줄 간격 × 줄 수
+                cell_h = 141 + 141 + int(tpt * 100 * 1.3) * n_lines
+                max_cell_h = max(max_cell_h, cell_h)
                 ps = "".join(self.p(self.para_pr(align, 130), [(cp, ln)]) for ln in lines)
-                cw = ws[ci]; per = max(1, int((cw - 1020) / ppc))
-                nl = sum(max(1, -(-len(ln) // per)) for ln in lines); h = int(nl * ppc * 1.3 + 400 + 282)
-                rh = max(rh, h)
-                tcs.append((ps, cw, hb if is_head else bb, ci))
-            trs.append((tcs, rh)); H += rh
-        out = []
-        for ri, (tcs, rh) in enumerate(trs):
-            cells = "".join(
+                cw = ws[ci]
+                tcs.append((ps, cw, hb if is_head else bb, ci, cell_h))
+            for ps, cw, bf, ci, cell_h in tcs:
+                pass  # tcs 튜플에 cell_h 포함
+            # 행 높이 = 해당 행에서 가장 큰 셀 높이
+            row_h = max_cell_h
+            H += row_h
+            cells_xml = "".join(
                 f'<hp:tc name="" header="{1 if (head and ri == 0) else 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{ps}</hp:subList>'
-                f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{cw}" height="{rh}"/>'
-                f'<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>' for ps, cw, bf, ci in tcs)
-            out.append(f"<hp:tr>{cells}</hp:tr>")
+                f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{cw}" height="{cell_h}"/>'
+                f'{cm}</hp:tc>' for ps, cw, bf, ci, cell_h in tcs)
+            trs.append(f"<hp:tr>{cells_xml}</hp:tr>")
         tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="TABLE" repeatHeader="1" '
                f'rowCnt="{len(rows)}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bb}" noAdjust="0"><hp:sz width="{sum(ws)}" widthRelTo="ABSOLUTE" height="{H}" heightRelTo="ABSOLUTE" protect="0"/>'
                '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(out) + "</hp:tbl>")  # 글자처럼 취급 끔: 긴 표가 쪽을 넘겨 이어지게
-        return f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>'
+               '<hp:outMargin left="0" right="0" top="0" bottom="850"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(trs) + "</hp:tbl>")  # 글자처럼 취급 끔: 긴 표가 쪽을 넘겨 이어지게
+        # 15차 Fix: 표 문단 next=0으로 변경, 대신 뒤따르는 5pt 빈 문단으로 간격 확보
+        tbl_para = f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>'
+        return tbl_para + self._tiny_gap()
 
     def box(self, lines):
         """강조 상자: 연한 음영 1칸 표, 본문 글꼴."""
@@ -488,7 +536,8 @@ class Composer:
                '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="850" right="850" top="566" bottom="566"/>'
                f'<hp:tr><hp:tc name="" header="0" hasMargin="1" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{ps}</hp:subList>'
                f'<hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{self.text_w - 200}" height="{h}"/><hp:cellMargin left="850" right="850" top="566" bottom="566"/></hp:tc></hp:tr></hp:tbl>')
-        return f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{cp}">{tbl}<hp:t/></hp:run></hp:p>'
+        box_para = f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{cp}">{tbl}<hp:t/></hp:run></hp:p>'
+        return box_para + self._tiny_gap()
 
     # ── 본문 조립 ──
     LVMAP = {"l1": "l1", "l2": "l2", "l3": "l3", "note": "note", "ref": "ref", "p": "p", "plain": "p", "h": "l1",
@@ -501,30 +550,19 @@ class Composer:
             t = b["type"]; lv = self.LVMAP.get(t, "p")
             self._after_table = prev in ("table",) and lv in ("note", "ref")
             if prev is not None:
-                internal = hasattr(self, "report_kind") and self.report_kind == "internal"
-                if lv == "caption":  # 표 제목 앞은 윗글과 한 줄 띄움 (internal도 유지)
-                    # 간소화 모드: caption 자체의 prev=1000(10pt)로 처리, gap 문단 생성 안 함
-                    # 표준/내부결재 모드: gap_fixed(10.0)로 빈 문단 생성
-                    if self.style == "simplified":
-                        g = None  # caption 앞 gap 없음 (caption의 prev로 처리)
-                    else:
-                        g = None if prev == "caption" else self.gap_fixed(10.0)
-                elif internal:
-                    # 내부결재: 항목 사이 빈 gap 문단 없이 문단 위(prev)로만 간격 처리
-                    g = None
-                else:
-                    g = None if prev == "caption" or self._after_table else self.gap(prev, lv)
-                    # 간소화 모드: 항목 사이 빈 gap 문단 없이 항목 자체의 prev(문단 위)로만 간격 처리
-                    # (l1=10pt/prev=1000, l2/l3/note/ref=5pt/prev=500 — item()에서 이미 설정됨)
-                    if self.style == "simplified" and lv != "caption":
-                        g = None
+                # 14차 Fix: 서식과 관계없이 항목 사이 g=None (빈 문단 만들지 않음)
+                # caption 앞도 g=None (caption 자체 prev=1000으로 간격 처리)
+                g = None
                 if g: out.append(g)
             if t in ("l1", "l2", "l3", "note", "ref", "p", "plain"): out.append(self.item(self.LVMAP[t], b["text"]))
-            elif t == "h": out.append(self.heading(b["text"]))
+            elif t == "h":
+                # 4번: 모든 소제목 앞 간격 10pt 통일 — heading prev=1000
+                # 표·caption·l1 등 모든 직전 요소 뒤 소제목 앞 간격을 10pt로 통일
+                h_prev = 1000
+                out.append(self.heading(b["text"], prev=h_prev))
             elif t == "caption":
-                # 간소화 모드: caption 앞 10pt를 caption 자체의 prev로 처리
-                prev_pt = 1000 if self.style == "simplified" else None
-                out.append(self.caption(b["text"], prev=prev_pt))
+                # 14차 Fix: caption prev=1000 모든 서식
+                out.append(self.caption(b["text"], prev=1000))
             elif t == "table": out.append(self.table(b["rows"]))
             elif t == "box": out.append(self.box(b["lines"]))
             elif t == "appx_h":
@@ -534,11 +572,13 @@ class Composer:
                 out.append(self.p_raw(self.para_pr("CENTER", 100), self.char("맑은 고딕", 10.0), self.picture(bid, w, h, min(b.get("width_mm", 150) * HU_MM, self.text_w - 200))))
             prev = "box" if t == "box" else lv
 
-    def heading(self, text):
-        """소제목: 본문 1계층 글꼴 +1pt 굵게, 다음 문단과 같은 쪽."""
+    def heading(self, text, prev=None):
+        """소제목: 본문 1계층 글꼴 +1pt 굵게, 다음 문단과 같은 쪽.
+        prev 지정 시 해당 문단 위(prev) 값의 paraPr 사용 (간소화 모드 표 다음 소제목 간격용)."""
         L_ = self.level("l1" if self.R.get("style") == "box" else "p")
         hc = self.char(L_["font"], L_["pt"] + 1, -2, True)
-        return self.p(self.para_pr("JUSTIFY", L_["line"], keep=True), [(hc, text.strip("* "))])
+        pp = self.para_pr("JUSTIFY", L_["line"], keep=True, prev=prev) if prev is not None else self.para_pr("JUSTIFY", L_["line"], keep=True)
+        return self.p(pp, [(hc, text.strip("* "))])
 
     # ── 그림 ──
     def add_image(self, path):
