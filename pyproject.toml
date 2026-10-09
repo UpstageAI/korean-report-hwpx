@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "korean-report-hwpx"
-version = "0.1.2"
+version = "0.2.0"
 description = "Korean government documents MCP server — turns a draft into a ministry-format report (개조식 보고서) or press release (보도자료) as HWPX (Hangul). 공무원 공문서 HWPX 생성 MCP"
 readme = "README.md"
 requires-python = ">=3.10"
