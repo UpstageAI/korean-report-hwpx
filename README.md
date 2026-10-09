@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![데모: 메모 원고 → 기관 서식 보고서·보도자료](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
+![데모: 메모 한 장 → 정식·간소화 보고서(HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
 [![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
 

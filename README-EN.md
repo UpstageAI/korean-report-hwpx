@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![Demo: memo → agency-format report and press release](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
+![Demo: one memo → standard and simplified reports (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
 [![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
 
