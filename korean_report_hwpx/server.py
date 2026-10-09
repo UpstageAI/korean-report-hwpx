@@ -304,9 +304,32 @@ def _dst(ministry, title, out_path, doc_type):
     return Path(out_path).expanduser() if out_path else out_dir() / f"{name}_{LABEL[doc_type]}_{re.sub(r'[^가-힣A-Za-z0-9]+', '_', title or LABEL[doc_type])[:30]}.hwpx"
 
 
+# 기존 번호 접두사 제거용 정규식: 텍스트 앞에 이미 붙은 번호(Ⅰ. 1. 가. 1) 가) 등)를 제거
+_EXISTING_NUMBER_RE = re.compile(
+    r"^\s*"  # 선행 공백
+    r"(?:"  # 번호 패턴 그룹 시작
+    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\."  # 로마 숫자: Ⅰ. Ⅱ. 등
+    r"|[1-9][0-9]?\."  # 아라비아 숫자: 1. 2. 10. 등
+    r"|[가-힣]\."  # 한글 자음: 가. 나. 등
+    r"|[1-9][0-9]?\)"  # 괄호 숫자: 1) 2) 등
+    r"|[가-힣]\)"  # 괄호 한글: 가) 나) 등
+    r")"
+    r"\s*"  # 번호 뒤 공백
+)
+
+
+def _strip_existing_number(text):
+    """텍스트 앞에 이미 붙은 번호 접두사(Ⅰ. 1. 가. 1) 가) 등)를 제거.
+    간소화 모드에서 자동 번호 부여 시 중복을 방지하기 위해 사용."""
+    if not text:
+        return text
+    return _EXISTING_NUMBER_RE.sub("", text, count=1)
+
+
 def _simplify_numbers(s):
     """구조 JSON의 body와 appendix에 간소화 모드 번호(Ⅰ. 1. 가. 1) 가))를 자동 부여.
-    level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음."""
+    level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음.
+    텍스트에 이미 붙은 번호 접두사는 정규화로 제거한 후 자동 번호를 부여한다."""
     counters = [0, 0, 0, 0, 0]  # Ⅰ., 1., 가., 1), 가) 카운터
 
     def _number_for_level(level):
@@ -347,7 +370,9 @@ def _simplify_numbers(s):
                     counters[3] = 0; counters[4] = 0  # l3, l4 리셋
                 elif typ == "l3":
                     counters[4] = 0  # l4 리셋
-                new_b["text"] = _number_for_level(level) + b.get("text", "")
+                # 기존 번호 접두사 제거 후 자동 번호 부여 (항목 1: 번호 이중화 방지)
+                text = _strip_existing_number(b.get("text", ""))
+                new_b["text"] = _number_for_level(level) + text
             elif typ in ("note", "ref"):
                 # note/ref는 현재 l1 수준 유지
                 pass
@@ -547,17 +572,55 @@ def _export_markdown(s, hwpx_path, style="standard"):
         s = _simplify_numbers(s)
         s = _add_table_numbers(s)
 
+    # 붙임/참고 참조 꼬리표 패턴: 문장 끝의 "붙임 N" 또는 "참고 N"을 "(붙임 N)" 또는 "(참고 N)"으로 변환
+    _REF_TAG_RE = re.compile(r"^(.*?)(붙임|참고)\s*(\d+)\s*$")
+
+    def _convert_ref_tag(text):
+        """문장 끝의 붙임/참고 참조 꼬리표를 (붙임 N) 또는 (참고 N) 형태로 변환."""
+        m = _REF_TAG_RE.match(text)
+        if m:
+            return f"{m.group(1)}({m.group(2)} {m.group(3)})"
+        return text
+
     def _blocks_to_md(bs, level=0):
+        """blocks to markdown.
+        level: 구조적 깊이 (h=0, l1=1, l2=2, l3=3)
+        - h: ## text (항상 ##)
+        - l1: 1. text (들여쓰기 없음)
+        - l2:   가. text (들여쓰기 2칸)
+        - l3:     1) text (들여쓰기 4칸)
+        - note: > * 내용 (블록 인용 + 각주 기호)
+        - ref: > ※ 내용 (블록 인용 + 참고 기호)
+        """
         lines = []
         for b in bs:
             typ = b.get("type")
             if typ == "h":
-                level += 1
-                lines.append(f"{'#' * min(level, 3)} {b.get('text', '').strip()}")
-            elif typ == "l1":
-                # l1은 h와 유사하게 ## 제목으로 출력 (항목 5)
+                # 소제목: 항상 ## (항목 2)
                 lines.append(f"## {b.get('text', '').strip()}")
-            elif typ in ("l2", "l3", "note", "ref", "p", "plain"):
+                level = 0  # h 이후 레벨 리셋
+            elif typ == "l1":
+                # l1: 들여쓰기 없는 목록 (항목 2)
+                text = _convert_ref_tag(b.get('text', '').strip())
+                lines.append(f"{text}")
+                level = 1
+            elif typ == "l2":
+                # l2: 들여쓰기 2칸 (항목 2)
+                text = _convert_ref_tag(b.get('text', '').strip())
+                lines.append(f"  {text}")
+                level = 2
+            elif typ == "l3":
+                # l3: 들여쓰기 4칸 (항목 2)
+                text = _convert_ref_tag(b.get('text', '').strip())
+                lines.append(f"    {text}")
+                level = 3
+            elif typ == "note":
+                # note: > * 내용 형태 (항목 3)
+                lines.append(f"> * {b.get('text', '').strip()}")
+            elif typ == "ref":
+                # ref: > ※ 내용 형태
+                lines.append(f"> ※ {b.get('text', '').strip()}")
+            elif typ in ("p", "plain"):
                 prefix = "" if typ == "p" else b.get("text", "")
                 lines.append(f"{'  ' * level}{prefix}")
             elif typ == "caption":

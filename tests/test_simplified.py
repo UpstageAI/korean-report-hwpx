@@ -458,41 +458,40 @@ class TestSimplifiedCheckWarnings:
         assert 'lineSpacing type="PERCENT" value="200"' not in head_default, "기본에 200%가 포함됨"
 
     def test_simplified_para_space_before_option(self, tmp_path):
-        """간소화 모드: para_space_before 옵션으로 문단 간격 변경 가능 (8번 항목)."""
+        """간소화 모드: para_space_before 옵션은 더 이상 본문 빈 문단에 사용되지 않음 (14차 Fix).
+        대신 항목 문단의 prev 값으로 간격 처리: l1=1000(10pt), l2/l3=500(5pt), note/ref=300(3pt).
+        para_space_before 옵션은 gap() 메서드에서만 사용되나, 본문 blocks()에서는 gap()을 호출하지 않음."""
         dst_default = tmp_path / "test_default.hwpx"
         dst_custom = tmp_path / "test_custom.hwpx"
-        # 기본 para_space_before=4pt (기본값)
+        # 기본 para_space_before=5pt (기본값)
         R.compose("", SIMPLE_REPORT, dst_default, style="simplified")
         # para_space_before=8pt 옵션 적용
         R.compose("", SIMPLE_REPORT, dst_custom, style="simplified", para_space_before=8.0)
         sec_default = zipfile.ZipFile(dst_default).read("Contents/section0.xml").decode()
         sec_custom = zipfile.ZipFile(dst_custom).read("Contents/section0.xml").decode()
-        # 간소화 모드에서 문단 간격(gap)은 빈 문단으로 생성됨
-        # para_space_before 옵션 적용 시 더 큰 간격의 빈 문단이 생성되어야 함
-        # 기본(4pt)과 커스텀(8pt)에서 생성된 문단 수나 내용이 달라야 함
-        # 빈 문단(내용 없는 <hp:p>)의 개수를 비교
-        import re
-        # 내용이 공백뿐인 문단 찾기 (빈 문단 = 간격 문단)
-        empty_paras_default = re.findall(r'<hp:p\b[^>]*>(?:<hp:run[^>]*><hp:t[^>]*>\s*</hp:t></hp:run>)*</hp:p>', sec_default)
-        empty_paras_custom = re.findall(r'<hp:p\b[^>]*>(?:<hp:run[^>]*><hp:t[^>]*>\s*</hp:t></hp:run>)*</hp:p>', sec_custom)
-        # 옵션 적용 시 빈 문단(간격)의 charPr이 달라야 함 (8pt vs 4pt)
-        # gap 메서드에서 생성된 문단의 charPr ID를 비교하여 다른지 확인
-        # 실제 검증: 두 header의 paraPr 중 pt 값이 다른 것이 있는지 확인
         head_default = zipfile.ZipFile(dst_default).read("Contents/header.xml").decode()
         head_custom = zipfile.ZipFile(dst_custom).read("Contents/header.xml").decode()
-        # paraPr id별 pt(height) 값 추출
-        def get_charpt_map(header):
-            return {m.group(1): int(m.group(2)) for m in re.finditer(r'<hh:charPr id="(\d+)" height="(\d+)"', header)}
-        charpt_default = get_charpt_map(head_default)
-        charpt_custom = get_charpt_map(head_custom)
-        # 8pt(800)와 5pt(500) 높이가 모두 존재하는지 확인
-        # 간소화 모드 gap에서 pt=5일 때 charPr height=500, pt=8일 때 height=800
-        assert any(v == 500 for v in charpt_default.values()), "기본 header에 5pt charPr이 없음"
-        assert any(v == 800 for v in charpt_custom.values()), "커스텀 header에 8pt charPr이 없음"
+
+        # 14차 Fix 이후: 본문에서 gap() 미사용, 항목 prev 값으로 간격 처리
+        # 따라서 para_space_before 옵션에 따른 빈 문단 차이는 없음
+        # 대신 항목 문단의 prev 값이 고정되어 있음: l1=1000, l2/l3=500, note/ref=300
+
+        # prev=500 (l2/l3 간격)이 header에 존재하는지 확인
+        assert 'prev value="500"' in head_default, "기본 header에 l2/l3 prev=500이 없음"
+        assert 'prev value="500"' in head_custom, "커스텀 header에 l2/l3 prev=500이 없음"
+
+        # 빈 문단(간격 문단) 수 비교: 두 경우 모두 유사해야 함 (제목·spacer·title_gap 등 구조적 빈 문단만)
+        import re
+        empty_paras_default = re.findall(r'<hp:p\b[^>]*>(?:<hp:run[^>]*><hp:t[^>]*>\s*</hp:t></hp:run>)*</hp:p>', sec_default)
+        empty_paras_custom = re.findall(r'<hp:p\b[^>]*>(?:<hp:run[^>]*><hp:t[^>]*>\s*</hp:t></hp:run>)*</hp:p>', sec_custom)
+        # 두 경우 모두 빈 문단 수가 같아야 함 (옵션이 빈 문단에 영향 없음)
+        assert len(empty_paras_default) == len(empty_paras_custom), \
+            f"빈 문단 수 다름: default={len(empty_paras_default)}, custom={len(empty_paras_custom)} (para_space_before 옵션이 영향 주면 안 됨)"
 
     def test_simplified_options_output_example(self, tmp_path):
-        """간소화 모드 줄간격·문단 간격 옵션 적용 결과 HWPX 출력 예 (8번 항목).
-        line_spacing=200, para_space_before=8 적용 시 실제 HWPX 값 확인."""
+        """간소화 모드 줄간격 옵션 적용 결과 HWPX 출력 예 (8번 항목).
+        line_spacing=200 적용 시 실제 HWPX 값 확인.
+        참고: para_space_before 옵션은 본문에서 더 이상 사용되지 않음 (14차 Fix)."""
         dst = tmp_path / "test_options.hwpx"
         R.compose("", SIMPLE_REPORT, dst, style="simplified", line_spacing=200, para_space_before=8.0)
         sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
@@ -501,14 +500,16 @@ class TestSimplifiedCheckWarnings:
         assert 'lineSpacing type="PERCENT" value="200"' in head, "line_spacing=200% 옵션이 header에 반영되지 않음"
         # line_spacing=150(기본)이 아닌 200이 있는지 확인
         assert 'lineSpacing type="PERCENT" value="150"' not in head, "기본 line_spacing=150%가 옵션 적용 후에도 남아있음"
-        # 2. 문단 간격 8pt 적용 확인: paraPr에 <hc:prev value="800"> (8pt = 800 HWPUNIT)
-        assert 'prev value="800"' in head, "para_space_before=8pt 옵션이 header에 반영되지 않음 (prev=800 없음)"
+        # 2. 문단 간격: para_space_before 옵션은 본문에서 미사용, 항목 prev 값으로 간격 처리
+        # l1=1000(10pt), l2/l3=500(5pt), note/ref=300(3pt)
+        assert 'prev value="1000"' in head, "l1 prev=1000이 header에 없음"
+        assert 'prev value="500"' in head, "l2/l3 prev=500이 header에 없음"
         # 3. 간소화 모드 기호 없음 확인
         assert "□" not in sec, "간소화 모드 옵션 적용 HWPX에 □ 기호가 있음"
         # 4. 번호 확인 (outlineLevel은 없음 - 6차 수정)
         assert "Ⅰ. 추진 배경" in Hwpx.text(sec, True)
         assert 'outlineLevel=' not in sec
-        # 출력 예: 생성된 paraPr 중 lineSpacing=200, prev=800인 것 확인
+        # 출력 예: 생성된 paraPr 중 lineSpacing=200인 것 확인
         import re
         paras = re.findall(r'<hh:paraPr id="(\d+)"[^>]*>.*?</hh:paraPr>', head, re.S)
         for pid, pxml in re.findall(r'<hh:paraPr id="(\d+)"[^>]*>(.*?)</hh:paraPr>', head, re.S):
@@ -578,3 +579,148 @@ class TestSimplifiedGuide:
         """잘못된 style 값은 오류."""
         with pytest.raises(ValueError, match="style은 'standard' 또는 'simplified'"):
             get_writing_guide(doc_type="report", style="invalid")
+
+
+# ── 빈 문단 회귀 방지 테스트 (13차 Fix 13) ──
+
+def _count_empty_paras_after_title(sec_xml, head_xml):
+    """제목·작성일 이후 텍스트 없는 문단 수 (표 셀 안 문단 제외)."""
+    import re
+    # 표 셀 안의 문단 ID 추적
+    table_cell_p_ids = set()
+    for m in re.finditer(r'<hp:tc[^>]*>(.*?)</hp:tc>', sec_xml, re.S):
+        for pm in re.finditer(r'<hp:p id="(\d+)"[^>]*>', m.group(1)):
+            table_cell_p_ids.add(pm.group(1))
+
+    def has_text(p_xml):
+        texts = re.findall(r'<hp:t>(.*?)</hp:t>', p_xml, re.S)
+        return any(t.strip() for t in texts)
+
+    empty_count = 0
+    for m in re.finditer(r'<hp:p\b([^>]*)>(.*?)</hp:p>', sec_xml, re.S):
+        attrs = m.group(1)
+        content = m.group(2)
+        p_id = re.search(r'id="(\d+)"', attrs)
+        if not p_id:
+            continue
+        p_id = p_id.group(1)
+        if p_id in table_cell_p_ids:
+            continue  # 표 셀 안 문단은 제외
+        if not has_text(content):
+            empty_count += 1
+    return empty_count
+
+
+def _get_first_n_para_info(sec_xml, head_xml, n=15):
+    """처음 n개 문단 (텍스트 앞 10자, prev) 정보 반환."""
+    import re
+    table_cell_p_ids = set()
+    for m in re.finditer(r'<hp:tc[^>]*>(.*?)</hp:tc>', sec_xml, re.S):
+        for pm in re.finditer(r'<hp:p id="(\d+)"[^>]*>', m.group(1)):
+            table_cell_p_ids.add(pm.group(1))
+
+    result = []
+    for m in re.finditer(r'<hp:p\b([^>]*)>(.*?)</hp:p>', sec_xml, re.S):
+        attrs = m.group(1)
+        content = m.group(2)
+        p_id = re.search(r'id="(\d+)"', attrs)
+        if not p_id:
+            continue
+        p_id = p_id.group(1)
+        if p_id in table_cell_p_ids:
+            continue
+        texts = re.findall(r'<hp:t>(.*?)</hp:t>', content, re.S)
+        text_preview = ''.join(texts)[:10].replace('\u00a0', ' ').strip()
+        pid_ref = re.search(r'paraPrIDRef="(\d+)"', attrs)
+        prev_val = '0'
+        if pid_ref:
+            pm = re.search(r'<hh:paraPr id="' + pid_ref.group(1) + r'"[^>]*>.*?<hc:prev value="(\d+)"', head_xml, re.S)
+            prev_val = pm.group(1) if pm else '0'
+        result.append((p_id, text_preview, prev_val))
+        if len(result) >= n:
+            break
+    return result
+
+
+class TestSimplifiedEmptyParagraphRegression:
+    """13차 회귀 방지: 간소화 모드에서 본문·붙임의 빈 문단이 없음."""
+
+    def test_sample_report_no_empty_paras(self, tmp_path):
+        """SAMPLE_REPORT를 simplified로 생성 → 빈 문단 0개."""
+        from sample_report import SAMPLE_REPORT
+        dst = tmp_path / "sample.hwpx"
+        R.compose("", SAMPLE_REPORT, dst, style="simplified")
+        sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
+        head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
+        empty_count = _count_empty_paras_after_title(sec, head)
+        assert empty_count == 0, f"빈 문단 {empty_count}개 발견 (기대: 0)"
+
+    def test_short_sample_no_empty_paras(self, tmp_path):
+        """짧은 샘플도 빈 문단 0개."""
+        doc = {
+            "title": "짧은 테스트",
+            "date": "2026. 1. 5.",
+            "dept": "테스트과",
+            "body": [
+                {"type": "h", "text": "배경"},
+                {"type": "l1", "text": "첫 항목"},
+                {"type": "l2", "text": "하위 항목"},
+                {"type": "caption", "text": "표 제목"},
+                {"type": "table", "rows": [["A", "B"], ["1", "2"]]},
+                {"type": "l1", "text": "두 번째 항목"},
+            ],
+        }
+        dst = tmp_path / "short.hwpx"
+        R.compose("", doc, dst, style="simplified")
+        sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
+        head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
+        empty_count = _count_empty_paras_after_title(sec, head)
+        assert empty_count == 0, f"빈 문단 {empty_count}개 발견 (기대: 0)"
+
+    def test_sample_report_prev_values(self, tmp_path):
+        """SAMPLE_REPORT의 prev 값 확인: l1=1000, l2/l3=500, note/ref=300, caption=1000."""
+        from sample_report import SAMPLE_REPORT
+        dst = tmp_path / "sample.hwpx"
+        R.compose("", SAMPLE_REPORT, dst, style="simplified")
+        sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
+        head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
+
+        paras = _get_first_n_para_info(sec, head, n=50)
+        # l1은 prev=1000, l2/l3는 prev=500, note/ref는 prev=300
+        for pid, text, prev in paras:
+            if text.startswith("*") or text.startswith("※"):
+                assert prev == "300", f"note/ref prev={prev} (기대: 300): {text[:20]}"
+            elif text.startswith("가.") or text.startswith("나.") or text.startswith("다."):
+                assert prev == "500", f"l2 prev={prev} (기대: 500): {text[:20]}"
+            elif text.startswith("1)") or text.startswith("2)") or text.startswith("3)"):
+                assert prev == "500", f"l3 prev={prev} (기대: 500): {text[:20]}"
+            elif text.startswith("1.") or text.startswith("2.") or text.startswith("3.") or text.startswith("4."):
+                # l1 또는 caption (〈표 N〉)
+                if "〈표" in text:
+                    assert prev == "1000", f"caption prev={prev} (기대: 1000): {text[:20]}"
+            elif "〈표" in text:
+                assert prev == "1000", f"caption prev={prev} (기대: 1000): {text[:20]}"
+
+    def test_appendix_no_empty_paras(self, tmp_path):
+        """붙임 본문도 빈 문단 0개."""
+        doc = {
+            "title": "붙임 테스트",
+            "date": "2026. 1. 5.",
+            "dept": "테스트과",
+            "body": [
+                {"type": "h", "text": "본문"},
+                {"type": "l1", "text": "본문 항목"},
+            ],
+            "appendix": [
+                {"title": "붙임 1", "heading": "붙임 내용", "body": [
+                    {"type": "l1", "text": "붙임 첫 항목"},
+                    {"type": "l2", "text": "붙임 하위 항목"},
+                ]},
+            ],
+        }
+        dst = tmp_path / "appendix.hwpx"
+        R.compose("", doc, dst, style="simplified")
+        sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
+        head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
+        empty_count = _count_empty_paras_after_title(sec, head)
+        assert empty_count == 0, f"붙임 포함 빈 문단 {empty_count}개 발견 (기대: 0)"
