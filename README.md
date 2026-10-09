@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
 
-> **0.2.0부터 업스테이지 Solar Pro 4로 개발합니다.** 간소화 모드(행안부 AI 친화적 보고서)·마크다운 출력·내부 결재 보고서는 Solar Pro 4(Solar Code CLI)가 코드를 작성하고, Claude가 결과를 검증했습니다.
+> **0.2.0부터 업스테이지 Solar Pro 4로 개발합니다.** 간소화 모드·마크다운 출력·내부 결재 보고서는 Solar Pro 4(Solar Code CLI)가 코드를 작성하고, Claude가 결과를 검증했습니다.
 
 **공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다.
 
@@ -70,7 +70,7 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 ### 간소화 모드 (style="simplified")
 
-행안부 'AI 친화적 보고서' 기준에 맞춘 간소화 서식. 항목 기호를 단계별 번호로 자동 부여하고, 제목 상자·표 머리 음영을 없앤 간결한 서식.
+AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 단순한 표). 항목 기호를 단계별 번호로 자동 부여하고, 제목 상자·표 머리 음영을 없앤 간결한 서식.
 
 **사용법**: `build_document(..., style="simplified")` 또는 `get_writing_guide(..., style="simplified")`로 지정.
 
