@@ -4,7 +4,9 @@
 
 ![Demo: one memo → standard and simplified reports (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
 
-[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) · [한국어](README.md)
+[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [한국어](README.md)
+
+> **Developed with Upstage Solar Pro 4 since 0.2.0.** Simplified mode, Markdown output and internal approval reports were written by Solar Pro 4 (Solar Code CLI) and verified by Claude.
 
 **Korean civil-service documents (reports and press releases) as HWPX, in each agency's format.** Your own AI (Claude, ChatGPT, …) structures the memo or draft, and the server draws a Hangul (HWPX) file from format rules for 52 central government agencies.
 
