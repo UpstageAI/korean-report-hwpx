@@ -191,6 +191,7 @@ class OfficialComposer(Composer):
         title = self.doc.get("title", "")
         tlbl = self._hl.get("labels", {}).get("title", "제목")
         out.append(self.p(pp, [(cp, f"{tlbl}{gap}{title}")]))
+        out.append(self._가로선())     # 별지 제1호서식: 두문 아래 가로선
         out.append(self._빈줄(6.0))   # 두문 → 본문 간격
         return out
 
@@ -245,7 +246,8 @@ class OfficialComposer(Composer):
                     prefix = _번호(lvl)
                     text = prefix + text
                     left = _왼쪽들여쓰기(lvl)
-                    pp = self.para_pr("JUSTIFY", line, left=left)
+                    hang = int(pt * 100 * (0.55 * sum(1 for ch in prefix if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix if ord(ch) >= 0x3000)))   # 번호 폭(영문·숫자 반각, 한글 전각)
+                    pp = self.para_pr("JUSTIFY", line, indent=-hang, left=left + hang, word=False)   # 둘째 줄부터 번호 다음 글자 위치에 맞춤(내어쓰기)
                     cp = self.char(font, pt)
                     out.append(self.p(pp, [(cp, text)]))
                 elif typ == "table":
@@ -269,7 +271,7 @@ class OfficialComposer(Composer):
                     out.append(self.p(pp, [(cp, f"< {cap} >")]))
                 elif typ == "h":
                     txt = b.get("text", "")
-                    pp = self.para_pr("JUSTIFY", line, keep=True)
+                    pp = self.para_pr("JUSTIFY", line, keep=True, word=False)
                     cp = self.char(font, pt, bold=True)
                     out.append(self.p(pp, [(cp, txt)]))
                 elif typ in ("p", "plain"):
@@ -388,7 +390,7 @@ class OfficialComposer(Composer):
         # 실제 sender 규칙: _공통.json의 sender 키
         snd = self.R.get("sender", self._org_r)
         cp = self.ch({"font": snd.get("font"), "pt": float(snd.get("pt")), "bold": False})
-        pp = self.para_pr("CENTER", 100)
+        pp = self.para_pr("CENTER", 100, prev=int(snd.get("before_pt", 20.0) * 100), keep=True)
         out.append(self.p(pp, [(cp, sender)]))
 
         # 2. to가 "수신자 참조"면 수신자란
@@ -402,28 +404,68 @@ class OfficialComposer(Composer):
             pp2 = self.para_pr("JUSTIFY", int(self._body.get("line", 160)))
             out.append(self.p(pp2, [(self.char(font, pt), txt)]))
 
-        # 3. 결재란: 첫 행 직위, 둘째 행 서명(빈 줄 또는 name)
-        out.extend(self._결재란(approval))
-
-        # 4. 협조자
-        coords = approval.get("coordinators", [])
-        if coords:
-            lbl = self._appr.get("coordinator_label", "협조자")
-            g = self._appr.get("label_gap", "  ")
-            pos = [c.get("title", "") for c in coords]
-            txt = f"{lbl}{g}{' / '.join(pos)}"
-            pt = float(self._body.get("pt", 15.0))
-            font = self._body.get("font", "휴먼명조")
-            pp3 = self.para_pr("JUSTIFY", int(self._body.get("line", 160)))
-            out.append(self.p(pp3, [(self.char(font, pt), txt)]))
-
-        # 5. 시행 / 접수
-        out.extend(self._시행접수(doc_no))
-
-        # 6. 주소 + 홈페이지
-        out.extend(self._주소연락처(contact))
-
+        # 3~6. 결재란·협조자·시행/접수·주소·연락처를 테두리 있는 표 하나로 (별지 제1호서식 결문 틀, Claude 10-14)
+        out.append(self._결문표(approval, doc_no, contact))
         return out
+
+    def _가로선(self, width="0.12 mm", height=80):
+        """가로선 한 줄(아래 변만 있는 1칸 표). 별지 제1호서식의 두문 아래·결문 아래 선."""
+        bf = self.border_sides(("bottom",), width=width)
+        W = int(self.text_w - 200)
+        cell = self.cell(0, 0, W, height, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), bf, margin=(0, 0, 0, 0))
+        return self._표블록([cell], 1, 1, W, height, bf)
+
+    def _결문표(self, approval, doc_no, contact):
+        """별지 제1호서식 결문: 회색 구분선 → 기안자·검토자·결재권자(직위·서명) 한 줄 → 협조자 → 시행 | 접수 → 우 주소 / 홈페이지 →
+        전화번호 팩스번호 / 전자우편 / 공개 구분 → 아래 가로선. 격자 없이 줄글(칸 선 없음), 값은 rules_official."""
+        fl, ap = self._foot, self._appr
+        cp = self.char(fl.get("font", "맑은 고딕"), float(fl.get("pt", 11.0)))
+        cpa = self.char(ap.get("font", "맑은 고딕"), float(ap.get("pt", 11.0)))
+        none = self.border_sides(())                                   # 선 없음
+        bottom = self.border_sides(("bottom",), width="0.12 mm")      # 마지막 줄 아래 가로선
+        W = int(self.text_w - 200)
+        def para(text, cpx=cp, align="LEFT"):
+            return self.p(self.para_pr(align, 130), [(cpx, text)])
+        drafter = approval.get("drafter", {}); reviewers = approval.get("reviewers", []); approver = approval.get("approver", {})
+        opinion = ap.get("opinion_text", "(의견 있음)")
+        titles = [f"{drafter.get('mark', '')}{drafter.get('title', '')}"] + \
+                 [f"{r.get('title', '')}{opinion if r.get('opinion') else ''}" for r in reviewers] + [approver.get("title", "")]
+        names = [drafter.get("name", "") or ""] + [r.get("name", "") or "" for r in reviewers] + [approver.get("name", "") or ""]
+        k = max(1, len(titles)); w = W // k
+        h1 = int(float(fl.get("pt", 11.0)) * 100 * 1.5) + 200
+        rows, H, r = [], 0, 0
+        # 회색 구분선(서식의 굵은 회색 띠)
+        bar_h = int(2.2 * C.HU_MM)
+        rows.append(self.cell(0, r, W, bar_h, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), self.border_sides((), fill="#BFBFBF"), colspan=k, margin=(0, 0, 0, 0))); H += bar_h; r += 1
+        # 기안자·검토자·결재권자: 직위 (서명은 성명이 있으면 뒤에)
+        rows.append("".join(self.cell(i, r, w, h1, para(f"{t}  {n}".rstrip(), cpa), none) for i, (t, n) in enumerate(zip(titles, names)))); H += h1; r += 1
+        coords = approval.get("coordinators", [])
+        txt = f"{ap.get('coordinator_label', '협조자')}{ap.get('label_gap', '  ')}{' / '.join(c.get('title', '') for c in coords)}" if coords else ap.get("coordinator_label", "협조자")
+        rows.append(self.cell(0, r, W, h1, para(txt, cpa), none, colspan=k)); H += h1; r += 1
+        issue = f"{fl.get('issue', '시행')}  {doc_no.get('issue', '')} ({_정규화날짜(doc_no.get('issue_date', ''))})"
+        if doc_no.get("receive"):
+            recv = f"{fl.get('receive', '접수')}  {doc_no.get('receive', '')} ({_정규화날짜(doc_no.get('receive_date', ''))})"
+            half = max(1, k // 2)
+            rows.append(self.cell(0, r, w * half, h1, para(issue), none, colspan=half) + self.cell(half, r, W - w * half, h1, para(recv), none, colspan=k - half))
+        else:
+            rows.append(self.cell(0, r, W, h1, para(issue), none, colspan=k))
+        H += h1; r += 1
+        addr = f"{fl.get('zip', '우')} {contact.get('zip', '')}  {contact.get('address', '')}{fl.get('sep', '  /  ')}{contact.get('homepage', '')}"
+        rows.append(self.cell(0, r, W, h1, para(addr), none, colspan=k)); H += h1; r += 1
+        cnt = (f"{fl.get('phone', '전화번호')} {contact.get('phone', '')}  {fl.get('fax', '팩스번호')} {contact.get('fax', '')}"
+               f"{fl.get('sep', '  /  ')}{contact.get('email', '')}{fl.get('sep', '  /  ')}{contact.get('disclosure', '')}")
+        rows.append(self.cell(0, r, W, h1, para(cnt), bottom, colspan=k)); H += h1; r += 1
+        return self._표블록(rows, r, k, W, H, none, page_break="TABLE")
+
+    def _표블록(self, rows, nrow, ncol, W, H, bf, page_break="CELL"):
+        """compose.table과 같은 배치(글자처럼 취급 끔, 쪽 넘김 가능)로 표 문단을 만든다 — 결문 표가 통째로 다음 쪽으로 밀리지 않게 (Claude 10-14)."""
+        from compose import _rid
+        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="{page_break}" repeatHeader="0" '
+               f'rowCnt="{nrow}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bf}" noAdjust="0"><hp:sz width="{int(W)}" widthRelTo="ABSOLUTE" height="{int(H)}" heightRelTo="ABSOLUTE" protect="0"/>'
+               '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
+               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(f"<hp:tr>{r}</hp:tr>" for r in rows) + "</hp:tbl>")
+        return (f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                f'<hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>')
 
     def _결재란(self, approval):
         """결재란: 첫 행에 기안자·검토자·결재권자 직위(마크+의견), 둘째 행에 서명(name 또는 빈 줄)."""
