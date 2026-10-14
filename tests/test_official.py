@@ -135,7 +135,7 @@ def test_end_mark_after_table_without_attachments(tmp_path):
 def test_end_mark_on_last_text_line(built_internal):
     r, z, sec, head, text = built_internal
     lines = _lines(sec)
-    last_body = next(l for l in lines if l.startswith("나. 2026. 11. 2.") or l.startswith("나. 2026. 11. 02."))
+    last_body = next(l for l in lines if l.startswith("가. 2026. 11. 2.") or l.startswith("가. 2026. 11. 02."))   # 두 번째 1. 아래 첫 항목이라 '가.'(상위 바뀌면 초기화)
     assert last_body.endswith(f"{RULES['end_mark']['gap']}{RULES['end_mark']['text']}")
 
 
