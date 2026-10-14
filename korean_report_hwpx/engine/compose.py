@@ -496,7 +496,8 @@ class Composer:
                 v = str(r[ci]) if ci < len(r) else ""
                 is_head = (head and ri == 0) or (label_col and ci == 0)
                 num = bool(re.fullmatch(r"[\d,.%△▲▽+\-~() ]+[^\s]{0,3}", v.strip())) and any(c.isdigit() for c in v)
-                align = "CENTER" if (is_head or len(v) <= 12 or ci == 0) else ("RIGHT" if num else "JUSTIFY")
+                is_date = bool(re.fullmatch(r"\d{4}\.\s?\d{1,2}\.\s?\d{1,2}\.?", v.strip()))   # 날짜 칸은 길이와 무관하게 가운데 (Claude 10-14)
+                align = "CENTER" if (is_head or is_date or len(v) <= 12 or ci == 0) else ("RIGHT" if num else "JUSTIFY")
                 cp = self.char(th.get("font") or "맑은 고딕", tpt if is_head else min(tpt, 11.0), -2, is_head and th.get("bold", True))
                 lines = v.split("\n") or [""]
                 n_lines = len(lines)
