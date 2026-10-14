@@ -1,0 +1,17 @@
+{
+  "_설명": "기안문(별지 제1호서식) 서식 값. 작성 Mia(윤승미)·Claude 2026-10-14. 근거: 행정업무의 운영 및 혁신에 관한 규정 제7조④⑤⑥, 시행규칙 제2조·제4조·제6조(법제처 2026-01-01 시행본). 본문 글꼴·크기·줄 간격은 보고서 공통 규칙(rules_report/_공통.json 1계층)과 같게 두어 기관 문서와 톤을 맞춤. 두문·결문 글꼴 크기는 별지 제1호서식 실물 관행값",
+  "org": {"font": "HY헤드라인M", "pt": 22.0, "align": "CENTER", "after_pt": 10.0},
+  "head_line": {"font": "휴먼명조", "pt": 15.0, "line": 160, "labels": {"to": "수신", "via": "(경유)", "title": "제목"}, "label_gap": "  "},
+  "body": {"font": "휴먼명조", "pt": 15.0, "line": 160, "indent_per_level": 2, "numbering": ["1.", "가.", "1)", "가)", "(1)", "(가)", "①", "㉮"], "after_mark": " "},
+  "attachments": {"label": "붙임", "label_gap": "  ", "numbered_from": 2},
+  "end_mark": {"text": "끝.", "gap": "  "},
+  "sender": {"font": "HY헤드라인M", "pt": 18.0, "align": "CENTER", "before_pt": 20.0, "after_pt": 10.0},
+  "recipients": {"label": "수신자", "label_gap": "  ", "sep": ", "},
+  "approval_table": {"font": "맑은 고딕", "pt": 11.0, "title_row_fill": null, "sign_row_height_mm": 12.0, "opinion_text": "(의견 있음)", "coordinator_label": "협조자", "label_gap": "  "},
+  "footer_lines": {"font": "맑은 고딕", "pt": 11.0, "line": 150,
+    "issue": "시행", "receive": "접수", "zip": "우", "phone": "전화번호", "fax": "팩스번호", "sep": "  /  ",
+    "disclosure_values": ["공개", "부분공개", "비공개"]},
+  "date": {"format": "YYYY. MM. DD.", "normalize_from": ["YYYY-MM-DD", "YYYY.MM.DD", "YYYY. MM. DD"]},
+  "page": {"width_mm": 210, "height_mm": 297},
+  "amount_rule": {"pattern": "금\\d|\\d{1,3}(,\\d{3})+원", "requires": "(금…원) 한글 병기", "basis": "시행규칙 제2조②"}
+}
