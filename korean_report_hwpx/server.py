@@ -26,15 +26,16 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "engine"))
 import compose as C  # noqa: E402
 import report as RP  # noqa: E402
+import official as O  # noqa: E402 — _정규화날짜, _unroll_table_rows, _strip_existing_number 등
 
-DOC_TYPES = ("report", "press_release")
-LABEL = {"report": "보고서", "press_release": "보도자료"}
+DOC_TYPES = ("report", "press_release", "official")
+LABEL = {"report": "보고서", "press_release": "보도자료", "official": "기안문"}
 STYLES = ("standard", "simplified")
 REPORT_KINDS = ("standard", "internal")
 
 mcp = MCPServer(
-    "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료)",
-    instructions="사용자가 '공문서처럼 써 줘', '보고서로 만들어 줘', '보도자료로 만들어 줘'처럼 한국 공무원 문서 양식의 HWPX(한글 파일)를 원할 때 쓴다. "
+    "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료·기안문)",
+    instructions="사용자가 '공문서처럼 써 줘', '보고서로 만들어 줘', '보도자료로 만들어 줘', '기안문·시행문으로 만들어 줘'처럼 한국 공무원 문서 양식의 HWPX(한글 파일)를 원할 때 쓴다. "
                  "외부 API 없이 로컬에서 동작한다. 순서: get_writing_guide로 작성 규칙과 구조 스키마 확인 → 원고를 구조 JSON으로 정리 "
                  "→ (선택) check_structure → build_document. 결과의 warnings가 있으면 구조를 고쳐 다시 build_document. "
                  "기관을 말하지 않으면 ministry를 비워 공통 서식(보고서)으로 만든다. 원고에 없는 사실·숫자·담당자는 지어내지 않는다.")
@@ -112,6 +113,29 @@ EXAMPLE_PRESS = {
              {"type": "l2", "text": "자주 찾는 민원 20종을 우선 안내 참고 1"}],
     "appendix": [{"title": "참고 1", "heading": "서비스 개요", "body": [{"type": "l1", "text": "(대상) 자주 찾는 민원 20종"}]}],
     "contact": {"dept": "", "people": []}}
+OFFICIAL_EXAMPLE = {
+    "org": "행정안전부", "to": "수신자 참조", "via": "",
+    "title": "2026년 공공부문 AI 업무도구 실증 참여 안내",
+    "body": [
+        {"type": "l1", "text": "국산 AI 모델 실증(POC) 참여 기관을 다음과 같이 안내합니다."},
+        {"type": "l2", "text": "실증 기간: 2026. 11. 2. ~ 2026. 12. 19."},
+        {"type": "l2", "text": "실증 범위: 업무 단위 도구의 시제품(POC·MVP) 수준"},
+        {"type": "l3", "text": "문서 기반 추출·요약·분류, 법령 근거를 붙인 검토, 서식 채우기"},
+        {"type": "l3", "text": "민원 분류·배정 같은 정형 판단"},
+        {"type": "l1", "text": "참여를 희망하는 기관은 2026. 10. 31.까지 참여 신청서를 제출해 주시기 바랍니다."},
+        {"type": "l2", "text": "실증 지원 예산은 기관당 금5,000,000원(금오백만원) 한도입니다."},
+        {"type": "table", "rows": [["구분", "내용", "기한"], ["신청", "참여 신청서 제출", "2026. 10. 31."], ["선정", "결과 통보", "2026. 11. 7."]]}],
+    "attachments": ["실증 참여 신청서 1부.", "실증 참여 안내문 1부."],
+    "recipients": ["기획재정부장관", "국세청장", "조달청장"],
+    "sender": "행정안전부장관",
+    "approval": {
+        "drafter": {"title": "주무관", "name": "", "mark": "★"},
+        "reviewers": [{"title": "디지털정부과장", "name": "", "opinion": False}, {"title": "디지털정부국장", "name": "", "opinion": True}],
+        "approver": {"title": "차관", "name": ""},
+        "coordinators": [{"title": "정보공개정책과장"}]},
+    "doc_no": {"issue": "디지털정부과-1234", "issue_date": "2026. 10. 14.", "receive": "", "receive_date": ""},
+    "contact": {"zip": "30112", "address": "세종특별자치시 한누리대로 411", "homepage": "www.mois.go.kr",
+                "phone": "044-000-0000", "fax": "044-000-0001", "email": "○○○@korea.kr", "disclosure": "공개"}}
 SCHEMA = {
     "report": {"title": "str(필수)", "date": "str", "dept": "str", "body": "[블록]", "appendix": "[{title, heading, body:[블록]}]"},
     "press_release": {"release": "str", "distribute": "str", "title": "str(필수)", "subtitles": "[str]", "body": "[블록]",
@@ -125,11 +149,40 @@ def _style(ministry):
     return "문단식(기호 없는 기사체 문단 위주)" if C.load_rules(ministry).get("style") == "para" else "□식(□→ㅇ→- 개조식)"
 
 
+OFFICIAL_RULES = """[기안문·시행문(별지 제1호서식) 규칙 — doc_type="official"]
+- org: 두문 행정기관명(필수). 상급기관 병기는 "국무조정실 ○○위원회"처럼 한 줄로.
+- to: 수신자(필수). "내부결재" | "○○장관(○○과장)" | "수신자 참조" 중 하나. "내부결재"면 결문에 수신자란 없음.
+- via: 경유(선택). 있으면 "(경유)  {via}" 줄에 표시.
+- title: 문서 제목(필수).
+- body: 블록 배열. type=l1~l6으로 항목 번호 자동 부여(서버가 부여, 사용자는 번호를 쓰지 않음):
+  번호 체계: 1., 가., 1), 가), (1), (가). l1→1. / l2→가. / l3→1) / l4→가) / l5→(1) / l6→(가). 같은 계층 안에서 순서대로 증가,
+  상위 계층이 바뀌면 하위 계층 번호 초기화. text에 이미 같은 형태 번호가 있으면 떼고 다시 붙임.
+  둘째 계층부터 상위 계층 번호 시작 위치에서 2타(한 글자) 오른쪽에서 시작(들여쓰기).
+  type=table(rows 2차원 배열)·type=lines(lines 문자열 배열)도 사용 가능.
+- 금액 표기: 금\\d 또는 \\d{1,3}(,\\d{3})+원 형태 뒤에는 반드시 (금…원) 한글 병기를 붙인다(시행규칙 제2조②).
+  없으면 build_document가 warnings에 "금액 한글 병기 필요(시행규칙 제2조②): …"를 낸다(생성 막지 않음).
+- attachments: 붙임 목록(선택). 1개면 "붙임  {명칭}", 2개 이상이면 "붙임  1. {명칭}" / "      2. {명칭}".
+- "끝.": 본문(붙임이 있으면 붙임) 마지막 글자에서 한 글자(2타) 띄우고 "끝."(제4조⑤). 본문이 table로 끝나고 붙임이 없으면
+  표 아래 왼쪽 기본선에서 한 글자 띄운 "끝." 줄을 따로 둔다. 문서 전체에서 "끝."은 정확히 한 번.
+- recipients: to가 "수신자 참조"일 때 결문 발신 명의 다음 줄에 "수신자  {recipients를 ', '로}" 표시.
+- sender: 발신 명의(필수), 결문 가운데 정렬 큰 글씨.
+- approval(결재란, 필수): drafter({title, name, mark:"★"|"⊙"|""}), reviewers([{title, name, opinion:bool}]),
+  approver({title, name}), coordinators([{title}]). mark "★"=발의자, "⊙"=보고자(제6조①).
+  결재란 표: 첫 행에 "{mark}{title}{(의견 있음)}" 순서로 기안자·검토자·결재권자, 둘째 행은 서명 칸(name이 있으면 성명, 없으면 비움).
+  그 아래 "협조자  {직위들}"(있을 때).
+- doc_no: {issue, issue_date, receive, receive_date}. issue_date/receive_date는 YYYY-MM-DD·YYYY.MM.DD면 YYYY. MM. DD.로 정규화(영 제7조⑤).
+- contact: {zip, address, homepage, phone, fax, email, disclosure}. disclosure는 "공개"|"부분공개"|"비공개"만 허용.
+- 날짜·시각: 그대로 받되 YYYY-MM-DD·YYYY.MM.DD 꼴이면 YYYY. MM. DD.로 정규화(영 제7조⑤). 예: "2026-10-14" → "2026. 10. 14."
+- 성명·전화 정화: name이 비어 있으면 서명 칸을 비우고(자리표시 "○○○" 아님), 전화·팩스는 입력값 그대로.
+- export_markdown=True면 같은 내용을 .md로(제목 #, 항목은 번호 글자 그대로, 결문은 표 없이 줄로)."""
+
+
 def guide_text(doc_type="report", ministry=None, style="standard"):
     t = _norm_type(doc_type)
     parts = [CHOOSE, COMMON_RULES]
     if t in ("report", "auto"): parts.append(REPORT_RULES)
     if t in ("press_release", "auto"): parts.append(PRESS_RULES)
+    if t in ("official",): parts.append(OFFICIAL_RULES)
     if ministry and ministry in C.ministries(): parts.append(f"[기관] {ministry} — 보도자료 본문 방식: {_style(ministry)}")
     if style == "simplified":
         parts.append(SIMPLIFIED_RULES)
@@ -148,14 +201,16 @@ def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str =
     out = {"guide": guide_text(t, ministry or None, style), "schema": SCHEMA, "style": style}
     if t in ("report", "auto"): out["example_report"] = EXAMPLE_REPORT
     if t in ("press_release", "auto"): out["example_press_release"] = EXAMPLE_PRESS
+    if t in ("official",): out["example_official"] = OFFICIAL_EXAMPLE
     if ministry and ministry in C.ministries(): out["ministry_style"] = _style(ministry)
     return out
 
 
 @mcp.prompt(name="writing_guide", title="공문서 작성 규칙")
 def writing_guide_prompt(doc_type: str = "report", ministry: str = "") -> str:
-    """원고를 보고서·보도자료 구조로 정리할 때의 작성 규칙과 구조 예시."""
-    ex = EXAMPLE_PRESS if _norm_type(doc_type) == "press_release" else EXAMPLE_REPORT
+    """원고를 보고서·보도자료·기안문 구조로 정리할 때의 작성 규칙과 구조 예시."""
+    t = _norm_type(doc_type)
+    ex = EXAMPLE_PRESS if t == "press_release" else (OFFICIAL_EXAMPLE if t == "official" else EXAMPLE_REPORT)
     return guide_text(doc_type, ministry or None) + "\n\n[구조 예시]\n" + json.dumps(ex, ensure_ascii=False, indent=1)
 
 
@@ -278,10 +333,40 @@ def _check_simplified_structure(s, t):
     return w
 
 
+def _validate_official(structure):
+    """기안문 구조 필수 검증: 필수 키, to·disclosure 허용값, 결재란 drafter·approver 필수, attachments 문자열 목록.
+    위반 시 Exception 발생 (check_structure 테스트용)."""
+    s = structure or {}
+    # 필수 키
+    for key in ("org", "to", "title", "sender", "approval"):
+        if not s.get(key):
+            raise ValueError(f"기안문 필수 필드 누락: {key}")
+    # to 허용값
+    to = s.get("to", "")
+    if to not in ("내부결재", "수신자 참조") and not (to.endswith("장관") or to.endswith("청장") or to.endswith("과장") or "(" in to):
+        pass  # to는 자유 형식도 허용 — 수신자 참조/내부결재 이외는 값 자체 허용
+    # disclosure 허용값
+    disclosure = (s.get("contact") or {}).get("disclosure", "")
+    if disclosure and disclosure not in ("공개", "부분공개", "비공개"):
+        raise ValueError(f"disclosure는 '공개'|'부분공개'|'비공개'만 허용: {disclosure}")
+    # approval 필수 키
+    appr = s.get("approval") or {}
+    if not appr.get("drafter"):
+        raise ValueError("기안문 approval.drafter(결재란 기안자) 누락")
+    if not appr.get("approver"):
+        raise ValueError("기안문 approval.approver(결재권자) 누락")
+    # attachments는 문자열 목록(선택이지만 형식 검증)
+    atts = s.get("attachments") or []
+    if not all(isinstance(a, str) for a in atts):
+        raise ValueError("attachments는 문자열 목록이어야 함")
+
+
 def check(structure, doc_type="report", style="standard"):
     t = _norm_type(doc_type)
     if t == "auto": t = "press_release" if any(k in (structure or {}) for k in ("release", "contact", "subtitles")) else "report"
     s, w = _normalize(structure, t)
+    if t == "official":
+        _validate_official(s)
     w = w + _style_warnings(s, t, style)
     if style == "simplified":
         w = w + _check_simplified_structure(s, t)
@@ -304,109 +389,8 @@ def _dst(ministry, title, out_path, doc_type):
     return Path(out_path).expanduser() if out_path else out_dir() / f"{name}_{LABEL[doc_type]}_{re.sub(r'[^가-힣A-Za-z0-9]+', '_', title or LABEL[doc_type])[:30]}.hwpx"
 
 
-# 기존 번호 접두사 제거용 정규식: 텍스트 앞에 이미 붙은 번호(Ⅰ. 1. 가. 1) 가) 등)를 제거
-_EXISTING_NUMBER_RE = re.compile(
-    r"^\s*"  # 선행 공백
-    r"(?:"  # 번호 패턴 그룹 시작
-    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\."  # 로마 숫자: Ⅰ. Ⅱ. 등
-    r"|[1-9][0-9]?\."  # 아라비아 숫자: 1. 2. 10. 등
-    r"|[가-힣]\."  # 한글 자음: 가. 나. 등
-    r"|[1-9][0-9]?\)"  # 괄호 숫자: 1) 2) 등
-    r"|[가-힣]\)"  # 괄호 한글: 가) 나) 등
-    r")"
-    r"\s*"  # 번호 뒤 공백
-)
-
-
-def _strip_existing_number(text):
-    """텍스트 앞에 이미 붙은 번호 접두사(Ⅰ. 1. 가. 1) 가) 등)를 제거.
-    간소화 모드에서 자동 번호 부여 시 중복을 방지하기 위해 사용."""
-    if not text:
-        return text
-    return _EXISTING_NUMBER_RE.sub("", text, count=1)
-
-
-def _simplify_numbers(s):
-    """구조 JSON의 body와 appendix에 간소화 모드 번호(Ⅰ. 1. 가. 1) 가))를 자동 부여.
-    level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음.
-    텍스트에 이미 붙은 번호 접두사는 정규화로 제거한 후 자동 번호를 부여한다."""
-    counters = [0, 0, 0, 0, 0]  # Ⅰ., 1., 가., 1), 가) 카운터
-
-    def _number_for_level(level):
-        """수준에 따른 번호 문자열 반환. 리셋은 _process_body에서 처리."""
-        if level == 0:  # h (소제목)
-            counters[0] += 1
-            roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ"]
-            return f"{roman[counters[0] - 1]}. "
-        elif level == 1:  # l1
-            counters[1] += 1
-            return f"{counters[1]}. "
-        elif level == 2:  # l2
-            counters[2] += 1
-            gajja = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
-            return f"{gajja[counters[2] - 1]}. "
-        elif level == 3:  # l3
-            counters[3] += 1
-            return f"{counters[3]}) "
-        else:  # level >= 4: 가)
-            counters[4] += 1
-            gajja = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
-            return f"{gajja[counters[4] - 1]}) "
-        return ""
-
-    def _process_body(body):
-        result = []
-        for b in body:
-            typ = b.get("type")
-            new_b = dict(b)
-            if typ in ("h", "l1", "l2", "l3"):
-                level = {"h": 0, "l1": 1, "l2": 2, "l3": 3}[typ]
-                # 번호 수준 리셋: 상위 수준 등장 시 하위 카운터만 리셋 (자기 카운터는 증가만)
-                if typ == "h":
-                    counters[1] = 0; counters[2] = 0; counters[3] = 0; counters[4] = 0
-                elif typ == "l1":
-                    counters[2] = 0; counters[3] = 0; counters[4] = 0  # l2, l3, l4 리셋
-                elif typ == "l2":
-                    counters[3] = 0; counters[4] = 0  # l3, l4 리셋
-                elif typ == "l3":
-                    counters[4] = 0  # l4 리셋
-                # 기존 번호 접두사 제거 후 자동 번호 부여 (항목 1: 번호 이중화 방지)
-                text = _strip_existing_number(b.get("text", ""))
-                new_b["text"] = _number_for_level(level) + text
-            elif typ in ("note", "ref"):
-                # note/ref는 현재 l1 수준 유지
-                pass
-            if "body" in b:
-                new_b["body"] = _process_body(b["body"])
-            result.append(new_b)
-        return result
-
-    s = dict(s)
-    s["body"] = _process_body(s.get("body") or [])
-    s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
-    return s
-
-
-def _add_table_numbers(s):
-    """간소화 모드: caption 앞에 〈표 N〉 형식 자동 번호 부여."""
-    table_counter = [0]
-
-    def _process_body(body):
-        result = []
-        for b in body:
-            new_b = dict(b)
-            if b.get("type") == "caption":
-                table_counter[0] += 1
-                new_b["text"] = f"〈표 {table_counter[0]}〉 " + b.get("text", "")
-            if "body" in b:
-                new_b["body"] = _process_body(b["body"])
-            result.append(new_b)
-        return result
-
-    s = dict(s)
-    s["body"] = _process_body(s.get("body") or [])
-    s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
-    return s
+# 중복 정의 제거 — report.py에서 import
+from report import _strip_existing_number, _simplify_numbers, _add_table_numbers  # noqa: F401
 
 
 def _convert_table_titles(s):
@@ -433,8 +417,9 @@ def _convert_table_titles(s):
 
 def _norm_type(doc_type):
     t = (doc_type or "auto").strip().lower().replace("-", "_")
-    t = {"보고서": "report", "보도자료": "press_release", "press": "press_release", "자동": "auto"}.get(doc_type, t)
-    if t not in DOC_TYPES + ("auto",): raise ValueError(f"doc_type은 'auto'·'report'·'press_release' 중 하나: {doc_type}")
+    t = {"보고서": "report", "보도자료": "press_release", "press": "press_release", "자동": "auto",
+         "기안문": "official", "시행문": "official", "official": "official"}.get(doc_type, t)
+    if t not in DOC_TYPES + ("auto",): raise ValueError(f"doc_type은 'auto'·'report'·'press_release'·'official' 중 하나: {doc_type}")
     return t
 
 
@@ -452,6 +437,22 @@ def _today():
     return f"{d.year}. {d.month}. {d.day}."
 
 
+def _normalize_official_dates(doc):
+    """기안문 날짜 정규화: doc_no의 issue_date/receive_date 및 body 텍스트 내 YYYY-MM-DD·YYYY.MM.DD → YYYY. MM. DD."""
+    import re as _re
+    dn = doc.get("doc_no") or {}
+    for k in ("issue_date", "receive_date"):
+        if dn.get(k):
+            dn[k] = O._정규화날짜(dn[k])
+    # body 텍스트 내 날짜 정규화 (YYYY-MM-DD → YYYY. MM. DD.)
+    for b in doc.get("body") or []:
+        if b.get("text"):
+            b["text"] = _re.sub(r"(\d{4})-(\d{1,2})-(\d{1,2})",
+                                lambda m: f"{m.group(1)}. {int(m.group(2))}. {int(m.group(3))}.",
+                                b["text"])
+    return doc
+
+
 def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placeholder_contact=True, polish=False, style="standard", report_kind="standard"):
     if doc_type == "report":
         if not str(doc.get("date") or "").strip():
@@ -461,6 +462,13 @@ def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placehold
             PL.polish(ministry, doc, dst, log=lambda m: None, build=RP.compose, logo_path=logo_path or None)
         else:
             RP.compose(ministry, doc, dst, logo_path=logo_path or None, style=style, report_kind=report_kind)
+    elif doc_type == "official":
+        # 날짜 정규화는 build_document에서 이미 완료 (s_for_md용)
+        if polish:
+            import polish as PL
+            PL.polish(ministry, doc, dst, log=lambda m: None, build=O.compose, logo_path=logo_path or None)
+        else:
+            O.compose(ministry, doc, dst, logo_path=logo_path or None)
     else:
         kw = dict(logo_path=logo_path or None, slogan_path=slogan_path or None, placeholder_contact=placeholder_contact)
         if polish:
@@ -473,28 +481,98 @@ def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placehold
 
 @mcp.tool()
 def list_ministries() -> list[dict]:
-    """지원 기관과 문서 종류별 지원 여부. 보고서: 기관 규칙(42곳) 또는 공통 규칙, 보도자료: 52개 기관.
-    보고서는 기관을 비우거나 '공통'으로 하면 기관 간 공통 서식으로 만든다."""
+    """지원 기관과 문서 종류별 지원 여부. 보고서: 기관 규칙(42곳) 또는 공통 규칙, 보도자료: 52개 기관, 기안문: rules_official/_공통.json.
+    보고서는 기관을 비우거나 '공통'으로 하면 기관 간 공통 서식으로 만든다. 기안문은 기관 지정 없이 공통 서식으로만 지원."""
     rep = set(RP.ministries()); out = []
     for o in C.ministries():
         r = C.load_rules(o)
-        out.append({"기관": o, "보고서": "기관 규칙" if o in rep else "공통 규칙", "보도자료": "지원",
+        out.append({"기관": o, "보고서": "기관 규칙" if o in rep else "공통 규칙", "보도자료": "지원", "기안문": "공통 서식",
                     "보도자료_본문방식": "문단식" if r.get("style") == "para" else "□식"})
-    out.append({"기관": "공통(미지정)", "보고서": "공통 규칙", "보도자료": "미지원(기관 지정 필요)", "보도자료_본문방식": ""})
+    out.append({"기관": "공통(미지정)", "보고서": "공통 규칙", "보도자료": "미지원(기관 지정 필요)", "기안문": "공통 서식",
+                "보도자료_본문방식": ""})
     return out
 
 
 @mcp.tool()
 def get_rules(ministry: str = "", doc_type: str = "report") -> dict:
     """기관·문서 종류별 서식 규칙값: 계층별 기호·기호 앞 공백·글꼴·크기·줄 간격, 계층 사이 빈 줄 크기,
-    보고서는 제목 상자·표 머리 규칙 포함. ministry를 비우면 보고서 공통 규칙."""
+    보고서는 제목 상자·표 머리 규칙 포함. ministry를 비우면 보고서 공통 규칙.
+    기안문(doc_type='official')은 rules_official/_공통.json 값만 반환(기관 지정 없음)."""
     t = _norm_type(doc_type)
     if t == "auto": t = "report"
     _check_ministry(ministry, t)
+    if t == "official":
+        r = dict(json.loads((ROOT / "rules_official" / "_공통.json").read_text("utf-8")))
+        r.pop("_설명", None)
+        return r
     r = RP.load_rules(ministry) if t == "report" else C.load_rules(ministry)
     r.pop("_base", None)
     if t == "report": r["적용"] = "기관 규칙" if RP.resolve(ministry)[0] != RP.COMMON else "공통 규칙"
     return r
+
+
+def _정규화날짜(s):
+    """YYYY-MM-DD / YYYY.MM.DD → YYYY. MM. DD. (server.py에서 사용)."""
+    return O._정규화날짜(s) if hasattr(O, '_정규화날짜') else s
+
+
+def _prepare_simplified_for_md(s, style="standard"):
+    """간소화 모드 s_for_md 조립: 번호 부여·표 번호·표 병합 풀어쓰기.
+    report·official이 같이 쓰는 공통 함수."""
+    if style != "simplified":
+        return s
+    s_md = _simplify_numbers(s)
+    s_md = _add_table_numbers(s_md)
+    s_md = dict(s_md)
+    s_md["body"] = [dict(b) for b in s_md.get("body", [])]
+    for b in s_md["body"]:
+        if b.get("type") == "table":
+            b["rows"] = _unroll_table_rows(b.get("rows", []))
+    for a in s_md.get("appendix", []):
+        a = dict(a)
+        a["body"] = [dict(b) for b in a.get("body", [])]
+        for b in a["body"]:
+            if b.get("type") == "table":
+                b["rows"] = _unroll_table_rows(b.get("rows", []))
+    return s_md
+
+
+def _number_official_body_for_md(s):
+    """기안문 body에 항목 번호(1. 가. 1) …)를 부여한 구조 복사본을 반환 (마크다운 export용).
+    OfficialComposer._본문()과 동일한 번호 부여 로직을 따른다."""
+    import re as _re
+    numbering = ["1.", "가.", "1)", "가)", "(1)", "(가)", "①", "㉮"]
+    counters = [0] * len(numbering)
+
+    def _strip_num(text):
+        if not text:
+            return text
+        m = _re.match(
+            r"^\s*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\.|[1-9][0-9]?\.|[가-힣]\.|[1-9][0-9]?\)|[가-힣]\))\s*",
+            text,
+        )
+        return text[m.end():] if m else text
+
+    def _process(blocks):
+        result = []
+        for b in blocks:
+            typ = b.get("type")
+            new_b = dict(b)
+            if typ in ("l1", "l2", "l3", "l4", "l5", "l6"):
+                lvl = {"l1": 0, "l2": 1, "l3": 2, "l4": 3, "l5": 4, "l6": 5}[typ]
+                for i in range(lvl + 1, len(counters)):
+                    counters[i] = 0
+                counters[lvl] += 1
+                from official import item_label
+                new_b["text"] = f"{item_label(numbering[lvl], counters[lvl])}{_strip_num(b.get('text', ''))}"
+            if "body" in b:
+                new_b["body"] = _process(b.get("body", []))
+            result.append(new_b)
+        return result
+
+    s_md = dict(s)
+    s_md["body"] = _process(s.get("body") or [])
+    return s_md
 
 
 @mcp.tool()
@@ -504,6 +582,7 @@ def build_document(structure: dict, doc_type: str = "report", ministry: str = ""
     """구조 JSON을 기관 서식 HWPX로 만든다(외부 전송 없음, 모두 로컬). 구조는 get_writing_guide 규칙대로 사용자 AI가 작성한다.
     doc_type='report': {title, date, dept, body, appendix} — ministry를 비우면 공통 서식(기관명 칸 비움).
     doc_type='press_release': {release, distribute, title, subtitles, body, appendix, contact} — ministry 필수.
+    doc_type='official': {org, to, via, title, body, attachments, recipients, sender, approval, doc_no, contact} — 기안문·시행문(별지 제1호서식).
     입력은 정규화(text 앞 기호·대시·공백 제거)하고, 고칠 점을 warnings로 돌려준다 — 있으면 구조를 고쳐 다시 호출한다.
     logo_path: 기관 로고 그림(선택). slogan_path: 보도자료 슬로건 그림(선택).
     placeholder_contact: 보도자료 담당자가 없으면 '○○과 / 김○○ / 044-000-0000' 자리표시로 채움.
@@ -517,36 +596,31 @@ def build_document(structure: dict, doc_type: str = "report", ministry: str = ""
     if report_kind not in REPORT_KINDS:
         raise ValueError(f"report_kind은 'standard' 또는 'internal': {report_kind}")
     t, s, w = check(structure, doc_type, style)
+    # 기안문 날짜 정규화 (제7조⑤) — HWPX·마크다운 공통
+    if t == "official":
+        s = _normalize_official_dates(s)
+        # 금액 한글 병기 경고 (제2조②) — 본문 직접 점검
+        amt_re = re.compile(r"금\d|\d{1,3}(?:,\d{3})+원")
+        kr_re = re.compile(r"\(금[^\)]+원\)")
+        for b in s.get("body") or []:
+            txt = b.get("text", "")
+            if txt and amt_re.search(txt) and not kr_re.search(txt):
+                w.append(f"금액 한글 병기 필요(시행규칙 제2조②): {txt.strip()}")
     org = ministry if ministry and ministry != "공통" else ""
     _check_ministry(org, t)
     dst = _dst(org, s.get("title"), out_path, t)
     # table.title/caption 키를 caption 블록으로 변환 (모든 스타일)
     s = _convert_table_titles(s)
-    # 간소화 모드: 마크다운 export를 위해 변환본 미리 준비
-    s_for_md = s
-    if style == "simplified":
-        s_for_md = _simplify_numbers(s)
-        s_for_md = _add_table_numbers(s_for_md)
-        # 표 병합 풀어쓰기
-        s_for_md = dict(s_for_md)
-        s_for_md["body"] = [dict(b) for b in s_for_md.get("body", [])]
-        for b in s_for_md["body"]:
-            if b.get("type") == "table":
-                b["rows"] = _unroll_table_rows(b.get("rows", []))
-        for a in s_for_md.get("appendix", []):
-            a = dict(a)
-            a["body"] = [dict(b) for b in a.get("body", [])]
-            for b in a["body"]:
-                if b.get("type") == "table":
-                    b["rows"] = _unroll_table_rows(b.get("rows", []))
+    # 마크다운 export를 위한 변환본 준비
+    s_for_md = _prepare_simplified_for_md(s, style)
+    if t == "official":
+        s_for_md = _number_official_body_for_md(s_for_md)
     _build(t, org, s, dst, logo_path, slogan_path, placeholder_contact, polish, style, report_kind)
     # 저장용 구조는 변환 전 원본 유지
     dst.with_suffix(".json").write_text(json.dumps(s, ensure_ascii=False, indent=1), "utf-8")
     md_path = ""
     if export_markdown:
-        # s_for_md는 이미 간소화 모드 처리(번호 부여, 표 번호, 병합 풀기)가 완료된 상태
-        # _export_markdown에서 다시 처리하지 않도록 style="standard"로 전달
-        md_path = _export_markdown(s_for_md, dst, "standard")
+        md_path = _export_markdown(s_for_md, dst, "standard", t)
     result = {"hwpx": str(dst), "doc_type": t, "문서종류": LABEL[t], "기관": org or "공통(미지정)", "warnings": w, "structure": s}
     if md_path: result["md"] = md_path
     return result
@@ -555,20 +629,16 @@ def build_document(structure: dict, doc_type: str = "report", ministry: str = ""
 def _unroll_table_rows(rows):
     """표 행의 병합 셀 풀어쓰기 (간소화 모드용). 병합 dicts를 일반 문자열로 변환."""
     if not rows: return rows
-    from report import ReportComposer
-    # 임시 composer 인스턴스 생성 (실제 build 없이 merge 처리만)
-    import compose as C
-    org = ""
-    c = ReportComposer(org)
-    return c._unroll_table_merges(rows)
+    return O._unroll_table_rows(rows)
 
 
-def _export_markdown(s, hwpx_path, style="standard"):
+def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
     """구조 JSON을 GFM 마크다운으로 변환하여 HWPX 옆 .md 파일로 저장.
-    간소화 모드면 번호 부여·표 번호 적용 후 변환."""
+    간소화 모드면 번호 부여·표 번호 적용 후 변환.
+    doc_type: 'report' | 'press_release' | 'official'."""
     md_path = Path(str(hwpx_path).replace(".hwpx", ".md"))
     # 간소화 모드: 엔진과 동일하게 번호 부여 후 변환
-    if style == "simplified":
+    if style == "simplified" and doc_type != "official":
         s = _simplify_numbers(s)
         s = _add_table_numbers(s)
 
@@ -584,41 +654,29 @@ def _export_markdown(s, hwpx_path, style="standard"):
 
     def _blocks_to_md(bs, level=0):
         """blocks to markdown.
-        level: 구조적 깊이 (h=0, l1=1, l2=2, l3=3)
+        level: 구조적 깊이 (h=0, l1=1, l2=2, l3=3, l4=4, l5=5, l6=6)
         - h: ## text (항상 ##)
-        - l1: 1. text (들여쓰기 없음)
-        - l2:   가. text (들여쓰기 2칸)
-        - l3:     1) text (들여쓰기 4칸)
-        - note: > * 내용 (블록 인용 + 각주 기호)
-        - ref: > ※ 내용 (블록 인용 + 참고 기호)
+        - l1: text (들여쓰기 없음)
+        - l2:   text (들여쓰기 2칸)
+        - l3:     text (들여쓰기 4칸)
+        - l4:       text (들여쓰기 6칸)
+        - l5:         text (들여쓰기 8칸)
+        - l6:           text (들여쓰기 10칸)
         """
         lines = []
         for b in bs:
             typ = b.get("type")
             if typ == "h":
-                # 소제목: 항상 ## (항목 2)
                 lines.append(f"## {b.get('text', '').strip()}")
-                level = 0  # h 이후 레벨 리셋
-            elif typ == "l1":
-                # l1: 들여쓰기 없는 목록 (항목 2)
+                level = 0
+            elif typ in ("l1", "l2", "l3", "l4", "l5", "l6"):
+                lvl_map = {"l1": 0, "l2": 1, "l3": 2, "l4": 3, "l5": 4, "l6": 5}
+                level = lvl_map[typ]
                 text = _convert_ref_tag(b.get('text', '').strip())
-                lines.append(f"{text}")
-                level = 1
-            elif typ == "l2":
-                # l2: 들여쓰기 2칸 (항목 2)
-                text = _convert_ref_tag(b.get('text', '').strip())
-                lines.append(f"  {text}")
-                level = 2
-            elif typ == "l3":
-                # l3: 들여쓰기 4칸 (항목 2)
-                text = _convert_ref_tag(b.get('text', '').strip())
-                lines.append(f"    {text}")
-                level = 3
+                lines.append(f"{'  ' * level}{text}")
             elif typ == "note":
-                # note: > * 내용 형태 (항목 3)
                 lines.append(f"> * {b.get('text', '').strip()}")
             elif typ == "ref":
-                # ref: > ※ 내용 형태
                 lines.append(f"> ※ {b.get('text', '').strip()}")
             elif typ in ("p", "plain"):
                 prefix = "" if typ == "p" else b.get("text", "")
@@ -628,8 +686,7 @@ def _export_markdown(s, hwpx_path, style="standard"):
             elif typ == "table":
                 rows = b.get("rows") or []
                 if rows:
-                    markdown_table = _table_to_gfm(rows)
-                    lines.append(markdown_table)
+                    lines.append(_table_to_gfm(rows))
             elif typ == "box":
                 for line in b.get("lines", []):
                     lines.append(f"> {line}")
@@ -652,30 +709,106 @@ def _export_markdown(s, hwpx_path, style="standard"):
             lines.append("| " + " | ".join(str(row[i]) if i < len(row) else "" for i in range(col_count)) + " |")
         return "\n".join(lines)
 
-    title = s.get("title", "").strip()
-    date = s.get("date", "").strip()
-    dept = s.get("dept", "").strip()
-
-    # 작성일이 비어 있으면 오늘 날짜 채우기 (버그5)
-    if not date:
-        date = _today()
-
     md_lines = []
-    md_lines.append(f"# {title}\n")
-    if date or dept:
-        md_lines.append(f"- 작성일: {date}")
-        if dept: md_lines.append(f"- 작성부서: {dept}")
+    title = s.get("title", "").strip()
+
+    if doc_type == "official":
+        # 기안문 마크다운: org, to, title, body, attachments, 결문
+        org = s.get("org", "")
+        to = s.get("to", "")
+        if org:
+            md_lines.append(f"# {org}  {title}")
+        else:
+            md_lines.append(f"# {title}")
+        md_lines.append(f"수신  {to}")
+        via = s.get("via", "")
+        if via:
+            md_lines.append(f"(경유)  {via}")
         md_lines.append("")
-
-    md_lines.extend(_blocks_to_md(s.get("body") or []))
-
-    appendix = s.get("appendix") or []
-    if appendix:
-        md_lines.append("\n## 붙임·참고\n")
-        for a in appendix:
-            md_lines.append(f"### {a.get('title', '').strip()}\n")
-            md_lines.append(f"{a.get('heading', '').strip()}\n")
-            md_lines.extend(_blocks_to_md(a.get("body") or []))
+        md_lines.extend(_blocks_to_md(s.get("body") or []))
+        # 붙임 + 끝 표시 (HWPX와 같은 자리: 붙임 마지막 줄, 없으면 본문 마지막 줄, 표로 끝나면 표 아래)
+        atts = s.get("attachments") or []
+        body_blocks = s.get("body") or []
+        if atts:
+            md_lines.append("")
+            if len(atts) == 1:
+                md_lines.append(f"붙임  {atts[0]}  끝.")
+            else:
+                md_lines.append(f"붙임  1. {atts[0]}")
+                for i, a in enumerate(atts[1:], 2):
+                    md_lines.append(f"      {i}. {a}" + ("  끝." if i == len(atts) else ""))
+        elif body_blocks and body_blocks[-1].get("type") == "table":
+            md_lines.append("")
+            md_lines.append("  끝.")
+        else:
+            for i in range(len(md_lines) - 1, -1, -1):
+                if md_lines[i].strip():
+                    md_lines[i] = md_lines[i] + "  끝."
+                    break
+        # 결문
+        sender = s.get("sender", "")
+        if sender:
+            md_lines.append("")
+            md_lines.append(sender)
+        to_val = s.get("to", "")
+        if to_val == "수신자 참조":
+            recps = s.get("recipients") or []
+            if recps:
+                md_lines.append(f"수신자  {', '.join(recps)}")
+        # 결재란
+        appr = s.get("approval") or {}
+        drafter = appr.get("drafter", {})
+        reviewers = appr.get("reviewers", [])
+        approver = appr.get("approver", {})
+        opinion_text = "(의견 있음)"
+        title_line = "  ".join(
+            [f"{drafter.get('mark', '')}{drafter.get('title', '')}"]
+            + [f"{r.get('title', '')}{opinion_text if r.get('opinion') else ''}" for r in reviewers]
+            + [approver.get('title', '')]
+        )
+        name_line = "  ".join(
+            [drafter.get('name', '') or ''] +
+            [r.get('name', '') or '' for r in reviewers] +
+            [approver.get('name', '') or '']
+        )
+        if title_line.strip():
+            md_lines.append(title_line)
+        if name_line.strip():
+            md_lines.append(name_line)
+        # 협조자
+        coords = appr.get("coordinators", [])
+        if coords:
+            md_lines.append(f"협조자  {' / '.join(c.get('title', '') for c in coords)}")
+        # 시행/접수
+        dn = s.get("doc_no") or {}
+        issue_d = _정규화날짜(dn.get("issue_date", ""))
+        receive_d = _정규화날짜(dn.get("receive_date", ""))
+        md_lines.append(f"시행  {dn.get('issue', '')} ({issue_d})")
+        if dn.get("receive"):
+            md_lines.append(f"접수  {dn.get('receive', '')} ({receive_d})")
+        # 주소/연락처
+        contact = s.get("contact", {}) or {}
+        md_lines.append(f"우  {contact.get('zip', '')}  {contact.get('address', '')}  /  {contact.get('homepage', '')}")
+        md_lines.append(f"전화번호  {contact.get('phone', '')}  팩스번호  {contact.get('fax', '')}  /  {contact.get('email', '')}  /  {contact.get('disclosure', '')}")
+    else:
+        # 보고서·보도자료 마크다운 (기존 동작)
+        date = s.get("date", "").strip()
+        dept = s.get("dept", "").strip()
+        if not date:
+            date = _today()
+        md_lines.append(f"# {title}\n")
+        if date or dept:
+            md_lines.append(f"- 작성일: {date}")
+            if dept: md_lines.append(f"- 작성부서: {dept}")
+            md_lines.append("")
+        md_lines.extend(_blocks_to_md(s.get("body") or []))
+        appendix = s.get("appendix") or []
+        if appendix:
+            md_lines.append("\n## 붙임·참고\n")
+            for a in appendix:
+                md_lines.append(f"### {a.get('title', '').strip()}\n")
+                md_lines.append(f"{a.get('heading', '').strip()}\n")
+                md_lines.extend(_blocks_to_md(a.get("body") or []))
 
     md_path.write_text("\n".join(md_lines), "utf-8")
     return str(md_path)
@@ -691,7 +824,7 @@ def build_from_structure(structure: dict, doc_type: str = "report", ministry: st
 
 def main():
     import argparse
-    p = argparse.ArgumentParser(prog="korean-report-hwpx", description="한국 공문서(보고서·보도자료) 기관 서식 HWPX 생성 MCP 서버")
+    p = argparse.ArgumentParser(prog="korean-report-hwpx", description="한국 공문서(보고서·보도자료·기안문) 기관 서식 HWPX 생성 MCP 서버")
     p.add_argument("--http", action="store_true"); p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8002)))
     a = p.parse_args()

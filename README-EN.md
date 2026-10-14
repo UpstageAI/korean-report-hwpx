@@ -30,11 +30,11 @@
 |---|---|---|---|
 | **Report (개조식 outline)** | Title box, date/department line (optional), section headings (Ⅰ. Ⅱ.) → □ → ㅇ → - → *, ※ notes, tables, attachment pages (붙임·참고) | Optional — 42 agencies have their own rules; others or none use common rules | `rules_report/` (1,326 report-style sections) |
 | **Press release (보도자료)** | Cover (logo slot), embargo/distribution, title and subtitles, body (paragraph / □ outline), contact table, appendix pages | Required — 52 agencies | `rules/`, `templates/` (2,670 releases) |
-| Draft approval document (기안문) | — | — | Planned for the next version |
+| **Draft approval document / official notice (기안문·시행문, 별지 제1호서식)** | Header (org centered), body with auto-numbered items (1.→가.→1)→가)→(1)→(가)), attachments, "끝." end mark, closing block (sender, recipients, approval table, coordinators, issue/receive, address, contact, disclosure) | Common format (rules_official/_공통.json), no agency needed | `rules_official/_공통.json` (Regulation Art.7, Enforcement Rule Art.2/4/6) |
 
 **Flow** — ask your AI "turn this memo into a <agency name> report" → it reads `get_writing_guide` → writes the structure JSON → calls `build_document` → if `warnings` come back, it fixes the structure and builds again.
 
-Type choice (in the guide): public announcement or distribution → press release; internal reporting, plans or reviews → report.
+Type choice (in the guide): public announcement or distribution → press release; internal reporting, plans or reviews → report; for a draft approval document / official notice (별지 제1호서식) → `official`.
 
 ## Install
 
@@ -60,11 +60,11 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 | Tool | What it does |
 |---|---|
-| `get_writing_guide` | Type-choice criteria, writing rules (□ one-sentence conclusion first, ㅇ grounds, - details, noun-form endings, no invented facts or numbers, no marks inside text, appendix structure), structure JSON schema and examples. Also exposed as MCP prompt `writing_guide` |
-| `check_structure` | Pre-build check: required fields, marks inside text, skipped levels, multi-sentence □, non-noun-form endings, long titles |
-| `build_document` | Structure JSON → agency-format HWPX; normalizes input (strips marks, dashes, leading spaces) and returns `warnings` to fix. `build_from_structure` is an alias |
-| `list_ministries` | Supported agencies and support per document type |
-| `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header) |
+| `get_writing_guide` | Type-choice criteria, writing rules (□ one-sentence conclusion first, ㅇ grounds, - details, noun-form endings, no invented facts/numbers, no marks in text, appendix structure, official doc item numbering/dates/amounts/end mark/attachments), structure JSON schema and examples. Also as MCP prompt `writing_guide` |
+| `check_structure` | Pre-build check: required fields, marks in text, skipped levels, multi-sentence □, non-noun-form endings, long titles; for official docs also: required keys, to/disclosure allowed values, approval drafter/approver required, attachments must be string list |
+| `build_document` | Structure JSON → agency-format HWPX; normalizes input (strips marks, dashes, leading spaces) and returns `warnings`. `build_from_structure` is an alias. For official docs use `doc_type="official"`; amount Korean annotation warnings and date normalization included |
+| `list_ministries` | Supported agencies and support per document type (reports: agency/common rules; press releases: body style; official docs: common format) |
+| `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header; official docs: rules_official/_공통.json) |
 
 Report structure JSON:
 
@@ -80,6 +80,36 @@ Report structure JSON:
 ```
 
 Press release structure: `{release, distribute, title, subtitles, body, appendix, contact}` (same block types plus `p` paragraph, `box`, `image`). Without a contact, the contact table is filled with placeholders `○○과 / 김○○ / 044-000-0000` (`placeholder_contact`).
+
+Official document (기안문·시행문, 별지 제1호서식) structure — use `doc_type="official"`:
+```json
+{
+  "org": "행정안전부",            // Header agency name (required). Upper agency combined in one line, e.g. "국무조정실 ○○위원회"
+  "to": "수신자 참조",             // Required. "내부결재" | "○○장관(○○과장)" | "수신자 참조"
+  "via": "",                       // Via (optional). If present, shown as "(경유)  {via}"
+  "title": "2026년 ○○ 계획 알림",  // Required
+  "body": [                        // Item numbers (1.→가.→1)→가)→(1)→(가)) assigned by the server
+    {"type": "l1", "text": "..."},
+    {"type": "l2", "text": "..."},
+    {"type": "l3", "text": "..."},
+    {"type": "table", "rows": [[...]]},
+    {"type": "lines", "lines": ["..."]}
+  ],
+  "attachments": ["○○ 계획서 1부.", "○○ 명단 1부."],  // Optional
+  "recipients": ["○○부장관", "○○청장"],                // Shown in closing when to="수신자 참조"
+  "sender": "행정안전부장관",            // Sender name (required)
+  "approval": {                          // Approval block (required: drafter and approver)
+    "drafter":   {"title": "주무관", "name": "", "mark": "★"},
+    "reviewers": [{"title": "과장", "name": "", "opinion": false}],
+    "approver":  {"title": "국장", "name": ""},
+    "coordinators": [{"title": "○○과장"}]
+  },
+  "doc_no": {"issue": "○○과-1234", "issue_date": "2026. 10. 14.", "receive": "", "receive_date": ""},
+  "contact": {"zip": "30112", "address": "세종특별자치시 ○○로 00", "homepage": "www.mois.go.kr",
+              "phone": "044-000-0000", "fax": "044-000-0001", "email": "○○○@korea.kr", "disclosure": "공개"}
+}
+```
+Item numbering: l1→1. / l2→가. / l3→1) / l4→가) / l5→(1) / l6→(가). Numbers increment sequentially within the same level, and reset when a higher level changes (제2조①). Second level and below are indented 2 characters (2타) to the right from the higher-level number start. Amounts must be written with Korean annotation, e.g. `금113,560원(금일십일만삼천오백육십원)`; if missing, `warnings` will contain "금액 한글 병기 필요(시행규칙 제2조②)" (제2조②). Dates are normalized from YYYY-MM-DD / YYYY.MM.DD to YYYY. MM. DD. (영 제7조⑤). `disclosure` must be one of "공개", "부분공개", "비공개".
 
 ## Supported agencies (52)
 
@@ -140,7 +170,7 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 - Output is a draft. Check it in Hangul before use.
 - Line ends (e.g. a one- or two-character last line) are fitted from estimated glyph widths, so some may remain. With **macOS + Hancom Office Hangul**, `polish=True` reads the real line layout and re-chooses spacing per paragraph (Hangul windows open several times; takes minutes).
 - Fonts render with whatever is installed; missing fonts (e.g. 휴먼명조, HY헤드라인M) are substituted.
-- Draft approval documents (기안문) are planned for the next version.
+- Draft approval documents / official notices (기안문·시행문) are supported with `doc_type="official"` (별지 제1호서식, rules_official/_공통.json). Item numbers (1.→가.→1)→가)→(1)→(가)) are assigned by the server; do not write numbers yourself. Dates are normalized from YYYY-MM-DD / YYYY.MM.DD to YYYY. MM. DD.
 
 ## License
 
