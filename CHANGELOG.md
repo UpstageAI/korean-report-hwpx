@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 (2026-10-25)
+
+- `build_document`·`build_from_structure`: `out_path`에 폴더를 주면 그 안에 기본 파일 이름(`{기관 또는 공통}_{종류}_{제목}.hwpx`)으로 저장 — 이전에는 `IsADirectoryError`로 문서가 만들어지지 않음. 확장자 없는 이름은 `.hwpx`를 붙이고, 없는 부모 폴더는 만듦
+- `server.json` 버전 표기를 패키지 버전과 맞춤(0.2.1로 남아 있던 것)
+- Solar Pro 4 작성, CodeSolar·Claude 검수
+
 ## 0.3.0 (2026-10-14)
 
 ### 신규 기능
