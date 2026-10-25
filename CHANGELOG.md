@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 (2026-10-25)
+
+- `check_structure`·`build_document`·`build_from_structure`: `structure`를 JSON 문자열로 줘도 처리(일부 모델이 객체 인자를 문자열로 넘겨 입력 검증에서 거부되던 문제). JSON이 아니거나 객체가 아니면 이유를 담은 오류
+- Solar Pro 4 작성, CodeSolar·Claude 검수
+
 ## 0.3.1 (2026-10-25)
 
 - `build_document`·`build_from_structure`: `out_path`에 폴더를 주면 그 안에 기본 파일 이름(`{기관 또는 공통}_{종류}_{제목}.hwpx`)으로 저장 — 이전에는 `IsADirectoryError`로 문서가 만들어지지 않음. 확장자 없는 이름은 `.hwpx`를 붙이고, 없는 부모 폴더는 만듦
