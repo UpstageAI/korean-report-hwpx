@@ -13,11 +13,9 @@
   list_ministries      — 지원 기관과 문서 종류별 지원 여부
   get_rules            — 기관·문서 종류별 서식 규칙값
 """
-import hashlib
 import json
 import os
 import platform
-import random
 import re
 import sys
 from pathlib import Path
@@ -653,8 +651,6 @@ def build_document(structure: dict | str, doc_type: str = "report", ministry: st
     s_for_md = _prepare_simplified_for_md(s, style)
     if t == "official":
         s_for_md = _number_official_body_for_md(s_for_md)
-    # 구조 내용으로 random 시드 고정 → 같은 구조는 항상 같은 요소 ID를 내도록 함
-    random.seed(int(hashlib.md5(json.dumps(s, sort_keys=True, ensure_ascii=True).encode()).hexdigest()[:8], 16))
     _build(t, org, s, dst, logo_path, slogan_path, placeholder_contact, polish, style, report_kind)
     # 저장용 구조는 변환 전 원본 유지
     dst.with_suffix(".json").write_text(json.dumps(s, ensure_ascii=False, indent=1), "utf-8")
