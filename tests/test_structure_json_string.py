@@ -1,6 +1,7 @@
 """structure를 JSON 문자열로 줘도 객체로 준 것과 같은 문서."""
 import asyncio
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -11,8 +12,10 @@ from sample_report import SAMPLE_REPORT
 
 
 def _section_xml(p):
+    """요소 id는 만들 때마다 달라질 수 있으므로 지우고 비교한다."""
     with zipfile.ZipFile(p) as z:
-        return z.read("Contents/section0.xml").decode("utf-8")
+        x = z.read("Contents/section0.xml").decode("utf-8")
+    return re.sub(r'\b(id|instid|zOrder)="[^"]*"', "", x)
 
 
 def test_build_document_json_string_same(tmp_path):
