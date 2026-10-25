@@ -361,6 +361,21 @@ def _validate_official(structure):
         raise ValueError("attachments는 문자열 목록이어야 함")
 
 
+def _as_structure(structure):
+    """structure가 dict면 그대로, JSON 문자열이면 파싱한 dict를 반환. 그 외는 ValueError."""
+    if isinstance(structure, dict):
+        return structure
+    if isinstance(structure, str):
+        try:
+            s = json.loads(structure)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"structure는 JSON 객체(또는 그 문자열)여야 함: {e}") from e
+        if not isinstance(s, dict):
+            raise ValueError(f"structure는 JSON 객체(또는 그 문자열)여야 함: 파싱 결과가 dict가 아님 ({type(s).__name__})")
+        return s
+    raise ValueError(f"structure는 JSON 객체(또는 그 문자열)여야 함: {type(structure).__name__}")
+
+
 def check(structure, doc_type="report", style="standard"):
     t = _norm_type(doc_type)
     if t == "auto": t = "press_release" if any(k in (structure or {}) for k in ("release", "contact", "subtitles")) else "report"
@@ -374,10 +389,12 @@ def check(structure, doc_type="report", style="standard"):
 
 
 @mcp.tool()
-def check_structure(structure: dict, doc_type: str = "report", style: str = "standard") -> dict:
+def check_structure(structure: dict | str, doc_type: str = "report", style: str = "standard") -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
-    □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. 돌려주는 값: {ok, doc_type, warnings}.
+    □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
+    돌려주는 값: {ok, doc_type, warnings}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
+    structure = _as_structure(structure)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     t, _, w = check(structure, doc_type, style)
@@ -592,10 +609,11 @@ def _number_official_body_for_md(s):
 
 
 @mcp.tool()
-def build_document(structure: dict, doc_type: str = "report", ministry: str = "", out_path: str = "",
+def build_document(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
                    logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                    style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
     """구조 JSON을 기관 서식 HWPX로 만든다(외부 전송 없음, 모두 로컬). 구조는 get_writing_guide 규칙대로 사용자 AI가 작성한다.
+    structure는 JSON 문자열로 줘도 된다.
     doc_type='report': {title, date, dept, body, appendix} — ministry를 비우면 공통 서식(기관명 칸 비움).
     doc_type='press_release': {release, distribute, title, subtitles, body, appendix, contact} — ministry 필수.
     doc_type='official': {org, to, via, title, body, attachments, recipients, sender, approval, doc_no, contact} — 기안문·시행문(별지 제1호서식).
@@ -608,6 +626,7 @@ def build_document(structure: dict, doc_type: str = "report", ministry: str = ""
     export_markdown: True이면 같은 구조로 .md 파일을 HWPX 옆에 함께 저장(GFM 표, 병합 없이, 번호 위계는 #, ##, ###와 번호 텍스트).
     report_kind: 'standard'(기본, 기존 보고서 서식) | 'internal'(내부 결재 보고서 — 제목 상자 라벨 없음, 쪽 번호 "- n -", 작성일·부서 "'26. 10. 8.(목) / 과·팀명" 형식, 표 머리 음영 없음/회색, □ 글꼴 HY헤드라인M).
     돌려주는 값: {hwpx, doc_type, 문서종류, 기관, warnings, structure(정리된 구조), md(export_markdown=True일 때)}. 같은 이름 .json에 구조도 저장."""
+    structure = _as_structure(structure)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     if report_kind not in REPORT_KINDS:
@@ -832,10 +851,10 @@ def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
 
 
 @mcp.tool()
-def build_from_structure(structure: dict, doc_type: str = "report", ministry: str = "", out_path: str = "",
+def build_from_structure(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
                          logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                          style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
-    """build_document와 같다(별칭)."""
+    """build_document와 같다(별칭). structure는 JSON 문자열로 줘도 된다."""
     return build_document(structure, doc_type, ministry, out_path, logo_path, slogan_path, placeholder_contact, polish, style, export_markdown, report_kind)
 
 
