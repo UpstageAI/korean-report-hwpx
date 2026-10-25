@@ -384,9 +384,25 @@ def check_structure(structure: dict, doc_type: str = "report", style: str = "sta
     return {"ok": not w, "doc_type": t, "warnings": w}
 
 
+def _default_file_name(name, doc_type, title):
+    """저장용 기본 파일 이름: {name}_{LABEL}_{제목 정리 30자}.hwpx — 빈 out_path·폴더 out_path에서 함께 쓴다."""
+    cleaned = re.sub(r'[^가-힣A-Za-z0-9]+', '_', title or LABEL[doc_type])[:30]
+    return f"{name}_{LABEL[doc_type]}_{cleaned}.hwpx"
+
+
 def _dst(ministry, title, out_path, doc_type):
     name = ministry or "공통"
-    return Path(out_path).expanduser() if out_path else out_dir() / f"{name}_{LABEL[doc_type]}_{re.sub(r'[^가-힣A-Za-z0-9]+', '_', title or LABEL[doc_type])[:30]}.hwpx"
+    base = _default_file_name(name, doc_type, title)
+    if not out_path:
+        p = out_dir() / base
+    else:
+        p = Path(out_path).expanduser()
+        if (p.exists() and p.is_dir()) or out_path.endswith(("/", os.sep)):
+            p = p / base
+        elif not p.suffix:
+            p = p.with_suffix(".hwpx")
+        p.parent.mkdir(parents=True, exist_ok=True)
+    return p
 
 
 # 중복 정의 제거 — report.py에서 import
@@ -584,6 +600,7 @@ def build_document(structure: dict, doc_type: str = "report", ministry: str = ""
     doc_type='press_release': {release, distribute, title, subtitles, body, appendix, contact} — ministry 필수.
     doc_type='official': {org, to, via, title, body, attachments, recipients, sender, approval, doc_no, contact} — 기안문·시행문(별지 제1호서식).
     입력은 정규화(text 앞 기호·대시·공백 제거)하고, 고칠 점을 warnings로 돌려준다 — 있으면 구조를 고쳐 다시 호출한다.
+    out_path: 저장 경로(선택, 기본은 아웃폴더). 폴더면 그 안에 기본 파일 이름으로 저장, 확장자 없는 이름이면 .hwpx를 붙인다.
     logo_path: 기관 로고 그림(선택). slogan_path: 보도자료 슬로건 그림(선택).
     placeholder_contact: 보도자료 담당자가 없으면 '○○과 / 김○○ / 044-000-0000' 자리표시로 채움.
     polish: True면 맥 한컴오피스 한글로 실제 줄 배치를 받아 문단별 자간을 다듬음(맥+한글 필요, 수 분 소요).
