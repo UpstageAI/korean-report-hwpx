@@ -350,3 +350,54 @@ def test_masked_name_not_stripped():
     assert n["body"][3]["text"].startswith("○○○ 과학기술정보통신부")
     assert n["body"][4]["text"] == "기호는 지운다"
     assert not any("body[3]" in w and "기호" in w for w in r["warnings"])
+
+
+# ── H: 리뷰 보완 ──
+def test_guide_section_once():
+    assert SV.get_writing_guide("press_release", MSIT)["guide"].count("[보도자료 작성 방법") == 1
+    assert SV.get_writing_guide("auto")["guide"].count("[보도자료 작성 방법") == 1
+
+
+def test_who_check_without_ministry():
+    s = mod(b0="11월 2일(월)부터 인공지능(AI) 안내 서비스를 시범 운영하는 곳이 늘어난다.")
+    ws = writing(SV.check_structure(s, "press_release")["warnings"])
+    assert "[작성] 리드(첫 문단) 앞부분에 '누가'(기관·기관장)가 없음 — '○○부(장관 ○○○)는 …'처럼 시작 (G20 39)" in ws
+    assert not [w for w in writing(SV.check_structure(GOOD, "press_release")["warnings"]) if "누가" in w]
+
+
+def test_exact_messages():
+    ws = writing(W(mod(b1="AI 안내는 누리집에서 받을 수 있고, 예산은 76억원이다.")))
+    assert "[작성] 단위는 띄어 쓴다: '76억원' → '76억 원' (G11 32~33, H22 66)" in ws
+    ws = writing(W(mod(b0="과학기술정보통신부(장관 ○○○)는 11월 2일(월)부터 AI 안내 서비스를 시범 운영한다.")))
+    assert "[작성] 'AI' 첫 등장에 한글 풀이 없음 — '인공지능(AI)'처럼 한글(약어)로 (G20 63)" in ws
+    ws = writing(W(mod(b1="AI 안내는 누리집에서 받을 수 있고, 이용자는 1,240, 지난달보다 늘었다.")))
+    assert any(w.startswith("[작성] 숫자 뒤 단위 없음: '") and "1,240" in w and w.endswith("— 건·명·원·% 등 단위를 붙인다 (G11 32, 말뭉치)") for w in ws)
+    ws = writing(W(mod(b2="과학기술정보통신부는 12월에 결과를 공개할 예정임.")))
+    assert "[작성] 명사형 종결 — '-다'로 끝낸다: '…결과를 공개할 예정임.' (G20 55)" in ws
+    ws = writing(W(mod(title="세계 최초 ○○ 서비스 시범 운영.")))
+    assert "[작성] 제목의 '최초' — 본문에 비교 기준·근거가 있는지 확인 (말뭉치·G20 33)" in ws
+    assert "[작성] 제목 끝에 마침표를 찍지 않는다" in ws
+    lead = "과학기술정보통신부(장관 ○○○)는 11월 2일(월)부터 인공지능(AI) 안내 서비스를 " + "가나다라마바사 " * 22 + "시범 운영한다."
+    assert f"[작성] 리드가 깁니다({len(lead)}자) — 누가·언제·무엇만 한 문장으로, 세부는 다음 문단 (G20 38)" in writing(W(mod(b0=lead)))
+
+
+def test_unit_warning_per_block():
+    s = mod(b1="AI 안내는 누리집에서 받고 이용자는 1,240, 지난달보다 늘었다.", b2="과학기술정보통신부는 응답 117, 이 중 일부를 공개할 계획이다.")
+    assert len([w for w in writing(W(s)) if w.startswith("[작성] 숫자 뒤 단위 없음")]) == 2
+
+
+def test_replace_words_no_cap():
+    s = mod(b2="과학기술정보통신부는 향후 금년 매뉴얼과 로드맵 대신 허브와 클러스터 계획을 공개할 계획이다.")
+    ws = writing(W(s))
+    for k in ("향후", "금년", "매뉴얼", "허브", "클러스터"):
+        assert any(w.startswith(f"[작성] '{k}' → ") for w in ws), k
+
+
+def test_josa_latin_s_and_draft_schema():
+    assert SV._josa("AWS") == "는" and SV._josa("CJ ENM") == "은"
+    tools = {t.name: t for t in asyncio.run(SV.mcp.list_tools())}
+    sch = json.dumps(tools["draft_press_structure"].input_schema, ensure_ascii=False)
+    assert '"object"' in sch and '"string"' in sch
+    r = SV.draft_press_structure(F(quote={"speaker": "○○○ 장관", "text": "하겠다", "verb": ""}, points=[{"text": "핵심이다.", "note": "  풀이  "}]))
+    b = r["structure"]["body"]
+    assert b[-1]["text"] == "○○○ 장관은 “하겠다.”라고 말했다." and {"type": "note", "text": "풀이"} in b

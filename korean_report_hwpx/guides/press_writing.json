@@ -609,7 +609,7 @@
    "㎏",
    "℃"
   ],
-  "unit_space_regex": "\\d(억|만|천)(원|명|건|개|가구|곳|톤|달러)",
+  "unit_space_regex": "(?<![\\d,.])\\d[\\d,.]*(억|만|천)(원|명|건|개|가구|곳|톤|달러)",
   "acronym_regex": "(?<![A-Za-z])[A-Z][A-Z0-9&]{1,}(?![A-Za-z])",
   "foreign_first_regex": "[A-Za-z][A-Za-z\\- ]{2,}\\([가-힣]",
   "ministry_short": {
