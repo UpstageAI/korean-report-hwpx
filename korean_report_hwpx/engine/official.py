@@ -330,13 +330,17 @@ class OfficialComposer(Composer):
         end_gap = self._end.get("gap", "  ")
         end_txt = self._end.get("text", "끝.")
 
+        def _폭(t):   # 글자 폭 근사(HWPUNIT): 한글 전각 1, 영문·숫자·공백 반각 0.5~0.55
+            return int(pt * 100 * sum(1.0 if ord(ch) >= 0x3000 else (0.5 if ch == " " else 0.55) for ch in t))
+
         if len(atts) == 1:
-            pp = self.para_pr("JUSTIFY", line)
+            # 둘째 줄을 첨부물 명칭 첫 글자에 맞춤(내어쓰기)
+            pp = self.para_pr("JUSTIFY", line, indent=-_폭(f"{label}{gap}"), left=0, word=False)
             txt = f"{label}{gap}{atts[0]}{end_gap}{end_txt}"      # 제4조⑤1호: 붙임 마지막 글자에서 한 글자 띄우고 "끝."
             out.append(self.p(pp, [(cp, txt)]))
             끝표시_포함 = True
         else:
-            pp = self.para_pr("JUSTIFY", line)
+            pp = self.para_pr("JUSTIFY", line, indent=-_폭(f"{label}{gap}{first_num}. "), left=0, word=False)
             out.append(self.p(pp, [(cp, f"{label}{gap}{first_num}. {atts[0]}")]))
             remaining = list(atts[1:])
             for idx, a in enumerate(remaining):
@@ -346,7 +350,7 @@ class OfficialComposer(Composer):
                     txt = f"      {i}. {a}{end_gap}{end_txt}"
                 else:
                     txt = f"      {i}. {a}"
-                pp2 = self.para_pr("JUSTIFY", line, left=0)
+                pp2 = pp   # 첫 항목과 같은 내어쓰기 — 둘째 줄을 명칭 첫 글자에 맞춤
                 out.append(self.p(pp2, [(cp, txt)]))
             끝표시_포함 = True
         return out, 끝표시_포함
