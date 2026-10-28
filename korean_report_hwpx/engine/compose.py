@@ -153,7 +153,7 @@ class Composer:
 
     def _add(self, kind, tag, el):
         nid = str(1 + max(int(x) for x in re.findall(r'<hh:%s id="(\d+)"' % tag, self.header)))
-        el = re.sub(r'id="\d+"', f'id="{nid}"', el, count=1)
+        el = re.sub(r'id="[^"]*"', f'id="{nid}"', el, count=1)
         self.header = self.header.replace(f"</hh:{kind}>", el + f"</hh:{kind}>")
         self.header = re.sub(r'<hh:%s itemCnt="(\d+)"' % kind, lambda z: f'<hh:{kind} itemCnt="{int(z.group(1)) + 1}"', self.header)
         return nid
@@ -173,9 +173,10 @@ class Composer:
         if sup: el = el.replace("</hh:charPr>", "<hh:supscript/></hh:charPr>")
         self.cache[key] = self._add("charProperties", "charPr", el); return self.cache[key]
 
-    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False, heading_level=None):
-        """문단 모양 생성. heading_level 지정 시 HWPX 개요(outline) heading level 설정 (간소화 모드)."""
-        key = ("p", align, line, indent, left, prev, nxt, word, keep, heading_level)
+    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False, heading_level=None, tab_ids=None):
+        """문단 모양 생성. heading_level 지정 시 HWPX 개요(outline) heading level 설정 (간소화 모드).
+        tab_ids: 탭 위치가 있는 문단용 <hh:tabPr> id 목록. 지정 시 paraPr의 tabPrIDRef를 해당 id로 설정."""
+        key = ("p", align, line, indent, left, prev, nxt, word, keep, heading_level, tuple(tab_ids or ()))
         if key in self.cache: return self.cache[key]
         el = re.search(r'<hh:paraPr id="%s".*?</hh:paraPr>' % self.base_para, self.header, re.S).group(0)
         el = re.sub(r'horizontal="\w+"', f'horizontal="{align}"', el, count=1)
@@ -198,7 +199,24 @@ class Composer:
         if heading_level is not None:
             el = re.sub(r'<hh:heading type="NONE" idRef="0" level="0"/>',
                         f'<hh:heading type="OUTLINE" idRef="0" level="{heading_level}"/>', el)
+        if tab_ids:
+            # base paraPr의 tabPrIDRef="0"을 실제 탭 모양 id로 교체
+            el = el.replace('tabPrIDRef="0"', f'tabPrIDRef="{tab_ids[0]}"', 1)
         self.cache[key] = self._add("paraProperties", "paraPr", el); return self.cache[key]
+
+    def _tabs_pr(self, positions):
+        """탭 모양 <hh:tabPr> 생성. positions: 탭 위치 목록(HWPUNIT, 문단 왼쪽 여백 기준).
+        한글 원본 형식: autoTabLeft=1, 각 위치는 <hp:switch><hp:case><hh:tabItem pos="…" type="LEFT" leader="NONE" unit="HWPUNIT"/></hp:case>
+        <hp:default><hh:tabItem pos="2배" type="LEFT" leader="NONE"/></hp:default></hp:switch>.
+        반환: tabPr id."""
+        case_items = ''.join(f'<hh:tabItem pos="{p}" type="LEFT" leader="NONE" unit="HWPUNIT"/>' for p in positions)
+        dflt_items = ''.join(f'<hh:tabItem pos="{2 * p}" type="LEFT" leader="NONE"/>' for p in positions)
+        inner = ('<hh:tabPr id="" autoTabLeft="1" autoTabRight="0">'
+                 '<hp:switch>'
+                 f'<hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar">{case_items}</hp:case>'
+                 f'<hp:default>{dflt_items}</hp:default>'
+                 '</hp:switch></hh:tabPr>')
+        return self._add("tabProperties", "tabPr", inner)
 
     def border(self, fill=None, line="SOLID", width="0.12 mm", color="#000000"):
         key = ("b", fill, line, width, color)
