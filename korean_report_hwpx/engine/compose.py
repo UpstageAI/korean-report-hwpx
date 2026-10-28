@@ -773,7 +773,11 @@ class Composer:
     # ── 담당 표 ──
     def contact(self, doc):
         c = doc.get("contact") or {}
-        if not c.get("people") and self.placeholder_contact: c = PLACEHOLDER_CONTACT
+        if not c.get("people") and self.placeholder_contact:
+            if c.get("dept"):
+                c = {"dept": c["dept"], "people": PLACEHOLDER_CONTACT["people"]}
+            else:
+                c = PLACEHOLDER_CONTACT
         people = [(list(p) + ["", "", "", ""])[:4] if len(p) >= 4 else ["", *([""] * (3 - len(p))), *p] for p in c.get("people", [])]
         if not people: people = [["담당자", "", "", ""]]
         L_ = self.L.get("contact") or {"widths": [6236, 15167, 6081, 5605, 5605, 9003], "row_h": 1800}

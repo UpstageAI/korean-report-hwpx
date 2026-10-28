@@ -65,6 +65,39 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 | `build_document` | Structure JSON → agency-format HWPX; normalizes input (strips marks, dashes, leading spaces) and returns `warnings`. `build_from_structure` is an alias. For official docs use `doc_type="official"`; amount Korean annotation warnings and date normalization included |
 | `list_ministries` | Supported agencies and support per document type (reports: agency/common rules; press releases: body style; official docs: common format) |
 | `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header; official docs: rules_official/_공통.json) |
+| `draft_press_structure` | Turns a fact memo (who·when·what, background·key points·plan, quote, contact, numbers, etc.) into a press-release structure JSON draft. It does not invent sentences, numbers, or names not in the memo; it places the lead, quote, tables, and appendix per the rules. |
+
+## How to write a press release (National Institute of Korean Language guidelines · Korea.kr measurement)
+
+Call `get_writing_guide(doc_type='press_release', ministry=agency)` to get press-release writing guidance (lead, title, quote, numbers, plain language) plus the fact-memo template and per-agency example structures. The guidance is based on the National Institute of Korean Language's press-release writing guides and a measurement of 2,667 Korea.kr press releases.
+
+**Fact-memo example (과학기술정보통신부, fictitious):**
+```json
+{
+  "kind": "보도자료",
+  "ministry": "과학기술정보통신부",
+  "release": "2026. 10. 29.(목) 조간",
+  "headline": "고영향 인공지능 확인 요청 128건, 평균 21일 만에 처리",
+  "subtitles": ["인공지능기본법 시행 9개월 확인제도 운영 결과 발표"],
+  "who": "과학기술정보통신부(장관 ○○○)",
+  "when": "10월 28일(수)",
+  "what": "「인공지능 발전과 신뢰 기반 조성 등에 관한 기본법」 시행 9개월을 맞아 고영향 인공지능 확인제도 운영 결과를 발표했다",
+  "points": ["1월 22일부터 10월 21일까지 확인 요청은 모두 128건 접수됐고, 이 가운데 117건을 처리했다."],
+  "numbers": [{"item": "확인 요청 접수", "value": "128", "unit": "건", "basis": "2026. 1. 22.~10. 21."}],
+  "quote": {"speaker": "○○○ 과학기술정보통신부 장관", "text": ["기업이 예측 가능하게 인공지능을 개발할 수 있도록 확인제도를 빠르고 투명하게 운영하겠다."], "verb": "말했다"},
+  "contact": {"dept": "과학기술정보통신부 인공지능신뢰정책과", "people": [["책임자", "과장", "○○○", "(044-202-0000)"]]}
+}
+```
+
+Then: `draft_press_structure(facts, ministry)` → structure JSON draft + missing/warnings → refine sentences → `check_structure(structure, 'press_release', ministry=agency)` → `build_document(structure, 'press_release', agency)`.
+
+**Sources:**
+- National Institute of Korean Language, 『유형별로 알아보는 보도자료 작성 길잡이』 (2020) — G20
+- National Institute of Korean Language, 『보도자료 유형별 표준안 개발』 (2020) — R20
+- National Institute of Korean Language, 『보도 자료 쓰기 길잡이』 (2011) — G11
+- National Institute of Korean Language, 『개정판 한눈에 알아보는 공공언어 바로 쓰기』 (2022) — H22
+- Ministry of Culture, Sports and Tourism·National Institute of Korean Language, 『쉬운 공공언어 쓰기 길잡이』 (2014) — E14
+- Korea.kr (정책브리핑) press releases, 2,667 documents, body text measurement (52 central agencies) — C
 
 Report structure JSON:
 
