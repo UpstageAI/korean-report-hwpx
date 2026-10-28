@@ -222,15 +222,13 @@ class OfficialComposer(Composer):
             return item_label(pat, c)
 
         def _왼쪽들여쓰기(level):
-            """둘째 계층(level≥1)부터 상위 번호 폭 + indent_per_level 타 오른쪽."""
+            """항목기호 시작 위치(공문서 작성 관행·행정업무규정 시행규칙 제2조): 첫째 항목은 왼쪽 기본선에서 바로,
+            둘째 항목부터 상위 항목기호 위치에서 오른쪽으로 indent_per_level타(2타 = 한글 1자)씩."""
             if level <= 0:
                 return 0
-            # 상위 레벨들의 번호 폭(한 글자 ≈ pt 단위) 합 + 각 레벨당 indent
-            widths = 0
-            for lv in range(level):
-                widths += pt * 100   # 한 글자 폭(HWPUNIT 근사)
-            widths += indent * pt * 100 * level
-            return int(widths)
+            return int(level * (indent / 2.0) * pt * 100)   # 2타 = 한글 1자 = pt×100 HWPUNIT
+
+        single_top = sum(1 for b in (self.doc.get("body") or []) if b.get("type") == "l1") == 1
 
         def _process(blocks):
             for b in blocks:
@@ -243,11 +241,12 @@ class OfficialComposer(Composer):
                     text_raw = b.get("text", "")
                     if _check_amount_needed(text_raw):
                         warnings.append(f"금액 한글 병기 필요(시행규칙 제2조②): {text_raw.strip()}")
-                    prefix = _번호(lvl)
+                    prefix = "" if (lvl == 0 and single_top) else _번호(lvl)   # 항목이 하나뿐이면 번호 없이
                     text = prefix + text
                     left = _왼쪽들여쓰기(lvl)
                     hang = int(pt * 100 * (0.55 * sum(1 for ch in prefix if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix if ord(ch) >= 0x3000)))   # 번호 폭(영문·숫자 반각, 한글 전각)
-                    pp = self.para_pr("JUSTIFY", line, indent=-hang, left=left + hang, word=False)   # 둘째 줄부터 번호 다음 글자 위치에 맞춤(내어쓰기)
+                    # 한글 문단: 첫 줄은 left에서 시작, 내어쓰기(intent 음수)만큼 둘째 줄부터 오른쪽 — 둘째 줄을 항목 내용 첫 글자에 맞춤
+                    pp = self.para_pr("JUSTIFY", line, indent=-hang, left=left, word=False)
                     cp = self.char(font, pt)
                     out.append(self.p(pp, [(cp, text)]))
                 elif typ == "table":
