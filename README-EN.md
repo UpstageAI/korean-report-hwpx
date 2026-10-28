@@ -198,6 +198,15 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 - Rule documents: `korean_report_hwpx/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
 - Source releases are published on Korea.kr under KOGL (공공누리). This repository contains no source files, text or images — only format numbers.
 
+## Format basis (page settings)
+
+Every document type (report, press release, draft approval document) uses A4 (210×297 mm, HWPUNIT 59528×84188) as the editing page, with left/right margins 20 mm (HWPUNIT 5669), top/bottom margins 15 mm (HWPUNIT 4252), header/footer 10 mm (HWPUNIT 2835), and gutter 0 as the default. The text width is width − left − right = 48190 (HWPUNIT, 170 mm); a table (`<hp:tbl>`) never exceeds the text width.
+
+- Basis: of 2,667 Korea.kr press releases (52 central agencies) measured, 2,640 used A4 with 20 mm left/right margins, and 1,817 used top 15 mm / bottom 15 mm / header 10 mm / footer 10 mm (the most common combination). Ministry of Science and ICT: 100 of 118; Ministry of the Interior and Safety: 120 of 135.
+- When an agency template (`templates/<agency>.json`, `page`) exists, its most common values (agency value) are used; if the sample is fewer than 10 documents, the common default is used. Agency values, with their basis, are recorded in `korean_report_hwpx/rules/_쪽설정.json` under `기관값`.
+- Draft approval documents use the same common values per Art. 7⑥ of the Regulation on Administrative Business Operation and Innovation (page size A4).
+- Rule file: `korean_report_hwpx/rules/_쪽설정.json`.
+
 ## Notes
 
 - Output is a draft. Check it in Hangul before use.

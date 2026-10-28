@@ -69,7 +69,7 @@ class OfficialComposer(Composer):
         self.doc = doc
         self.logo_path = logo_path
         self.R = _common()          # rules_official/_공통.json
-        self.L = {"page": self.R.get("page", {})}   # A4 페이지 정보
+        self.L = {"page": B.page_settings("")}   # A4 페이지 정보 (blank.page_settings default)
         self.cache = {}
         self.images = []
         self.header = B.header_xml()
@@ -152,6 +152,8 @@ class OfficialComposer(Composer):
         out.extend(self._결문())
 
         out = [o for o in out if o]
+        sec = B.sec_pr(self.L.get("page", {}))
+        out[0] = re.sub(r"(<hp:p\b[^>]*>)", lambda m: m.group(1) + f'<hp:run charPrIDRef="0">{sec}</hp:run>', out[0], count=1)
         section = B.section_xml(out)
         prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x.replace("<hp:nbSpace/>", " ")) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
         B.save(dst, self.header, section, self.images, html.unescape(prv)[:1000], "기안문")

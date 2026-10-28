@@ -97,7 +97,7 @@ PRESS_RULES = """[보도자료 규칙]
   문단식 기관 → "p"(기사체 문단, 첫 문단은 누가·언제·무엇), 하위 나열이 필요할 때만 "l2"(ㅇ)·"l3"(-)
   □식 기관 → "l1"(□ 대항목, 두괄식 한 문장), "l2"(ㅇ), "l3"(-)
   공통 → "note"(*), "ref"(※), "caption", "table"(rows), "box"(lines: 강조 상자), "image"(path, width_mm)
-- 기관장 인용은 본문 끝(마지막 문단), 형식 '○○○ 장관은 "…."라고 말했다.'.
+- 기관장 인용은 본문 끝(마지막 문단), 형식 '○○○ 장관은 "…."라고 말했다.'
 - contact: {"dept": 부서명, "people": [[구분, 직위, 이름, "(전화)"], ...]}. 원고에 있으면 본문에서는 뺀다.
 - 참고 자료는 appendix: [{"title":"참고 1","heading":"제목","body":[블록...]}]."""
 
@@ -210,8 +210,6 @@ def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str =
         out["press_writing"] = {"steps": PRESS_GUIDE["steps"], "facts_template": PRESS_GUIDE["facts_template"],
                                  "facts_fields": PRESS_GUIDE["facts_fields"], "kinds": PRESS_GUIDE["kinds"],
                                  "types_order": PRESS_GUIDE["types_order"]}
-        if t == "press_release":
-            out["guide"] = out["guide"] + "\n" + "\n".join(PRESS_GUIDE["guide"])
     if t in ("official",): out["example_official"] = OFFICIAL_EXAMPLE
     if ministry and ministry in C.ministries(): out["ministry_style"] = _style(ministry)
     return out
@@ -306,18 +304,22 @@ def _press_release_checks(s, ministry):
     kind = s.get("kind", "보도자료")
     is_explanation = kind in ("설명자료", "해명자료")
 
-    # E1: 리드 누가
+    # E1: 리드 누가 — ministry가 비면 who_regex만 사용
     if not is_explanation and lead:
         window = lead[:CK["who_window"]]
-        if (ministry not in window
-                and CK["ministry_short"].get(ministry, "") not in window
-                and not re.search(CK["who_regex"], window)):
-            w.append("[작성] 리드 — 누가 (G20 39)")
+        if not ministry:
+            if not re.search(CK["who_regex"], window):
+                w.append("[작성] 리드(첫 문단) 앞부분에 '누가'(기관·기관장)가 없음 — '○○부(장관 ○○○)는 …'처럼 시작 (G20 39)")
+        else:
+            if (ministry not in window
+                    and CK["ministry_short"].get(ministry, "") not in window
+                    and not re.search(CK["who_regex"], window)):
+                w.append("[작성] 리드(첫 문단) 앞부분에 '누가'(기관·기관장)가 없음 — '○○부(장관 ○○○)는 …'처럼 시작 (G20 39)")
 
     # E2: 리드 언제
     if not is_explanation and lead:
         if not re.search(CK["when_regex"], lead):
-            w.append("[작성] 리드 — 언제 (G20 39)")
+            w.append("[작성] 리드에 '언제'(날짜·시행일·기간)가 없음 — 예: '10월 28일(수)', '11월 2일부터' (G20 39)")
 
     # E3: 리드 완결
     if not is_explanation and lead:
@@ -325,17 +327,17 @@ def _press_release_checks(s, ministry):
         # 끝의 "참고 N" 제거 후 확인
         lead_clean = re.sub(r"\s*참고\s*\d+\s*$", "", lead_stripped)
         if not lead_clean.endswith("다.") and not lead_clean.endswith("다"):
-            w.append("[작성] 리드 — 완결 (G20 54)")
+            w.append("[작성] 리드는 '~한다/~했다'로 끝나는 완결 문장으로 (G20 54)")
 
     # E4: 리드 길이
     if not is_explanation and lead:
         if len(lead) > CK["lead_max"]:
-            w.append("[작성] 리드가 깁니다 (G20 38)")
+            w.append(f"[작성] 리드가 깁니다({len(lead)}자) — 누가·언제·무엇만 한 문장으로, 세부는 다음 문단 (G20 38)")
 
     # E5: 리드 인용
     if not is_explanation and lead:
         if re.search(CK["quote_regex"], lead):
-            w.append("[작성] 리드 — 인용 (G20 38~39)")
+            w.append("[작성] 리드에 인용문 — 리드는 사실만, 인용은 본문 끝으로 (G20 38~39)")
 
     # E6: 인용 위치
     if not is_explanation:
@@ -353,37 +355,47 @@ def _press_release_checks(s, ministry):
             # 마지막 인용 블록 뒤에 본문 문장 블록이 3개 이상
             after_count = sum(1 for i, _ in text_blocks if i > last_qi)
             if after_count >= 3:
-                w.append("[작성] 인용 — 끝 (말뭉치: 끝 세 문단 안 88%)")
+                w.append("[작성] 인용 문단은 본문 끝(마지막~끝에서 셋째 문단)에 둔다 (말뭉치: 끝 세 문단 안 88%)")
 
     # E7: 제목 과장
     title = s.get("title", "")
     if title:
         for hw in CK["hype_words"]:
             if hw in title:
-                w.append(f"[작성] 제목 — {hw} — 근거 (말뭉치·G20 33)")
+                w.append(f"[작성] 제목의 '{hw}' — 본문에 비교 기준·근거가 있는지 확인 (말뭉치·G20 33)")
 
     # E8: 제목 마침표
     if title and title.endswith("."):
-        w.append("[작성] 제목 — 마침표")
+        w.append("[작성] 제목 끝에 마침표를 찍지 않는다")
 
     # E9: 부제 수
     subtitles = s.get("subtitles") or []
     if len(subtitles) > CK["subtitle_max_count"]:
-        w.append(f"[작성] 부제 — {CK['subtitle_max_count']}개 (G20 36)")
+        w.append(f"[작성] 부제는 1개가 가장 좋고 2개를 넘기지 않는다 (G20 36)")
 
-    # E10: 숫자 단위
+    # E10: 숫자 단위 — _check_number_units에서 문서 최대 3개, 블록마다 1개 처리
     unit_warnings = _check_number_units(s, CK)
     w.extend(unit_warnings)
 
-    # E11: 단위 띄어쓰기
+    # E11: 단위 띄어쓰기 — 본문 문장 블록과 note 대상, 매치마다
     unit_space_hits = []
     for _, b in text_blocks:
         txt = b.get("text", "")
         m = re.search(CK["unit_space_regex"], txt)
         if m and len(unit_space_hits) < 3:
             unit_space_hits.append(m)
+    # note 블록도 대상
+    for _, b in _walk(s):
+        if b.get("type") == "note":
+            txt = b.get("text", "")
+            m = re.search(CK["unit_space_regex"], txt)
+            if m and len(unit_space_hits) < 3:
+                unit_space_hits.append(m)
     for m in unit_space_hits:
-        w.append("[작성] 띄어 (G11 32~33, H22 66)")
+        matched = m.group(0)
+        # 정규화 예시: 숫자와 단위 사이에 공백 추가
+        norm = re.sub(r"(\d[\d,.]*[천만억조]*)\s*([가-힣]+)", r"\1 \2", matched)
+        w.append(f"[작성] 단위는 띄어 쓴다: '{matched}' → '{norm}' (G11 32~33, H22 66)")
 
     # E12: 외국 문자 먼저
     foreign_hits = []
@@ -391,8 +403,8 @@ def _press_release_checks(s, ministry):
     for txt in check_texts:
         if txt and re.search(CK["foreign_first_regex"], txt) and len(foreign_hits) < 3:
             foreign_hits.append(txt)
-    for _ in foreign_hits:
-        w.append("[작성] 한글을 먼저 (G20 63)")
+    for txt in foreign_hits:
+        w.append(f"[작성] 외국 문자는 한글을 먼저 쓰고 괄호 안에: '{txt}' (국어기본법 제14조, G20 63)")
 
     # E13: 약어 풀이 — 약어별 첫 등장만 확인, 괄호 안 첫 등장은 경고 제외
     if text_blocks:
@@ -414,7 +426,7 @@ def _press_release_checks(s, ministry):
                 acronym_hits.append(acr)
             seen_acronyms.add(acr)  # 첫 등장 처리 완료 (괄호 안이든 밖이든)
         for acr in acronym_hits:
-            w.append(f"[작성] {acr} — 한글 (G20 63)")
+            w.append(f"[작성] '{acr}' 첫 등장에 한글 풀이 없음 — '인공지능(AI)'처럼 한글(약어)로 (G20 63)")
 
     # E14: 쉬운 말
     replace_hits = []
@@ -423,7 +435,7 @@ def _press_release_checks(s, ministry):
         if not txt:
             continue
         for rw, replacement in CK["replace_words"].items():
-            if rw in txt and len(replace_hits) < 3:
+            if rw in txt:
                 src = CK["replace_sources"].get(rw, CK["replace_sources"].get("_default", "G20 108~109"))
                 w.append(f"[작성] '{rw}' → '{replacement}' ({src})")
                 replace_hits.append(rw)
@@ -434,7 +446,7 @@ def _press_release_checks(s, ministry):
         txt = b.get("text", "")
         for auth_word, suggestion in CK["authoritarian"].items():
             if auth_word in txt and len(auth_hits) < 3:
-                w.append(f"[작성] {auth_word} — {suggestion} (G11 53)")
+                w.append(f"[작성] 권위적 표현 '{auth_word}' → '{suggestion}' (G11 53)")
                 auth_hits.append(auth_word)
 
     # E16: 종결 혼용
@@ -450,7 +462,7 @@ def _press_release_checks(s, ministry):
         if re.search(r"[다]\.(?:\s|$)", txt_no_quote) and "니다." not in txt_no_quote:
             has_da = True
     if has_nida and has_da:
-        w.append("[작성] 혼용 (G20 55, G11 65)")
+        w.append("[작성] '-다'와 '-습니다' 혼용 — 한 가지로 (G20 55, G11 65)")
 
     # E17: 명사형 종결
     noun_end_hits = []
@@ -460,8 +472,9 @@ def _press_release_checks(s, ministry):
         txt = b.get("text", "").strip()
         if re.search(r"(함|임|됨|음|예정|필요)\.?$", txt) and len(noun_end_hits) < 3:
             noun_end_hits.append(txt)
-    for _ in noun_end_hits:
-        w.append("[작성] 명사형 (G20 55)")
+    for txt in noun_end_hits:
+        tail = txt[-12:] if len(txt) >= 12 else txt
+        w.append(f"[작성] 명사형 종결 — '-다'로 끝낸다: '…{tail}' (G20 55)")
 
     # E18: 긴 문장
     long_sent_hits = []
@@ -472,8 +485,8 @@ def _press_release_checks(s, ministry):
         for sent in sentences:
             if len(sent) > CK["sentence_max"] and len(long_sent_hits) < 3:
                 long_sent_hits.append(sent)
-    for _ in long_sent_hits:
-        w.append("[작성] 문장이 깁니다 (G20 56)")
+    for sent in long_sent_hits:
+        w.append(f"[작성] 문장이 깁니다({len(sent)}자) — 3줄(약 150자) 안쪽으로 끊는다 (G20 56)")
 
     return w
 
@@ -503,7 +516,7 @@ def _check_number_units(s, CK):
         block_has_hit = False
         # 숫자 토큰 찾기
         for m in re.finditer(r"(?<![\w.,’'‘])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?", txt):
-            if hit_count >= 3 or block_hit:
+            if hit_count >= 3 or id(txt) in block_hit:
                 break
             token = m.group(0)
             # 정수부가 한 자리이고 쉼표·소수점이 없으면 건너뜀
@@ -528,7 +541,7 @@ def _check_number_units(s, CK):
                 ctx_start = max(0, start - 8)
                 ctx_end = min(len(txt), end + 8)
                 ctx = txt[ctx_start:ctx_end]
-                w.append(f"[작성] 단위 — {ctx} (G11 32, 말뭉치)")
+                w.append(f"[작성] 숫자 뒤 단위 없음: '{ctx}' — 건·명·원·% 등 단위를 붙인다 (G11 32, 말뭉치)")
     return w
 
 
@@ -771,7 +784,7 @@ def _josa(word, pair="은/는"):
         return front if last in "013678" else back
     # 라틴 문자: L·M·N·R → 앞, 그 밖 → 뒤
     if "A" <= last.upper() <= "Z":
-        return front if last.upper() in "LMNRS" else back
+        return front if last.upper() in "LMNR" else back
     return back
 
 
@@ -823,6 +836,8 @@ def _normalize_quote_text(t):
 
 def _make_quote_block(speaker, texts, verb, josa):
     """인용 블록 text 생성. 1개면 '~라고', 2개 이상이면 '~라며, ~라고'."""
+    if not verb:
+        verb = "말했다"
     verb = verb.rstrip(".").strip()
     cleaned = [_normalize_quote_text(t) for t in texts]
     if len(cleaned) == 1:
@@ -954,7 +969,7 @@ def draft_press_structure(facts, ministry=""):
                     if d and d.strip():
                         body.append({"type": "l2", "text": d.strip()})
                 if pt.get("note"):
-                    body.append({"type": "note", "text": pt["note"]})
+                    body.append({"type": "note", "text": pt["note"].strip()})
 
         # plan
         plan = facts.get("plan", [])

@@ -120,9 +120,7 @@ class ReportComposer(C.Composer):
         self.header = re.sub(r'(</hh:refList>)', footer_xml + r'\1', self.header)
 
     def load(self, org):
-        tpl = ROOT / "templates" / f"{org}.json"
-        page = json.loads(tpl.read_text("utf-8")).get("page", {}) if org and tpl.exists() else {}
-        return load_rules(org), {"page": page}
+        return load_rules(org), {"page": B.page_settings(org)}
 
     def level(self, lv):
         out = super().level(lv)
