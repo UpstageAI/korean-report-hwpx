@@ -224,7 +224,10 @@ def test_draft_reference_kind_label(tmp_path):
 def test_draft_invents_no_numbers():
     e = EX[MSIT]
     r = SV.draft_press_structure(e["facts"])
-    got = set(re.findall(r"\d+", json.dumps(r["structure"], ensure_ascii=False)))
+    st = copy.deepcopy(r["structure"])
+    for ap in st["appendix"]: ap.pop("title")   # '참고 N'은 붙이는 고정 말
+    for b in st["body"] + [x for ap in st["appendix"] for x in ap["body"]]: b.pop("type")   # 'l2' 같은 블록 종류 이름 제외
+    got = set(re.findall(r"\d+", json.dumps(st, ensure_ascii=False)))
     src = set(re.findall(r"\d+", json.dumps(e["facts"], ensure_ascii=False)))
     assert got <= src
 
@@ -338,7 +341,7 @@ def test_cover_label_is_press_release_by_default(m, tmp_path):
 def test_contact_dept_kept_with_placeholder_people(tmp_path):
     b = SV.build_document(EX[MOIS]["structure"], "press_release", MOIS, str(tmp_path / "e.hwpx"))
     xml = zipfile.ZipFile(b["hwpx"]).read("Contents/section0.xml").decode("utf-8")
-    assert "행정안전부 재정정책과" in xml and "044-000-0000" in xml
+    assert EX[MOIS]["structure"]["contact"]["dept"] in xml and "044-000-0000" in xml
 
 
 def test_masked_name_not_stripped():
