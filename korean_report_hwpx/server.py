@@ -685,14 +685,25 @@ def check(structure, doc_type="report", style="standard", ministry=""):
     return t, s, w
 
 
+def _infer_doc_type(structure, doc_type):
+    """doc_type을 비우면 구조 키로 문서 종류를 정한다: release·subtitles·contact → 보도자료, to·sender → 기안문, 그 밖 → 보고서.
+    보도자료 구조를 doc_type 없이 넘겨 보고서로 만들어지던 문제 방지."""
+    if doc_type: return doc_type
+    if isinstance(structure, dict):
+        if any(k in structure for k in ("release", "subtitles", "distribute")): return "press_release"
+        if any(k in structure for k in ("to", "sender", "recipients")): return "official"
+    return "report"
+
+
 @mcp.tool()
-def check_structure(structure: dict | str, doc_type: str = "report", style: str = "standard", ministry: str = "") -> dict:
+def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "") -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
     □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
     보도자료를 ministry와 함께 점검하면 작성 점검(E1~E18: 리드·제목·인용·숫자·쉬운 말 등)을 추가로 수행한다.
     돌려주는 값: {ok, doc_type, warnings}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
     structure = _as_structure(structure)
+    doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     t, _, w = check(structure, doc_type, style, ministry)
@@ -952,9 +963,12 @@ def draft_press_structure(facts, ministry=""):
         bg = facts.get("background", [])
         if isinstance(bg, str):
             bg = [bg]
-        for b in bg:
-            if b and b.strip():
-                body.append({"type": bt, "text": b.strip()})
+        bg = [b.strip() for b in bg if b and b.strip()]
+        if bt == "p" and bg:   # 기사형(문단) 기관: 배경 문장들은 한 문단으로 이어 쓴다(실물 보도자료 문단은 2~3문장)
+            body.append({"type": bt, "text": " ".join(bg)})
+        else:
+            for b in bg:
+                body.append({"type": bt, "text": b})
 
         # points
         for pt in facts.get("points", []):
@@ -962,12 +976,15 @@ def draft_press_structure(facts, ministry=""):
                 if pt and pt.strip():
                     body.append({"type": bt, "text": pt.strip()})
             elif isinstance(pt, dict):
-                txt = pt.get("text", "")
-                if txt and txt.strip():
-                    body.append({"type": bt, "text": txt.strip()})
-                for d in pt.get("details", []) or []:
-                    if d and d.strip():
-                        body.append({"type": "l2", "text": d.strip()})
+                txt = (pt.get("text", "") or "").strip()
+                det = [d.strip() for d in (pt.get("details", []) or []) if d and d.strip()]
+                if bt == "p" and txt:   # 기사형 기관: 세부 문장은 ○ 줄로 쪼개지 않고 같은 문단에 이어 쓴다
+                    body.append({"type": bt, "text": " ".join([txt] + det)})
+                else:
+                    if txt:
+                        body.append({"type": bt, "text": txt})
+                    for d in det:
+                        body.append({"type": "l2", "text": d})
                 if pt.get("note"):
                     body.append({"type": "note", "text": pt["note"].strip()})
 
@@ -1028,24 +1045,27 @@ def draft_press_structure(facts, ministry=""):
         items = ap.get("items", [])
         rows = ap.get("rows")
         body_blocks = ap.get("body")
-        title = f"참고 {appx_idx + 1}"
+        appx_title = f"참고 {appx_idx + 1}"
         appx_idx += 1
         if body_blocks is not None:
             # body가 이미 있으면 그대로
-            appendix.append({"title": title, "heading": heading, "body": body_blocks})
+            appendix.append({"title": appx_title, "heading": heading, "body": body_blocks})
         elif items:
-            appendix.append({"title": title, "heading": heading,
+            appendix.append({"title": appx_title, "heading": heading,
                              "body": [{"type": "l1", "text": str(it)} for it in items]})
         elif rows is not None:
-            appendix.append({"title": title, "heading": heading,
+            appendix.append({"title": appx_title, "heading": heading,
                              "body": [{"type": "caption", "text": heading},
                                       {"type": "table", "rows": [list(r) for r in rows]}]})
         else:
             # heading만 있는 경우 빈 body
-            appendix.append({"title": title, "heading": heading, "body": []})
+            appendix.append({"title": appx_title, "heading": heading, "body": []})
 
     # numbers → appendix 맨 뒤
     numbers = facts.get("numbers", [])
+    body_text = " ".join(b.get("text", "") for b in body)
+    if numbers and all(str(n.get("value") or "") in body_text for n in numbers) and not facts.get("numbers_heading"):
+        numbers = []   # 본문에 이미 다 나온 숫자는 '주요 수치' 참고 표로 되풀이하지 않는다
     if numbers:
         nheading = facts.get("numbers_heading") or "주요 수치"
         # basis가 모두 비었는지 확인 → 2열 또는 3열
@@ -1260,7 +1280,7 @@ def _number_official_body_for_md(s):
 
 
 @mcp.tool()
-def build_document(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
+def build_document(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                    logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                    style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
     """보고서·보도자료(보도참고·설명·해명자료 포함)·기안문을 기관 서식 HWPX(한글 파일)로 만든다.
@@ -1280,6 +1300,7 @@ def build_document(structure: dict | str, doc_type: str = "report", ministry: st
     report_kind: 'standard'(기본, 기존 보고서 서식) | 'internal'(내부 결재 보고서 — 제목 상자 라벨 없음, 쪽 번호 "- n -", 작성일·부서 "'26. 10. 8.(목) / 과·팀명" 형식, 표 머리 음영 없음/회색, □ 글꼴 HY헤드라인M).
     돌려주는 값: {hwpx, doc_type, 문서종류, 기관, warnings, structure(정리된 구조), md(export_markdown=True일 때)}. 같은 이름 .json에 구조도 저장."""
     structure = _as_structure(structure)
+    doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     if report_kind not in REPORT_KINDS:
@@ -1507,7 +1528,7 @@ def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
 
 
 @mcp.tool()
-def build_from_structure(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
+def build_from_structure(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                          logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                          style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
     """build_document와 같다(별칭). structure는 JSON 문자열로 줘도 된다."""
