@@ -689,6 +689,32 @@ class Composer:
             tcs.append(self.cell(k, 0, w, h, paras, bf))
         return self.tbl_para(["".join(tcs)], 1, len(ws), sum(ws), h, none)
 
+    def cover_box(self, doc):
+        """머리 표: 기관 서식처럼 바깥 테두리 한 상자 안에 [기관명 | 보도자료 | 빈칸]. 로고 그림은 넣지 않고(정부상징 규정)
+        로고 칸에 기관명을 글로 쓴다. 기관 서식에 테두리가 없으면 기존 cover()."""
+        c = self.L.get("cover") or {}
+        b = c.get("border") or {}
+        if self.logo_path or (b.get("line") or "NONE") == "NONE": return self.cover(doc)
+        ws = self.fit_widths(c.get("widths") or [13352, 19012, 15333]); h = max(2600, min(c.get("height", 3481), 3600))
+        lw = b.get("width") or "0.12 mm"; n = len(ws)
+        label = doc.get("kind") or "보도자료"
+        lab = dict(c.get("label_char") or {}); lab.setdefault("font", "HY헤드라인M"); lab["pt"] = min(20.0, float(lab.get("pt") or 20.0))
+        org = self.L.get("org") or doc.get("ministry") or ""
+        tcs = []
+        for k, w in enumerate(ws):
+            sides = {"top": lw, "bottom": lw}
+            if k == 0: sides["left"] = lw
+            if k == n - 1: sides["right"] = lw
+            bf = self.border_sides(sides)
+            if k == c.get("label_col", 1):
+                paras = self.p(self.para_pr("CENTER", 100), [(self.ch(lab), label)])
+            elif k == c.get("logo_col", 0):
+                paras = self.p(self.para_pr("CENTER", 100), [(self.char("맑은 고딕", 11.0, bold=True), org)])
+            else:
+                paras = self.p(self.para_pr("CENTER", 100), [(self.char("바탕", 10.0), "")])
+            tcs.append(self.cell(k, 0, w, h, paras, bf))
+        return self.tbl_para(["".join(tcs)], 1, n, sum(ws), h, self.border(None, "NONE"))
+
     # ── 보도시점·배포 ──
     def release(self, doc):
         rel = doc.get("release") or ""; dist = doc.get("distribute") or doc.get("배포") or ""
@@ -790,11 +816,28 @@ class Composer:
             paras = "".join(self.p(self.para_pr(row.get("align") or "CENTER", 130), [(cp, ln)]) for ln in lines)
             b = row.get("border") or {}
             bf = self.border(row.get("fill"), b.get("line") or "SOLID", b.get("width") or "0.12 mm")
-            h = max(row.get("h", 2000), int(len(lines) * float(spec.get("pt", 12)) * 130 + 1000))
+            need = int(len(lines) * float(spec.get("pt", 12)) * 130 + 1400)
+            has_sub_row = any(r["role"] == "subtitle" for r in t["rows"])
+            h = max(row.get("h", 2000), need) if has_sub_row else need   # 부제 칸 없는 기관 서식 높이는 부제 포함 실물 값 → 제목만이면 내용 높이
             rows.append(self.cell(0, len(rows), width, h, paras, bf, margin=(850, 850, 566, 566))); H += h
-        if subs and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 표 아래 문단
-            return [self.tbl_para(rows, len(rows), 1, width, H, self.border(None, "NONE"))] + \
-                   [self.p(self.para_pr("CENTER", 130), [(self.ch(t["rows"][0].get("char"), pt=min(16.0, max(11.0, float((t["rows"][0].get("char") or {}).get("pt", 18)) - 6)), bold=False), s)]) for s in subs]
+        if subs and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 상자 안, 제목 아래에 '- 부제'(왼쪽, 내어쓰기)
+            row = next(r for r in t["rows"] if r["role"] == "title")
+            spec, lines = self.fit_title(doc["title"], dict(row.get("char") or {}), width - 1700)
+            tpt = float(spec.get("pt", 20))
+            sspec = {"font": "휴먼명조", "pt": 15.0 if tpt >= 20 else 13.0, "bold": False}
+            sw = WIDTHS.get("휴먼명조") or WIDTHS.get("바탕")
+            hang = int(F.width("- ", sspec["pt"], 0, 100, sw))
+            inner = width - 1700
+            paras = "".join(self.p(self.para_pr("CENTER", 130), [(self.ch(spec), ln)]) for ln in lines)
+            nsub = 0
+            for s0 in doc.get("subtitles", []):
+                txt = "- " + s0.strip().strip("-").strip()
+                nsub += max(1, -(-int(F.width(txt, sspec["pt"], 0, 100, sw) * 1.08) // max(1, inner - hang)))
+                paras += self.p(self.para_pr("LEFT", 130, -hang), [(self.ch(sspec), txt)])
+            b = row.get("border") or {}
+            bf = self.border(row.get("fill"), b.get("line") or "SOLID", b.get("width") or "0.12 mm")
+            h = int(len(lines) * tpt * 130 + nsub * sspec["pt"] * 130 + 1400)
+            return [self.tbl_para([self.cell(0, 0, width, h, paras, bf, margin=(850, 850, 566, 566))], 1, 1, width, h, self.border(None, "NONE"))]
         return [self.tbl_para(rows, len(rows), 1, width, H, self.border(None, "NONE"))]
 
     # ── 담당 표 ──
@@ -832,7 +875,7 @@ class Composer:
 
     # ── 조립 ──
     def build(self, doc, dst):
-        out = [self.cover(doc), self.spacer(), self.release(doc), self.spacer(8.0)] + self.title(doc) + [self.title_gap()]
+        out = [self.cover_box(doc), self.spacer(), self.release(doc), self.spacer(8.0)] + self.title(doc) + [self.title_gap()]
         sec = B.sec_pr(self.L.get("page", {}))
         out[0] = re.sub(r"(<hp:p\b[^>]*>)", lambda m: m.group(1) + f'<hp:run charPrIDRef="0">{sec}</hp:run>', out[0], count=1)
         body = doc.get("body", [])
