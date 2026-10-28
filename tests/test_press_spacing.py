@@ -88,3 +88,25 @@ def test_report_unchanged(tmp_path):
     ps = [p for p in top_paras(sec) if "<hp:tbl" not in p]
     l1 = [p for p in ps if text(p).lstrip().startswith("□")]
     assert l1 and all(para_prev(hdr, p) == 1000 for p in l1)
+
+
+def test_no_blank_line_before_caption_heading_appendix(tmp_path):
+    doc = copy.deepcopy(DOC)
+    b = doc["body"]
+    doc["body"] = [b[0], {"type": "caption", "text": "표 제목"}, {"type": "table", "rows": [["구분", "값"], ["가", "1건"]]},
+                   b[1], {"type": "h", "text": "소제목"}, b[2]]   # 캡션·소제목 모두 p 바로 뒤
+    doc["appendix"] = [{"title": "참고 1", "heading": "참고 제목", "body": [{"type": "l1", "text": "참고 내용이다."}]}]
+    sec, hdr = build("과학기술정보통신부", doc, tmp_path)
+    ps = top_paras(sec)
+    for key in ("표 제목", "소제목"):
+        k = next(i for i, p in enumerate(ps) if key in text(p) and "<hp:tbl" not in p)
+        assert text(ps[k - 1]).strip(), (key, "앞에 빈 줄")
+    k = next(i for i, p in enumerate(ps) if "참고 제목" in p)
+    assert text(ps[k - 1]).strip() or "<hp:tbl" in ps[k - 1], "참고 머리 앞에 빈 줄"
+
+
+def test_spacing_rules_read_once():
+    import compose as C
+    src = Path(C.__file__).read_text("utf-8")
+    body = src[src.index("    def item(self"):src.index("    RATIOS")]
+    assert "_문단위간격.json" not in body   # 문단마다 파일을 읽지 않는다(모듈 또는 인스턴스에서 한 번)
