@@ -55,6 +55,8 @@ def load_rules(org):
 
 
 class ReportComposer(C.Composer):
+    PRESS_SPACING = False   # 보고서: 문단 간격은 고정값, 보도자료용 _문단위간격.json·빈 줄 미적용
+
     def __init__(self, org, logo_path=None, style="standard", report_kind="standard",
                  line_spacing=None, para_space_before=None, **kw):
         if style not in STYLES:

@@ -63,6 +63,7 @@ def item_label(pat, c):
 
 class OfficialComposer(Composer):
     """기안문(별지 제1호서식)composer. compose.Composer를 상속하고 규칙·조립을 overrides."""
+    PRESS_SPACING = False   # 기안문: 문단 간격은 고정값(gap_pt=6.0), 보도자료용 _문단위간격.json·빈 줄 미적용
 
     def __init__(self, org, doc, logo_path=None):
         self.org = org
