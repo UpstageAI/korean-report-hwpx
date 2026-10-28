@@ -90,6 +90,10 @@ class Composer:
         """
         self.org = org; self.R, self.L = self.load(org); self.cache = {}
         self.override = {}; self.items = {}; self._seq = 7000000  # polish 루프용: 문단 번호 → 자간
+        if self.PRESS_SPACING:
+            self._sp = json.loads((ROOT / "rules" / "_문단위간격.json").read_text("utf-8"))
+        else:
+            self._sp = None
         self.header = B.header_xml(); self.base_para = "0"; self.base_char = "0"
         self.images = []   # [(id, ext, bytes)]
         self.style = style   # "standard" 또는 "simplified" (보고서 간소화 모드)
@@ -275,10 +279,9 @@ class Composer:
         internal = getattr(self, "report_kind", "standard") == "internal"
         outline_level = None
         heading_level = None
-        # 문단 위 간격(prev): 보도자료는 _문단위간격.json 기관값→전체값, 보고서·기안문은 고정값
+        # 문단 위 간격(prev): 보도자료는 기관·전체 간격표 기관값→전체값, 보고서·기안문은 고정값
         if self.PRESS_SPACING:
-            _sp = json.loads((ROOT / "rules" / "_문단위간격.json").read_text("utf-8"))
-            prev = _sp["기관"].get(self.org, {}).get(lv, _sp["전체"].get(lv, 0))
+            prev = self._sp["기관"].get(self.org, {}).get(lv, self._sp["전체"].get(lv, 0))
         else:
             if lv in ("l1", "l2", "l3", "note", "ref"):
                 if lv == "l1":
@@ -556,8 +559,8 @@ class Composer:
         for b in blocks:
             t = b["type"]; lv = self.LVMAP.get(t, "p")
             self._after_table = prev in ("table",) and lv in ("note", "ref")
-            if prev is not None:
-                # 보도자료: 규칙 gaps에 따라 빈 줄 삽입(0.2.0 동작 복원). caption·h 앞은 빈 줄 없음
+            if prev is not None and t not in ("caption", "h", "appx_h"):
+                # 보도자료: 규칙 gaps에 따라 빈 줄 삽입(0.2.0 동작 복원). caption·h·appx_h 앞은 빈 줄 없음
                 # 보고서·기안문: 지금 동작 유지(g=None)
                 g = self.gap(prev, lv) if self.PRESS_SPACING else None
                 if g: out.append(g)
