@@ -157,12 +157,11 @@ def test_format_matches_rules(built, org):
 
 @pytest.mark.parametrize("org", ORGS)
 def test_gaps_match_rules(built, org):
-    """14차 Fix 이후: 항목 사이 gap 문단 없이 항목 자체 prev로 간격 처리.
-    항목 문단들은 항상 인접(b - a == 1)하며, prev 값은 항목 수준에 따라 결정됨.
-    - l1(□): prev=1000 (10pt)
-    - l2/l3: prev=500 (5pt)
-    - note/ref: prev=300 (3pt)
-    """
+    """보도자료 항목 사이 간격은 기관 실측값대로(SPEC_press_spacing.md, 0.4.0에서 0.2.0 동작으로 되돌림):
+    - 빈 줄: Composer.gap_pt(앞, 뒤)가 None이면 없음, 값이 있으면 그 크기의 빈 문단 1개
+    - 문단 위 간격: rules/_문단위간격.json 기관값 → 없으면 전체값
+    (보고서·기안문의 빈 줄 없음·고정 문단 위 간격은 test_report·test_internal_spacing이 지킨다)"""
+    sp = json.loads((Path(C.__file__).resolve().parent.parent / "rules" / "_문단위간격.json").read_text("utf-8"))
     c, _, sec, head, _ = built[org]
     fonts, chars, _ = _header_maps(head)
     tops = [p for *_, p in balanced(sec, "p")]
@@ -173,24 +172,14 @@ def test_gaps_match_rules(built, org):
         la, lb = c.items[ids[a]]["lv"], c.items[ids[b]]["lv"]
         between = tops[a + 1:b]
         if any("<hp:tbl" in x or "<hp:rect" in x for x in between) or b - a > 2: continue   # 표·상자를 사이에 둔 경우 제외
-
-        # 14차 Fix: 항목 사이 gap 문단 없음, 항목은 항상 인접
-        assert b - a == 1, (org, la, lb, "항목 사이에 gap 문단이 있음")
-
-        # 항목 prev 값 검증 (간격이 gap 문단이 아닌 항목 자체 prev로 처리됨)
-        item_a = c.items[ids[a]]
-        expected_prev = {"l1": 1000, "l2": 500, "l3": 500, "note": 300, "ref": 300}.get(item_a["lv"])
-        if expected_prev is not None:
-            # 항목 문단의 paraPr에서 prev 값 확인
-            pid_ref = re.search(r'paraPrIDRef="(\d+)"', tops[a])
-            if pid_ref:
-                pid = pid_ref.group(1)
-                pxml = re.search(r'<hh:paraPr id="%s"[^>]*>(.*?)</hh:paraPr>' % pid, head, re.S)
-                if pxml:
-                    prev_m = re.search(r'<hc:prev value="(-?\d+)"', pxml.group(1))
-                    if prev_m:
-                        actual_prev = int(prev_m.group(1))
-                        assert actual_prev == expected_prev, \
-                            (org, item_a["lv"], f"prev={actual_prev}, 기대={expected_prev}")
+        want = c.gap_pt(la, lb)
+        assert (b - a == 1) == (want is None), (org, la, lb, want, b - a)
+        if want is not None:
+            cid = re.search(r'charPrIDRef="(\d+)"', between[0]).group(1)
+            assert _char(fonts, chars, cid)[1] == int(round(want * 100)), (org, la, lb)
+        pid = re.search(r'paraPrIDRef="(\d+)"', tops[b]).group(1)
+        pxml = re.search(r'<hh:paraPr id="%s"[^>]*>(.*?)</hh:paraPr>' % pid, head, re.S).group(1)
+        expected_prev = sp["기관"].get(org, {}).get(lb, sp["전체"].get(lb, 0))
+        assert int(re.search(r'<hc:prev value="(-?\d+)"', pxml).group(1)) == expected_prev, (org, lb)
         n += 1
     assert n >= 2

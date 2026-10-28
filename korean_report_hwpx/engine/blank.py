@@ -3,7 +3,9 @@
 HWPX = zip(mimetype, version.xml, META-INF/*, Contents/content.hpf, Contents/header.xml, Contents/section0.xml, settings.xml, Preview/PrvText.txt, BinData/*).
 header.xml은 글꼴 1개·글자 모양 1개·문단 모양 1개·테두리 2개·스타일 1개만 둔 최소 구성이고,
 생성기(compose.Composer)가 규칙값에 따라 글자·문단·테두리 모양을 덧붙인다."""
+import json
 import zipfile
+from pathlib import Path
 
 NS = ('xmlns:ha="http://www.hancom.co.kr/hwpml/2011/app" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" '
       'xmlns:hp10="http://www.hancom.co.kr/hwpml/2016/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
@@ -16,6 +18,19 @@ NS = ('xmlns:ha="http://www.hancom.co.kr/hwpml/2011/app" xmlns:hp="http://www.ha
 XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
 LANGS = ("HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER")
 ALL7 = lambda v: " ".join(f'{l.lower()}="{v}"' for l in LANGS)
+
+ROOT = Path(__file__).resolve().parent.parent
+PAGE_DEFAULTS = json.loads((ROOT / "rules" / "_쪽설정.json").read_text("utf-8"))["default"]
+
+
+def page_settings(org=""):
+    """쪽 설정(편집 용지) dict. org가 있고 templates/<org>.json이 있으면 그 page 값이 default를 덮어쓴다."""
+    page = dict(PAGE_DEFAULTS)
+    if org:
+        tpl = ROOT / "templates" / f"{org}.json"
+        if tpl.exists():
+            page.update(json.loads(tpl.read_text("utf-8")).get("page", {}))
+    return page
 
 
 def _border_fill(i, line="NONE", width="0.1 mm"):
@@ -69,8 +84,8 @@ def sec_pr(page):
             '<hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="0" pic="0" tbl="0" equation="0"/>'
             '<hp:visibility hideFirstHeader="0" hideFirstFooter="0" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="0" hideFirstEmptyLine="0" showLineNumber="0"/>'
             '<hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/>'
-            f'<hp:pagePr landscape="WIDELY" width="{g("width", 59528)}" height="{g("height", 84188)}" gutterType="LEFT_ONLY">'
-            f'<hp:margin header="{g("header", 4252)}" footer="{g("footer", 4252)}" gutter="{g("gutter", 0)}" left="{g("left", 5669)}" right="{g("right", 5669)}" top="{g("top", 2834)}" bottom="{g("bottom", 2834)}"/></hp:pagePr>'
+            f'<hp:pagePr landscape="WIDELY" width="{g("width", PAGE_DEFAULTS["width"])}" height="{g("height", PAGE_DEFAULTS["height"])}" gutterType="LEFT_ONLY">'
+            f'<hp:margin header="{g("header", PAGE_DEFAULTS["header"])}" footer="{g("footer", PAGE_DEFAULTS["footer"])}" gutter="{g("gutter", PAGE_DEFAULTS["gutter"])}" left="{g("left", PAGE_DEFAULTS["left"])}" right="{g("right", PAGE_DEFAULTS["right"])}" top="{g("top", PAGE_DEFAULTS["top"])}" bottom="{g("bottom", PAGE_DEFAULTS["bottom"])}"/></hp:pagePr>'
             f'<hp:footNotePr>{note("EACH_COLUMN", -1)}</hp:footNotePr><hp:endNotePr>{note("END_OF_DOCUMENT", -4)}</hp:endNotePr>'
             + pbf("BOTH") + pbf("EVEN") + pbf("ODD") + '</hp:secPr>'
             '<hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="1" sameSz="1" sameGap="0"/></hp:ctrl>')

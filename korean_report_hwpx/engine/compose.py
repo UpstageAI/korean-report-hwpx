@@ -80,6 +80,8 @@ def _img_size(b):
 
 
 class Composer:
+    PRESS_SPACING = True   # 보도자료 전용 문단 간격(빈 줄·문단 위 prev): 하위 클래스(ReportComposer·OfficialComposer)에서 False로 override
+
     def __init__(self, org, logo_path=None, slogan_path=None, placeholder_contact=False, style="standard",
                  line_spacing=None, para_space_before=None):
         """간격 옵션:
@@ -88,11 +90,16 @@ class Composer:
         """
         self.org = org; self.R, self.L = self.load(org); self.cache = {}
         self.override = {}; self.items = {}; self._seq = 7000000  # polish 루프용: 문단 번호 → 자간
+        if self.PRESS_SPACING:
+            self._sp = json.loads((ROOT / "rules" / "_문단위간격.json").read_text("utf-8"))
+        else:
+            self._sp = None
         self.header = B.header_xml(); self.base_para = "0"; self.base_char = "0"
         self.images = []   # [(id, ext, bytes)]
         self.style = style   # "standard" 또는 "simplified" (보고서 간소화 모드)
         self.line_spacing = line_spacing      # 본문 줄 간격 옵션 (%)
         self.para_space_before = para_space_before  # 본문 문단 위 간격 옵션 (pt)
+        # PRESS_SPACING: 클래스 속성으로만 설정 (하위 클래스가 False로 override). 인스턴스 속성 아님.
         pg = self.L.get("page", {})
         self.text_w = pg.get("width", 59528) - pg.get("left", 5669) - pg.get("right", 5669)
         self.logo_path, self.slogan_path, self.placeholder_contact = logo_path, slogan_path, placeholder_contact
@@ -153,7 +160,7 @@ class Composer:
 
     def _add(self, kind, tag, el):
         nid = str(1 + max(int(x) for x in re.findall(r'<hh:%s id="(\d+)"' % tag, self.header)))
-        el = re.sub(r'id="\d+"', f'id="{nid}"', el, count=1)
+        el = re.sub(r'id="[^"]*"', f'id="{nid}"', el, count=1)
         self.header = self.header.replace(f"</hh:{kind}>", el + f"</hh:{kind}>")
         self.header = re.sub(r'<hh:%s itemCnt="(\d+)"' % kind, lambda z: f'<hh:{kind} itemCnt="{int(z.group(1)) + 1}"', self.header)
         return nid
@@ -173,9 +180,10 @@ class Composer:
         if sup: el = el.replace("</hh:charPr>", "<hh:supscript/></hh:charPr>")
         self.cache[key] = self._add("charProperties", "charPr", el); return self.cache[key]
 
-    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False, heading_level=None):
-        """문단 모양 생성. heading_level 지정 시 HWPX 개요(outline) heading level 설정 (간소화 모드)."""
-        key = ("p", align, line, indent, left, prev, nxt, word, keep, heading_level)
+    def para_pr(self, align="JUSTIFY", line=160, indent=0, left=0, prev=0, nxt=0, word=True, keep=False, heading_level=None, tab_ids=None):
+        """문단 모양 생성. heading_level 지정 시 HWPX 개요(outline) heading level 설정 (간소화 모드).
+        tab_ids: 탭 위치가 있는 문단용 <hh:tabPr> id 목록. 지정 시 paraPr의 tabPrIDRef를 해당 id로 설정."""
+        key = ("p", align, line, indent, left, prev, nxt, word, keep, heading_level, tuple(tab_ids or ()))
         if key in self.cache: return self.cache[key]
         el = re.search(r'<hh:paraPr id="%s".*?</hh:paraPr>' % self.base_para, self.header, re.S).group(0)
         el = re.sub(r'horizontal="\w+"', f'horizontal="{align}"', el, count=1)
@@ -198,7 +206,24 @@ class Composer:
         if heading_level is not None:
             el = re.sub(r'<hh:heading type="NONE" idRef="0" level="0"/>',
                         f'<hh:heading type="OUTLINE" idRef="0" level="{heading_level}"/>', el)
+        if tab_ids:
+            # base paraPr의 tabPrIDRef="0"을 실제 탭 모양 id로 교체
+            el = el.replace('tabPrIDRef="0"', f'tabPrIDRef="{tab_ids[0]}"', 1)
         self.cache[key] = self._add("paraProperties", "paraPr", el); return self.cache[key]
+
+    def _tabs_pr(self, positions):
+        """탭 모양 <hh:tabPr> 생성. positions: 탭 위치 목록(HWPUNIT, 문단 왼쪽 여백 기준).
+        한글 원본 형식: autoTabLeft=1, 각 위치는 <hp:switch><hp:case><hh:tabItem pos="…" type="LEFT" leader="NONE" unit="HWPUNIT"/></hp:case>
+        <hp:default><hh:tabItem pos="2배" type="LEFT" leader="NONE"/></hp:default></hp:switch>.
+        반환: tabPr id."""
+        case_items = ''.join(f'<hh:tabItem pos="{p}" type="LEFT" leader="NONE" unit="HWPUNIT"/>' for p in positions)
+        dflt_items = ''.join(f'<hh:tabItem pos="{2 * p}" type="LEFT" leader="NONE"/>' for p in positions)
+        inner = ('<hh:tabPr id="" autoTabLeft="1" autoTabRight="0">'
+                 '<hp:switch>'
+                 f'<hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar">{case_items}</hp:case>'
+                 f'<hp:default>{dflt_items}</hp:default>'
+                 '</hp:switch></hh:tabPr>')
+        return self._add("tabProperties", "tabPr", inner)
 
     def border(self, fill=None, line="SOLID", width="0.12 mm", color="#000000"):
         key = ("b", fill, line, width, color)
@@ -272,17 +297,19 @@ class Composer:
         internal = getattr(self, "report_kind", "standard") == "internal"
         outline_level = None
         heading_level = None
-        # 14차 Fix: prev 결정을 세 서식 공통으로
-        # l1(□ / 1.) = 1000, l2·l3 = 500, note·ref = 300
-        if lv in ("l1", "l2", "l3", "note", "ref"):
-            if lv == "l1":
-                prev = 1000
-            elif lv in ("note", "ref"):
-                prev = 300
-            else:
-                prev = 500
+        # 문단 위 간격(prev): 보도자료는 기관·전체 간격표 기관값→전체값, 보고서·기안문은 고정값
+        if self.PRESS_SPACING:
+            prev = self._sp["기관"].get(self.org, {}).get(lv, self._sp["전체"].get(lv, 0))
         else:
-            prev = 0
+            if lv in ("l1", "l2", "l3", "note", "ref"):
+                if lv == "l1":
+                    prev = 1000
+                elif lv in ("note", "ref"):
+                    prev = 300
+                else:
+                    prev = 500
+            else:
+                prev = 0
         para_xml = self.p(self.para_pr("JUSTIFY", L_["line"], -hang, word=word is not False,
                                         prev=prev,
                                         heading_level=heading_level), segs, pno, outline_level=outline_level)
@@ -550,10 +577,10 @@ class Composer:
         for b in blocks:
             t = b["type"]; lv = self.LVMAP.get(t, "p")
             self._after_table = prev in ("table",) and lv in ("note", "ref")
-            if prev is not None:
-                # 14차 Fix: 서식과 관계없이 항목 사이 g=None (빈 문단 만들지 않음)
-                # caption 앞도 g=None (caption 자체 prev=1000으로 간격 처리)
-                g = None
+            if prev is not None and t not in ("caption", "h", "appx_h"):
+                # 보도자료: 규칙 gaps에 따라 빈 줄 삽입(0.2.0 동작 복원). caption·h·appx_h 앞은 빈 줄 없음
+                # 보고서·기안문: 지금 동작 유지(g=None)
+                g = self.gap(prev, lv) if self.PRESS_SPACING else None
                 if g: out.append(g)
             if t in ("l1", "l2", "l3", "note", "ref", "p", "plain"): out.append(self.item(self.LVMAP[t], b["text"]))
             elif t == "h":
@@ -773,7 +800,11 @@ class Composer:
     # ── 담당 표 ──
     def contact(self, doc):
         c = doc.get("contact") or {}
-        if not c.get("people") and self.placeholder_contact: c = PLACEHOLDER_CONTACT
+        if not c.get("people") and self.placeholder_contact:
+            if c.get("dept"):
+                c = {"dept": c["dept"], "people": PLACEHOLDER_CONTACT["people"]}
+            else:
+                c = PLACEHOLDER_CONTACT
         people = [(list(p) + ["", "", "", ""])[:4] if len(p) >= 4 else ["", *([""] * (3 - len(p))), *p] for p in c.get("people", [])]
         if not people: people = [["담당자", "", "", ""]]
         L_ = self.L.get("contact") or {"widths": [6236, 15167, 6081, 5605, 5605, 9003], "row_h": 1800}

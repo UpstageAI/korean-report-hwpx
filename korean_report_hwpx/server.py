@@ -28,6 +28,8 @@ import compose as C  # noqa: E402
 import report as RP  # noqa: E402
 import official as O  # noqa: E402 — _정규화날짜, _unroll_table_rows, _strip_existing_number 등
 
+PRESS_GUIDE = json.loads((ROOT / "guides" / "press_writing.json").read_text("utf-8"))
+
 DOC_TYPES = ("report", "press_release", "official")
 LABEL = {"report": "보고서", "press_release": "보도자료", "official": "기안문"}
 STYLES = ("standard", "simplified")
@@ -35,9 +37,11 @@ REPORT_KINDS = ("standard", "internal")
 
 mcp = MCPServer(
     "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료·기안문)",
-    instructions="사용자가 '공문서처럼 써 줘', '보고서로 만들어 줘', '보도자료로 만들어 줘', '기안문·시행문으로 만들어 줘'처럼 한국 공무원 문서 양식의 HWPX(한글 파일)를 원할 때 쓴다. "
-                 "외부 API 없이 로컬에서 동작한다. 순서: get_writing_guide로 작성 규칙과 구조 스키마 확인 → 원고를 구조 JSON으로 정리 "
-                 "→ (선택) check_structure → build_document. 결과의 warnings가 있으면 구조를 고쳐 다시 build_document. "
+    instructions="사용자가 '보도자료', '보도참고자료', '설명자료', '해명자료', '보고서', '기안문', 'HWPX', '한글' 파일을 원할 때 쓴다. "
+                 "파이썬 등으로 HWPX를 직접 만들지 말고 이 도구를 쓴다. 외부 API 없이 로컬에서 동작한다. "
+                 "보도자료 순서: get_writing_guide(doc_type='press_release', ministry=기관) → draft_press_structure(사실 메모 → 구조 초안) → 문장 다듬기 → check_structure → build_document. "
+                 "일반 순서: get_writing_guide로 작성 규칙과 구조 스키마 확인 → 원고를 구조 JSON으로 정리 → (선택) check_structure → build_document. "
+                 "결과의 warnings가 있으면 구조를 고쳐 다시 build_document. "
                  "기관을 말하지 않으면 ministry를 비워 공통 서식(보고서)으로 만든다. 원고에 없는 사실·숫자·담당자는 지어내지 않는다.")
 
 
@@ -88,11 +92,12 @@ SIMPLIFIED_RULES = """[간소화 모드 규칙] style="simplified" 지정 시 �
 PRESS_RULES = """[보도자료 규칙]
 - title: 핵심 한 줄. subtitles: 부제 명사문 1~2개(앞뒤 '-' 없이).
 - release: 보도시점(예: '2026. 10. 7.(수) 조간', '배포 즉시'), 없으면 "". distribute: 배포 일시, 없으면 "".
+- kind: '보도자료'(기본)·'보도참고자료'·'설명자료'·'해명자료' 중 선택(머리 이름). 없으면 '보도자료'.
 - body 블록 type — 기관 본문 방식에 맞춘다(get_writing_guide의 ministry_style):
   문단식 기관 → "p"(기사체 문단, 첫 문단은 누가·언제·무엇), 하위 나열이 필요할 때만 "l2"(ㅇ)·"l3"(-)
   □식 기관 → "l1"(□ 대항목, 두괄식 한 문장), "l2"(ㅇ), "l3"(-)
   공통 → "note"(*), "ref"(※), "caption", "table"(rows), "box"(lines: 강조 상자), "image"(path, width_mm)
-- 기관장 인용은 마지막 문단으로.
+- 기관장 인용은 본문 끝(마지막 문단), 형식 '○○○ 장관은 "…."라고 말했다.'
 - contact: {"dept": 부서명, "people": [[구분, 직위, 이름, "(전화)"], ...]}. 원고에 있으면 본문에서는 뺀다.
 - 참고 자료는 appendix: [{"title":"참고 1","heading":"제목","body":[블록...]}]."""
 
@@ -106,13 +111,7 @@ EXAMPLE_REPORT = {
              {"type": "table", "title": "서식별 비교", "rows": [["구분", "값"], ["가", "100"]]},
              {"type": "l1", "text": "단계별 확대 예정 붙임 1"}],
     "appendix": [{"title": "붙임 1", "heading": "세부 일정", "body": [{"type": "l1", "text": "1~2월 시범 운영"}]}]}
-EXAMPLE_PRESS = {
-    "release": "2026. 10. 7.(수) 조간", "distribute": "2026. 10. 6.(화) 10:00",
-    "title": "○○시, AI 민원 안내 서비스 시범 운영", "subtitles": ["민원 처리 시간 단축 기대"],
-    "body": [{"type": "p", "text": "○○부는 10월 7일(수)부터 AI 민원 안내 서비스를 시범 운영한다고 밝혔다."},
-             {"type": "l2", "text": "자주 찾는 민원 20종을 우선 안내 참고 1"}],
-    "appendix": [{"title": "참고 1", "heading": "서비스 개요", "body": [{"type": "l1", "text": "(대상) 자주 찾는 민원 20종"}]}],
-    "contact": {"dept": "", "people": []}}
+
 OFFICIAL_EXAMPLE = {
     "org": "행정안전부", "to": "수신자 참조", "via": "",
     "title": "2026년 공공부문 AI 업무도구 실증 참여 안내",
@@ -139,7 +138,8 @@ OFFICIAL_EXAMPLE = {
 SCHEMA = {
     "report": {"title": "str(필수)", "date": "str", "dept": "str", "body": "[블록]", "appendix": "[{title, heading, body:[블록]}]"},
     "press_release": {"release": "str", "distribute": "str", "title": "str(필수)", "subtitles": "[str]", "body": "[블록]",
-                      "appendix": "[{title, heading, body:[블록]}]", "contact": "{dept: str, people: [[구분, 직위, 이름, (전화)]]}"},
+                      "appendix": "[{title, heading, body:[블록]}]", "contact": "{dept: str, people: [[구분, 직위, 이름, (전화)]]}",
+                      "kind": "str(보도자료|보도참고자료|설명자료|해명자료, 선택)"},
     "블록": {"h|l1|l2|l3|note|ref|p|caption": {"type": "...", "text": "str"}, "table": {"type": "table", "rows": "[[str]]", "title|caption": "str(표 제목, 선택)"},
              "box": {"type": "box", "lines": "[str]"}, "image": {"type": "image", "path": "str", "width_mm": "int", "caption": "str(선택)"}},
 }
@@ -181,7 +181,9 @@ def guide_text(doc_type="report", ministry=None, style="standard"):
     t = _norm_type(doc_type)
     parts = [CHOOSE, COMMON_RULES]
     if t in ("report", "auto"): parts.append(REPORT_RULES)
-    if t in ("press_release", "auto"): parts.append(PRESS_RULES)
+    if t in ("press_release", "auto"):
+        parts.append(PRESS_RULES)
+        parts.append("\n".join(PRESS_GUIDE["guide"]))
     if t in ("official",): parts.append(OFFICIAL_RULES)
     if ministry and ministry in C.ministries(): parts.append(f"[기관] {ministry} — 보도자료 본문 방식: {_style(ministry)}")
     if style == "simplified":
@@ -193,6 +195,7 @@ def guide_text(doc_type="report", ministry=None, style="standard"):
 @mcp.tool()
 def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str = "standard") -> dict:
     """원고를 공문서 구조 JSON으로 바꿀 때 지켜야 할 작성 규칙과 스키마·예시. build_document 전에 먼저 확인한다.
+    보도자료를 쓸 때는 doc_type='press_release'와 ministry를 주면 작성 방법(리드·제목·인용·숫자·쉬운 말)과 사실 메모 양식, 기관별 가상 예시를 함께 준다.
     doc_type: 'report'(보고서) | 'press_release'(보도자료) | 'auto'(둘 다 + 판단 기준). ministry: 기관 이름(선택).
     style: 'standard'(기본, 기존 동작) | 'simplified'(간소화 모드 — 항목 번호 자동 부여, 제목 상자 없음, 표 머리 음영 없음, 표 제목 자동 번호, 서술식 허용)."""
     if style not in STYLES:
@@ -200,7 +203,13 @@ def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str =
     t = _norm_type(doc_type)
     out = {"guide": guide_text(t, ministry or None, style), "schema": SCHEMA, "style": style}
     if t in ("report", "auto"): out["example_report"] = EXAMPLE_REPORT
-    if t in ("press_release", "auto"): out["example_press_release"] = EXAMPLE_PRESS
+    if t in ("press_release", "auto"):
+        ex = next((e for e in PRESS_GUIDE["examples"] if e["ministry"] == ministry), PRESS_GUIDE["examples"][0])
+        out["example_press_release"] = ex["structure"]
+        out["examples_press_release"] = PRESS_GUIDE["examples"]
+        out["press_writing"] = {"steps": PRESS_GUIDE["steps"], "facts_template": PRESS_GUIDE["facts_template"],
+                                 "facts_fields": PRESS_GUIDE["facts_fields"], "kinds": PRESS_GUIDE["kinds"],
+                                 "types_order": PRESS_GUIDE["types_order"]}
     if t in ("official",): out["example_official"] = OFFICIAL_EXAMPLE
     if ministry and ministry in C.ministries(): out["ministry_style"] = _style(ministry)
     return out
@@ -210,14 +219,19 @@ def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str =
 def writing_guide_prompt(doc_type: str = "report", ministry: str = "") -> str:
     """원고를 보고서·보도자료·기안문 구조로 정리할 때의 작성 규칙과 구조 예시."""
     t = _norm_type(doc_type)
-    ex = EXAMPLE_PRESS if t == "press_release" else (OFFICIAL_EXAMPLE if t == "official" else EXAMPLE_REPORT)
+    if t == "press_release":
+        ex = next((e for e in PRESS_GUIDE["examples"] if e["ministry"] == ministry), PRESS_GUIDE["examples"][0])["structure"]
+    elif t == "official":
+        ex = OFFICIAL_EXAMPLE
+    else:
+        ex = EXAMPLE_REPORT
     return guide_text(doc_type, ministry or None) + "\n\n[구조 예시]\n" + json.dumps(ex, ensure_ascii=False, indent=1)
 
 
 # ── 점검·정규화 ──
 TEXT_TYPES = ("h", "l1", "l2", "l3", "note", "ref", "p", "plain", "caption")
 ALL_TYPES = TEXT_TYPES + ("table", "box", "image")
-LEAD = re.compile(r"^[\s\u3000]*(?:[○〇ㅇ◦∘•●·‧*]+[\s\u3000]+|[\-‐–—―]+[\s\u3000]*|[□■◆◇❍▪▶►☞※]+[\s\u3000]*)+")   # ○○부 같은 가림 표기는 남김
+LEAD = re.compile(r"^[\s\u3000]*(?:(?![○〇]{2})[○〇ㅇ◦∘•●·‧*]+[\s\u3000]+|[\-‐–—―]+[\s\u3000]*|[□■◆◇❍▪▶►☞※]+[\s\u3000]*)+")   # ○○부 같은 가림 표기(○ 2개 이상)는 남김
 DASH = re.compile(r"[‐–—―]")
 VERB_END = re.compile(r"(니다|했다|한다|이다|된다|있다|없다|였다|밝혔다)\.?\s*(붙임\s?\d+|참고\s?\d+)?\s*$")
 
@@ -271,6 +285,287 @@ def _normalize(structure, t):
     if t == "press_release":
         if not s.get("release"): w.append("release(보도시점)가 비어 있음 — 원고에 없으면 그대로 두어도 됨")
     return s, w
+
+
+def _press_release_checks(s, ministry):
+    """보도자료 작성 점검 E1~E18. warnings 목록에 [작성] 접두어로 추가."""
+    CK = PRESS_GUIDE["check"]
+    w = []
+    body = s.get("body") or []
+    # 본문 문장 블록: type이 p·l1·l2·l3인 블록 (순서 유지)
+    text_blocks = [(i, b) for i, b in enumerate(body) if b.get("type") in _TEXT_TYPES_PRESS]
+    # 리드: 본문 문장 블록 중 type이 p 또는 l1인 첫 블록의 text
+    lead_block = None
+    for i, b in text_blocks:
+        if b.get("type") in ("p", "l1"):
+            lead_block = b
+            break
+    lead = lead_block.get("text", "") if lead_block else ""
+    kind = s.get("kind", "보도자료")
+    is_explanation = kind in ("설명자료", "해명자료")
+
+    # E1: 리드 누가 — ministry가 비면 who_regex만 사용
+    if not is_explanation and lead:
+        window = lead[:CK["who_window"]]
+        if not ministry:
+            if not re.search(CK["who_regex"], window):
+                w.append("[작성] 리드(첫 문단) 앞부분에 '누가'(기관·기관장)가 없음 — '○○부(장관 ○○○)는 …'처럼 시작 (G20 39)")
+        else:
+            if (ministry not in window
+                    and CK["ministry_short"].get(ministry, "") not in window
+                    and not re.search(CK["who_regex"], window)):
+                w.append("[작성] 리드(첫 문단) 앞부분에 '누가'(기관·기관장)가 없음 — '○○부(장관 ○○○)는 …'처럼 시작 (G20 39)")
+
+    # E2: 리드 언제
+    if not is_explanation and lead:
+        if not re.search(CK["when_regex"], lead):
+            w.append("[작성] 리드에 '언제'(날짜·시행일·기간)가 없음 — 예: '10월 28일(수)', '11월 2일부터' (G20 39)")
+
+    # E3: 리드 완결
+    if not is_explanation and lead:
+        lead_stripped = lead.rstrip()
+        # 끝의 "참고 N" 제거 후 확인
+        lead_clean = re.sub(r"\s*참고\s*\d+\s*$", "", lead_stripped)
+        if not lead_clean.endswith("다.") and not lead_clean.endswith("다"):
+            w.append("[작성] 리드는 '~한다/~했다'로 끝나는 완결 문장으로 (G20 54)")
+
+    # E4: 리드 길이
+    if not is_explanation and lead:
+        if len(lead) > CK["lead_max"]:
+            w.append(f"[작성] 리드가 깁니다({len(lead)}자) — 누가·언제·무엇만 한 문장으로, 세부는 다음 문단 (G20 38)")
+
+    # E5: 리드 인용
+    if not is_explanation and lead:
+        if re.search(CK["quote_regex"], lead):
+            w.append("[작성] 리드에 인용문 — 리드는 사실만, 인용은 본문 끝으로 (G20 38~39)")
+
+    # E6: 인용 위치
+    if not is_explanation:
+        # 인용 블록 찾기: 본문 문장 블록 중 quote_regex 매치 + quote_verbs 중 하나 포함
+        quote_blocks = []
+        for i, b in text_blocks:
+            txt = b.get("text", "")
+            if re.search(CK["quote_regex"], txt):
+                for verb in CK["quote_verbs"]:
+                    if verb in txt:
+                        quote_blocks.append(i)
+                        break
+        if quote_blocks:
+            last_qi = quote_blocks[-1]
+            # 마지막 인용 블록 뒤에 본문 문장 블록이 3개 이상
+            after_count = sum(1 for i, _ in text_blocks if i > last_qi)
+            if after_count >= 3:
+                w.append("[작성] 인용 문단은 본문 끝(마지막~끝에서 셋째 문단)에 둔다 (말뭉치: 끝 세 문단 안 88%)")
+
+    # E7: 제목 과장
+    title = s.get("title", "")
+    if title:
+        for hw in CK["hype_words"]:
+            if hw in title:
+                w.append(f"[작성] 제목의 '{hw}' — 본문에 비교 기준·근거가 있는지 확인 (말뭉치·G20 33)")
+
+    # E8: 제목 마침표
+    if title and title.endswith("."):
+        w.append("[작성] 제목 끝에 마침표를 찍지 않는다")
+
+    # E9: 부제 수
+    subtitles = s.get("subtitles") or []
+    if len(subtitles) > CK["subtitle_max_count"]:
+        w.append(f"[작성] 부제는 1개가 가장 좋고 2개를 넘기지 않는다 (G20 36)")
+
+    # E10: 숫자 단위 — _check_number_units에서 문서 최대 3개, 블록마다 1개 처리
+    unit_warnings = _check_number_units(s, CK)
+    w.extend(unit_warnings)
+
+    # E11: 단위 띄어쓰기 — 본문 문장 블록과 note 대상, 매치마다
+    unit_space_hits = []
+    for _, b in text_blocks:
+        txt = b.get("text", "")
+        m = re.search(CK["unit_space_regex"], txt)
+        if m and len(unit_space_hits) < 3:
+            unit_space_hits.append(m)
+    # note 블록도 대상
+    for _, b in _walk(s):
+        if b.get("type") == "note":
+            txt = b.get("text", "")
+            m = re.search(CK["unit_space_regex"], txt)
+            if m and len(unit_space_hits) < 3:
+                unit_space_hits.append(m)
+    for m in unit_space_hits:
+        matched = m.group(0)
+        # 정규화 예시: 숫자와 단위 사이에 공백 추가
+        norm = re.sub(r"(\d[\d,.]*[천만억조]*)\s*([가-힣]+)", r"\1 \2", matched)
+        w.append(f"[작성] 단위는 띄어 쓴다: '{matched}' → '{norm}' (G11 32~33, H22 66)")
+
+    # E12: 외국 문자 먼저
+    foreign_hits = []
+    check_texts = [title] + (subtitles or []) + [b.get("text", "") for _, b in text_blocks]
+    for txt in check_texts:
+        if txt and re.search(CK["foreign_first_regex"], txt) and len(foreign_hits) < 3:
+            foreign_hits.append(txt)
+    for txt in foreign_hits:
+        w.append(f"[작성] 외국 문자는 한글을 먼저 쓰고 괄호 안에: '{txt}' (국어기본법 제14조, G20 63)")
+
+    # E13: 약어 풀이 — 약어별 첫 등장만 확인, 괄호 안 첫 등장은 경고 제외
+    if text_blocks:
+        joined = "".join(b.get("text", "") for _, b in text_blocks)
+        acronym_hits = []
+        seen_acronyms = set()
+        for m in re.finditer(CK["acronym_regex"], joined):
+            if len(acronym_hits) >= 3:
+                break
+            acr = m.group(0)
+            if acr in CK["replace_words"] or acr in seen_acronyms:
+                continue  # E14가 다루거나 이미 첫 등장 처리한 약어 제외
+            pos = m.start()
+            before = joined[:pos]
+            # 닫히지 않은 "("가 없고 바로 뒤가 "("도 아님 → 괄호 안이 아님
+            is_outside = (before.count("(") == before.count(")") and
+                          not (pos < len(joined) and joined[pos] == "("))
+            if is_outside:
+                acronym_hits.append(acr)
+            seen_acronyms.add(acr)  # 첫 등장 처리 완료 (괄호 안이든 밖이든)
+        for acr in acronym_hits:
+            w.append(f"[작성] '{acr}' 첫 등장에 한글 풀이 없음 — '인공지능(AI)'처럼 한글(약어)로 (G20 63)")
+
+    # E14: 쉬운 말
+    replace_hits = []
+    for txt in [title] + (subtitles or []) + [b.get("text", "") for _, b in text_blocks] + \
+               [b.get("text", "") for _, b in _walk(s) if b.get("type") == "note"]:
+        if not txt:
+            continue
+        for rw, replacement in CK["replace_words"].items():
+            if rw in txt:
+                src = CK["replace_sources"].get(rw, CK["replace_sources"].get("_default", "G20 108~109"))
+                w.append(f"[작성] '{rw}' → '{replacement}' ({src})")
+                replace_hits.append(rw)
+
+    # E15: 권위적 표현
+    auth_hits = []
+    for _, b in text_blocks:
+        txt = b.get("text", "")
+        for auth_word, suggestion in CK["authoritarian"].items():
+            if auth_word in txt and len(auth_hits) < 3:
+                w.append(f"[작성] 권위적 표현 '{auth_word}' → '{suggestion}' (G11 53)")
+                auth_hits.append(auth_word)
+
+    # E16: 종결 혼용
+    has_nida = False
+    has_da = False
+    for _, b in text_blocks:
+        txt = b.get("text", "")
+        # 인용 부분 제거
+        txt_no_quote = re.sub(r"[“\"][^”\"]{8,}[”\"]|[\"][^\"]{8,}[\"]", "", txt)
+        if "니다." in txt_no_quote:
+            has_nida = True
+        # "다."로 끝나는 문장 확인 (명사형 종결 아님)
+        if re.search(r"[다]\.(?:\s|$)", txt_no_quote) and "니다." not in txt_no_quote:
+            has_da = True
+    if has_nida and has_da:
+        w.append("[작성] '-다'와 '-습니다' 혼용 — 한 가지로 (G20 55, G11 65)")
+
+    # E17: 명사형 종결
+    noun_end_hits = []
+    for _, b in text_blocks:
+        if b.get("type") not in ("p", "l1"):
+            continue
+        txt = b.get("text", "").strip()
+        if re.search(r"(함|임|됨|음|예정|필요)\.?$", txt) and len(noun_end_hits) < 3:
+            noun_end_hits.append(txt)
+    for txt in noun_end_hits:
+        tail = txt[-12:] if len(txt) >= 12 else txt
+        w.append(f"[작성] 명사형 종결 — '-다'로 끝낸다: '…{tail}' (G20 55)")
+
+    # E18: 긴 문장
+    long_sent_hits = []
+    for _, b in text_blocks:
+        txt = b.get("text", "")
+        # "다."로 문장 분리
+        sentences = re.split(r"(?<=다\.)\s+", txt)
+        for sent in sentences:
+            if len(sent) > CK["sentence_max"] and len(long_sent_hits) < 3:
+                long_sent_hits.append(sent)
+    for sent in long_sent_hits:
+        w.append(f"[작성] 문장이 깁니다({len(sent)}자) — 3줄(약 150자) 안쪽으로 끊는다 (G20 56)")
+
+    return w
+
+
+def _check_number_units(s, CK):
+    """E10 숫자 단위 점검. 본문 문장 블록과 note 블록의 text 대상."""
+    w = []
+    body = s.get("body") or []
+    text_blocks = []
+    for b in body:
+        if b.get("type") in _TEXT_TYPES_PRESS or b.get("type") == "note":
+            text_blocks.append(b.get("text", ""))
+    # appendix의 note도 포함
+    for ap in s.get("appendix") or []:
+        for b in ap.get("body") or []:
+            if b.get("type") == "note":
+                text_blocks.append(b.get("text", ""))
+    if not text_blocks:
+        return w
+
+    hit_count = 0
+    block_hit = set()
+    for txt in text_blocks:
+        if hit_count >= 3:
+            break
+        # 블록마다 최대 1개
+        block_has_hit = False
+        # 숫자 토큰 찾기
+        for m in re.finditer(r"(?<![\w.,’'‘])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?", txt):
+            if hit_count >= 3 or id(txt) in block_hit:
+                break
+            token = m.group(0)
+            # 정수부가 한 자리이고 쉼표·소수점이 없으면 건너뜀
+            if len(token) == 1 and "," not in token and "." not in token:
+                continue
+            start = m.start()
+            end = m.end()
+            rest = txt[end:]
+            # 토큰 바로 앞 글자가 제·-·–·~·∼·/·: 중 하나이면 건너뜀
+            if start > 0:
+                prev_char = txt[start - 1]
+                if prev_char in "제-–~∼/:":
+                    continue
+            r = rest.lstrip(" ")
+            # 정상(건너뜀) 조건 확인
+            if _is_unit_ok(rest, r, CK):
+                continue
+            # 그 밖 → 경고
+            if hit_count < 3 and id(txt) not in block_hit:
+                hit_count += 1
+                block_hit.add(id(txt))
+                ctx_start = max(0, start - 8)
+                ctx_end = min(len(txt), end + 8)
+                ctx = txt[ctx_start:ctx_end]
+                w.append(f"[작성] 숫자 뒤 단위 없음: '{ctx}' — 건·명·원·% 등 단위를 붙인다 (G11 32, 말뭉치)")
+    return w
+
+
+def _is_unit_ok(rest, r, CK):
+    """숫자를 건너뛰어야 하는 경우(정상)인지 확인."""
+    # units 중 하나로 시작하면 정상
+    for u in sorted(CK["units"], key=len, reverse=True):
+        if r.startswith(u):
+            return True
+    # 첫 글자가 라틴 문자(A-Z, a-z) 또는 단위 기호
+    if r and (('A' <= r[0].upper() <= 'Z') or r[0] in "%℃㎡㎢㎞㎏"):
+        return True
+    # rest[0]이 :·~·∼·-·–·/·(`` ` ``·`(`·`)`·×) 중 하나
+    if rest and rest[0] in r":~∼-–/·`()×":
+        return True
+    # rest가 "."로 시작하고 그다음이 (공백 뒤)숫자 또는 "("
+    if rest.startswith("."):
+        after_dot = rest[1:].lstrip()
+        if after_dot and (after_dot[0].isdigit() or after_dot[0] == "("):
+            return True
+    # rest가 ","로 시작하고 바로 다음 글자가 숫자
+    if rest.startswith(",") and len(rest) > 1 and rest[1].isdigit():
+        return True
+    return False
 
 
 def _style_warnings(s, t, style="standard"):
@@ -376,7 +671,7 @@ def _as_structure(structure):
     raise ValueError(f"structure는 JSON 객체(또는 그 문자열)여야 함: {type(structure).__name__}")
 
 
-def check(structure, doc_type="report", style="standard"):
+def check(structure, doc_type="report", style="standard", ministry=""):
     t = _norm_type(doc_type)
     if t == "auto": t = "press_release" if any(k in (structure or {}) for k in ("release", "contact", "subtitles")) else "report"
     s, w = _normalize(structure, t)
@@ -385,19 +680,22 @@ def check(structure, doc_type="report", style="standard"):
     w = w + _style_warnings(s, t, style)
     if style == "simplified":
         w = w + _check_simplified_structure(s, t)
+    if t == "press_release":
+        w = w + _press_release_checks(s, ministry)
     return t, s, w
 
 
 @mcp.tool()
-def check_structure(structure: dict | str, doc_type: str = "report", style: str = "standard") -> dict:
+def check_structure(structure: dict | str, doc_type: str = "report", style: str = "standard", ministry: str = "") -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
     □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
+    보도자료를 ministry와 함께 점검하면 작성 점검(E1~E18: 리드·제목·인용·숫자·쉬운 말 등)을 추가로 수행한다.
     돌려주는 값: {ok, doc_type, warnings}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
     structure = _as_structure(structure)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
-    t, _, w = check(structure, doc_type, style)
+    t, _, w = check(structure, doc_type, style, ministry)
     return {"ok": not w, "doc_type": t, "warnings": w}
 
 
@@ -456,12 +754,365 @@ def _norm_type(doc_type):
     return t
 
 
+def _josa(word, pair="은/는"):
+    """조사 붙이기: 끝 공백·괄호 묶음·닫는 따옴표를 번갈아 뗀 뒤 마지막 글자로 판단.
+    한글 음절은 받침 유무, 숫자는 끝자리, 라틴 문자는 L·M·N·R 여부로 앞/뒤 조사 결정."""
+    front, back = pair.split("/")
+    s = word
+    # 끝 공백, 괄호 묶음, 닫는 따옴표를 더 뗄 것이 없을 때까지 번갈아 제거
+    while True:
+        before = s
+        s = s.rstrip()
+        # 끝 괄호 묶음 제거: "("와 ")"가 모두 있고 ")"로 끝나면 "("부터 ")"까지 제거
+        if s.endswith(")") and "(" in s:
+            idx = s.rfind("(")
+            if idx >= 0:
+                s = s[:idx].rstrip()
+        # 끝 닫는 따옴표 제거
+        if s and s[-1] in "」』'\"":
+            s = s[:-1].rstrip()
+        if s == before:
+            break
+    if not s:
+        return back
+    last = s[-1]
+    # 한글 음절: 받침 유무로 판단
+    if "\uAC00" <= last <= "\uD7A3":
+        return front if ((ord(last) - 0xAC00) % 28) != 0 else back
+    # 숫자: 0·1·3·6·7·8 → 앞, 2·4·5·9 → 뒤
+    if last.isdigit():
+        return front if last in "013678" else back
+    # 라틴 문자: L·M·N·R → 앞, 그 밖 → 뒤
+    if "A" <= last.upper() <= "Z":
+        return front if last.upper() in "LMNR" else back
+    return back
+
+
 def _check_ministry(ministry, doc_type):
     if doc_type == "press_release":
         if ministry not in C.ministries():
             raise ValueError(f"보도자료는 기관 지정이 필요합니다(52개 중 하나, list_ministries 참고): {ministry or '(없음)'}")
     elif ministry and ministry not in ("공통",) and ministry not in C.ministries():
         raise ValueError(f"지원하지 않는 기관: {ministry} (list_ministries 참고, 비우면 공통 서식)")
+
+
+_KIND_SET = {"보도자료", "보도참고자료", "설명자료", "해명자료"}
+_TEXT_TYPES_PRESS = ("p", "l1", "l2", "l3")  # 본문 문장 블록 유형
+
+
+def _strip_end_punctuation(s):
+    """text 끝의 '.'를 하나까지만 떼고, 연속 공백은 하나로."""
+    s = re.sub(r"\s+", " ", s).strip()
+    if s.endswith("."):
+        s = s[:-1].rstrip()
+    return s
+
+
+def _clean_subtitle(s):
+    """부제 앞뒤 공백과 앞뒤 '-'·'–'·'—'를 뗀다."""
+    s = s.strip()
+    s = re.sub(r"^[-–—]+", "", s)
+    s = re.sub(r"[-–—]+$", "", s)
+    return s.strip()
+
+
+def _build_lead(who, when, what, josa):
+    """리드 문장 생성. what 끝 '.'는 떼고 하나만 붙임."""
+    what = _strip_end_punctuation(what)
+    what = re.sub(r"\s+", " ", what).strip()
+    if when:
+        return f"{who}{josa(who)} {when} {what}."
+    return f"{who}{josa(who)} {what}."
+
+
+def _normalize_quote_text(t):
+    """인용 문장 정리: strip 후 앞뒤 따옴표 떼고, 끝이 .·?·!가 아니면 '.' 붙인다."""
+    t = t.strip()
+    t = re.sub(r"^[“\"'‘]+|[”\"'‘]+$", "", t)
+    if t and t[-1] not in ".?!":
+        t = t + "."
+    return t
+
+
+def _make_quote_block(speaker, texts, verb, josa):
+    """인용 블록 text 생성. 1개면 '~라고', 2개 이상이면 '~라며, ~라고'."""
+    if not verb:
+        verb = "말했다"
+    verb = verb.rstrip(".").strip()
+    cleaned = [_normalize_quote_text(t) for t in texts]
+    if len(cleaned) == 1:
+        return f"{speaker}{josa(speaker)} “{cleaned[0]}”라고 {verb}."
+    parts = []
+    for i, t in enumerate(cleaned):
+        if i == 0:
+            parts.append(f"“{t}”라며")
+        elif i == len(cleaned) - 1:
+            parts.append(f"“{t}”라고")
+        else:
+            parts.append(f"“{t}”라며")
+    return f"{speaker}{josa(speaker)} {', '.join(parts)} {verb}."
+
+
+def _is_para_style(ministry):
+    """기관이 문단식(body type "p")인지 확인."""
+    return C.load_rules(ministry).get("style") == "para"
+
+
+def _body_type_for(ministry):
+    """기관 본문 방식에 맞는 블록 type 반환."""
+    return "p" if _is_para_style(ministry) else "l1"
+
+
+def _contact_to_struct(contact):
+    """contact dict → {"dept": str, "people": list[사자]}."""
+    if not isinstance(contact, dict):
+        return {"dept": "", "people": []}
+    dept = contact.get("dept") or ""
+    people = contact.get("people") or []
+    out_people = []
+    for p in people:
+        if isinstance(p, list):
+            out_people.append([str(x) for x in p])
+        elif isinstance(p, dict):
+            phone = str(p.get("phone") or "")
+            if phone and not phone.startswith("("):
+                phone = f"({phone})"
+            out_people.append([str(p.get("role") or ""), str(p.get("title") or ""),
+                               str(p.get("name") or ""), phone])
+    return {"dept": dept, "people": out_people}
+
+
+@mcp.tool()
+def draft_press_structure(facts, ministry=""):
+    """사실 메모(dict 또는 JSON 문자열)를 보도자료 구조 JSON 초안으로 옮긴다.
+    메모에 없는 문장·숫자·이름을 만들지 않는다. 붙이는 고정 말은 조사(은/는), “ ”라고, ”라며, “, 인용 동사, 표 머리 구분·수치·기준·비교, 주요 수치, 참고 N뿐이다."""
+    if isinstance(facts, str):
+        try:
+            facts = json.loads(facts)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"facts는 dict 또는 JSON 문자열이어야 함: {e}") from e
+        if not isinstance(facts, dict):
+            raise ValueError("facts는 dict 또는 JSON 문자열이어야 함: 파싱 결과가 dict가 아님")
+    if not isinstance(facts, dict):
+        raise ValueError("facts는 dict 또는 JSON 문자열이어야 함")
+
+    # 기관
+    m = ministry or facts.get("ministry", "")
+    if m not in C.ministries():
+        raise ValueError(f"보도자료는 기관 지정이 필요합니다(52개 중 하나, list_ministries 참고): {m or '(없음)'}")
+
+    # kind
+    kind = facts.get("kind") or "보도자료"
+    if kind not in _KIND_SET:
+        raise ValueError(f"kind는 {'·'.join(_KIND_SET)} 중 하나여야 함: {kind}")
+    is_press = kind == "보도자료"
+
+    # 기본 필드
+    release = facts.get("release") or ""
+    distribute = facts.get("distribute") or ""
+
+    # title / subtitles
+    headline = facts.get("headline", "")
+    title = _strip_end_punctuation(headline.rstrip())
+    subtitles_raw = facts.get("subtitles") or []
+    subtitles = []
+    for st in subtitles_raw:
+        cleaned = _clean_subtitle(st)
+        if cleaned:
+            subtitles.append(cleaned)
+    if len(subtitles) > 2:
+        subtitles = subtitles[:2]
+
+    # 블록 type
+    bt = _body_type_for(m)
+
+    body = []
+    missing = []
+    warnings = []
+
+    # 본문 구성 (보도자료·보도참고자료)
+    if is_press or kind == "보도참고자료":
+        lead_text = facts.get("lead", "")
+        who = facts.get("who", "")
+        when = facts.get("when", "")
+        what = facts.get("what", "")
+
+        if lead_text and lead_text.strip():
+            body.append({"type": bt, "text": lead_text.strip()})
+        elif who and what:
+            if not what.rstrip().endswith("다"):
+                missing.append("what은 '~한다/~했다'로 끝나는 서술어 절로")
+            lead = _build_lead(who, when, what, _josa)
+            body.append({"type": bt, "text": lead})
+        elif not lead_text:
+            if not who or not what:
+                missing.append("lead 또는 who·what")
+
+        # background
+        bg = facts.get("background", [])
+        if isinstance(bg, str):
+            bg = [bg]
+        for b in bg:
+            if b and b.strip():
+                body.append({"type": bt, "text": b.strip()})
+
+        # points
+        for pt in facts.get("points", []):
+            if isinstance(pt, str):
+                if pt and pt.strip():
+                    body.append({"type": bt, "text": pt.strip()})
+            elif isinstance(pt, dict):
+                txt = pt.get("text", "")
+                if txt and txt.strip():
+                    body.append({"type": bt, "text": txt.strip()})
+                for d in pt.get("details", []) or []:
+                    if d and d.strip():
+                        body.append({"type": "l2", "text": d.strip()})
+                if pt.get("note"):
+                    body.append({"type": "note", "text": pt["note"].strip()})
+
+        # plan
+        plan = facts.get("plan", [])
+        if isinstance(plan, str):
+            plan = [plan]
+        for p in plan:
+            if p and p.strip():
+                body.append({"type": bt, "text": p.strip()})
+
+        # quote (본문 맨 끝)
+        quote = facts.get("quote")
+        if isinstance(quote, dict) and quote.get("speaker") and quote.get("text"):
+            speaker = quote.get("speaker", "")
+            texts = quote.get("text", [])
+            if isinstance(texts, str):
+                texts = [texts]
+            verb = quote.get("verb", "말했다")
+            if texts:
+                body.append({"type": bt, "text": _make_quote_block(speaker, texts, verb, _josa)})
+    else:
+        # 설명자료·해명자료: issue → position → grounds
+        issue = facts.get("issue", "")
+        position = facts.get("position", "")
+        grounds = facts.get("grounds", [])
+
+        if issue:
+            body.append({"type": bt, "text": issue.strip()})
+        else:
+            missing.append("issue(문제 사안 — 보도 내용 요약)")
+        if position:
+            body.append({"type": bt, "text": position.strip()})
+        else:
+            missing.append("position(입장)")
+        for g in grounds or []:
+            if g and g.strip():
+                body.append({"type": bt, "text": g.strip()})
+
+        # quote (설명·해명도 본문 맨 끝)
+        quote = facts.get("quote")
+        if isinstance(quote, dict) and quote.get("speaker") and quote.get("text"):
+            speaker = quote.get("speaker", "")
+            texts = quote.get("text", [])
+            if isinstance(texts, str):
+                texts = [texts]
+            verb = quote.get("verb", "말했다")
+            if texts:
+                body.append({"type": bt, "text": _make_quote_block(speaker, texts, verb, _josa)})
+
+    # appendix
+    appendix = []
+    appx_items = facts.get("appendix", [])
+    appx_idx = 0
+    for ap in appx_items or []:
+        ap = dict(ap) if isinstance(ap, dict) else {}
+        heading = ap.get("heading", "")
+        items = ap.get("items", [])
+        rows = ap.get("rows")
+        body_blocks = ap.get("body")
+        title = f"참고 {appx_idx + 1}"
+        appx_idx += 1
+        if body_blocks is not None:
+            # body가 이미 있으면 그대로
+            appendix.append({"title": title, "heading": heading, "body": body_blocks})
+        elif items:
+            appendix.append({"title": title, "heading": heading,
+                             "body": [{"type": "l1", "text": str(it)} for it in items]})
+        elif rows is not None:
+            appendix.append({"title": title, "heading": heading,
+                             "body": [{"type": "caption", "text": heading},
+                                      {"type": "table", "rows": [list(r) for r in rows]}]})
+        else:
+            # heading만 있는 경우 빈 body
+            appendix.append({"title": title, "heading": heading, "body": []})
+
+    # numbers → appendix 맨 뒤
+    numbers = facts.get("numbers", [])
+    if numbers:
+        nheading = facts.get("numbers_heading") or "주요 수치"
+        # basis가 모두 비었는지 확인 → 2열 또는 3열
+        all_blank_basis = all(not n.get("basis") for n in numbers)
+        header = ["구분", "수치"] if all_blank_basis else ["구분", "수치", "기준·비교"]
+        rows = [header]
+        for i, n in enumerate(numbers):
+            item = str(n.get("item") or "")
+            value = str(n.get("value") or "")
+            unit = str(n.get("unit") or "")
+            basis = str(n.get("basis") or "")
+            row = [item, f"{value}{unit}"]
+            if not all_blank_basis:
+                row.append(basis)
+            rows.append(row)
+            if not unit:
+                warnings.append(f"numbers[{i}] '{item}' 단위 없음 — 건·명·원·% 등")
+        appendix.append({"title": f"참고 {appx_idx + 1}", "heading": nheading,
+                         "body": [{"type": "caption", "text": nheading},
+                                  {"type": "table", "rows": rows}]})
+
+    # contact
+    contact = facts.get("contact")
+    contact_struct = _contact_to_struct(contact) if isinstance(contact, dict) else {"dept": "", "people": []}
+    if not contact or not contact.get("people"):
+        missing.append("contact(담당 부서·책임자·담당자·전화)")
+
+    # missing 체크
+    if not title:
+        missing.append("headline(제목)")
+    if not release:
+        missing.append("release(보도시점)")
+
+    # 부제 경고
+    if len(subtitles_raw) > 2:
+        raw_count = len([s for s in subtitles_raw if _clean_subtitle(s)])
+        if raw_count > 2:
+            warnings.append("부제는 2개까지 — 앞 2개만 넣음")
+
+    # 구조 조립
+    structure = {
+        "release": release,
+        "distribute": distribute,
+        "title": title,
+        "subtitles": subtitles,
+        "body": body,
+        "appendix": appendix,
+        "contact": contact_struct,
+    }
+    if not is_press:
+        structure["kind"] = kind
+
+    # 점검 추가
+    ck_warnings = check(structure, "press_release", "standard", m)[2]
+    warnings = warnings + ck_warnings
+
+    next_msg = (f"메모에 없는 사실을 더하지 말고 문장을 다듬은 뒤 "
+                f"check_structure(structure, 'press_release', ministry='{m}') → "
+                f"build_document(structure, 'press_release', ministry='{m}')")
+    return {
+        "structure": structure,
+        "doc_type": "press_release",
+        "ministry": m,
+        "missing": missing,
+        "warnings": warnings,
+        "next": next_msg,
+    }
 
 
 def _today():
@@ -612,12 +1263,14 @@ def _number_official_body_for_md(s):
 def build_document(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
                    logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                    style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
-    """구조 JSON을 기관 서식 HWPX로 만든다(외부 전송 없음, 모두 로컬). 구조는 get_writing_guide 규칙대로 사용자 AI가 작성한다.
+    """보고서·보도자료(보도참고·설명·해명자료 포함)·기안문을 기관 서식 HWPX(한글 파일)로 만든다.
+    구조 JSON을 기관 서식 HWPX로 만든다(외부 전송 없음, 모두 로컬). 구조는 get_writing_guide 규칙대로 사용자 AI가 작성한다.
     structure는 JSON 문자열로 줘도 된다.
     doc_type='report': {title, date, dept, body, appendix} — ministry를 비우면 공통 서식(기관명 칸 비움).
     doc_type='press_release': {release, distribute, title, subtitles, body, appendix, contact} — ministry 필수.
     doc_type='official': {org, to, via, title, body, attachments, recipients, sender, approval, doc_no, contact} — 기안문·시행문(별지 제1호서식).
     입력은 정규화(text 앞 기호·대시·공백 제거)하고, 고칠 점을 warnings로 돌려준다 — 있으면 구조를 고쳐 다시 호출한다.
+    ministry 인자로 check_structure에 기관을 넘겨 보도자료 작성 점검(E1~E18)을 수행한다.
     out_path: 저장 경로(선택, 기본은 아웃폴더). 폴더면 그 안에 기본 파일 이름으로 저장, 확장자 없는 이름이면 .hwpx를 붙인다.
     logo_path: 기관 로고 그림(선택). slogan_path: 보도자료 슬로건 그림(선택).
     placeholder_contact: 보도자료 담당자가 없으면 '○○과 / 김○○ / 044-000-0000' 자리표시로 채움.
@@ -631,7 +1284,7 @@ def build_document(structure: dict | str, doc_type: str = "report", ministry: st
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     if report_kind not in REPORT_KINDS:
         raise ValueError(f"report_kind은 'standard' 또는 'internal': {report_kind}")
-    t, s, w = check(structure, doc_type, style)
+    t, s, w = check(structure, doc_type, style, ministry)
     # 기안문 날짜 정규화 (제7조⑤) — HWPX·마크다운 공통
     if t == "official":
         s = _normalize_official_dates(s)
@@ -642,6 +1295,9 @@ def build_document(structure: dict | str, doc_type: str = "report", ministry: st
             txt = b.get("text", "")
             if txt and amt_re.search(txt) and not kr_re.search(txt):
                 w.append(f"금액 한글 병기 필요(시행규칙 제2조②): {txt.strip()}")
+    # press_release: kind 기본값 — 템플릿 머리 이름이 '보도참고자료'·'보도설명자료'인 기관도 '보도자료'로
+    if t == "press_release":
+        s["kind"] = s.get("kind") or "보도자료"
     org = ministry if ministry and ministry != "공통" else ""
     _check_ministry(org, t)
     dst = _dst(org, s.get("title"), out_path, t)

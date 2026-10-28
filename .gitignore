@@ -16,3 +16,7 @@ scripts/hancom_check.py
 out_check_report/
 scripts/calibrate_widths.py
 scripts/make_demo.py
+# 보도자료 작성 지침 원문(국립국어원) — 로컬 보관, 목록은 refs/press_guides/SOURCES.md
+refs/press_guides/*.pdf
+refs/press_guides/*.hwp
+.DS_Store

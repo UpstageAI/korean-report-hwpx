@@ -65,6 +65,39 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 | `build_document` | Structure JSON → agency-format HWPX; normalizes input (strips marks, dashes, leading spaces) and returns `warnings`. `build_from_structure` is an alias. For official docs use `doc_type="official"`; amount Korean annotation warnings and date normalization included |
 | `list_ministries` | Supported agencies and support per document type (reports: agency/common rules; press releases: body style; official docs: common format) |
 | `get_rules` | Format rules per agency and document type (marks, fonts, sizes, indents, gaps, title box, table header; official docs: rules_official/_공통.json) |
+| `draft_press_structure` | Turns a fact memo (who·when·what, background·key points·plan, quote, contact, numbers, etc.) into a press-release structure JSON draft. It does not invent sentences, numbers, or names not in the memo; it places the lead, quote, tables, and appendix per the rules. |
+
+## How to write a press release (National Institute of Korean Language guidelines · Korea.kr measurement)
+
+Call `get_writing_guide(doc_type='press_release', ministry=agency)` to get press-release writing guidance (lead, title, quote, numbers, plain language) plus the fact-memo template and per-agency example structures. The guidance is based on the National Institute of Korean Language's press-release writing guides and a measurement of 2,667 Korea.kr press releases.
+
+**Fact-memo example (과학기술정보통신부, fictitious):**
+```json
+{
+  "kind": "보도자료",
+  "ministry": "과학기술정보통신부",
+  "release": "2026. 11. 4.(수) 조간",
+  "headline": "어르신 디지털 배움터 키오스크 교육 4,820명 수료",
+  "subtitles": ["교육장 37곳 운영 결과, 수료생 만족도 92.4%"],
+  "who": "과학기술정보통신부(장관 ○○○)",
+  "when": "11월 3일(화)",
+  "what": "올해 어르신 디지털 배움터 키오스크 교육 운영 결과를 발표했다",
+  "points": ["3월부터 10월까지 전국 교육장 37곳에서 어르신 4,820명이 교육을 마쳤다."],
+  "numbers": [{"item": "수료 인원", "value": "4,820", "unit": "명", "basis": "2026. 3.~10."}],
+  "quote": {"speaker": "○○○ 과학기술정보통신부 장관", "text": ["어르신 누구나 무인 기기를 불편 없이 쓸 수 있도록 가까운 곳에서 배울 기회를 넓히겠다."], "verb": "말했다"},
+  "contact": {"dept": "과학기술정보통신부 디지털포용정책과", "people": [["책임자", "과장", "○○○", "(044-202-0000)"]]}
+}
+```
+
+Then: `draft_press_structure(facts, ministry)` → structure JSON draft + missing/warnings → refine sentences → `check_structure(structure, 'press_release', ministry=agency)` → `build_document(structure, 'press_release', agency)`.
+
+**Sources:**
+- National Institute of Korean Language, 『유형별로 알아보는 보도자료 작성 길잡이』 (2020) — G20
+- National Institute of Korean Language, 『보도자료 유형별 표준안 개발』 (2020) — R20
+- National Institute of Korean Language, 『보도 자료 쓰기 길잡이』 (2011) — G11
+- National Institute of Korean Language, 『개정판 한눈에 알아보는 공공언어 바로 쓰기』 (2022) — H22
+- Ministry of Culture, Sports and Tourism·National Institute of Korean Language, 『쉬운 공공언어 쓰기 길잡이』 (2014) — E14
+- Korea.kr (정책브리핑) press releases, 2,667 documents, body text measurement (52 central agencies) — C
 
 Report structure JSON:
 
@@ -164,6 +197,15 @@ Government symbols and agency logos are not bundled (usage regulations). Agency 
 - Measurement: 2,670 Korea.kr press releases from 52 agencies (1,326 with a report section), from which per-agency marks, fonts, blank lines and cover-table values were derived.
 - Rule documents: `korean_report_hwpx/refs/`. Rule values: `rules/`, `rules_report/`; press release cover/contact numbers: `templates/`.
 - Source releases are published on Korea.kr under KOGL (공공누리). This repository contains no source files, text or images — only format numbers.
+
+## Format basis (page settings)
+
+Every document type (report, press release, draft approval document) uses A4 (210×297 mm, HWPUNIT 59528×84188) as the editing page, with left/right margins 20 mm (HWPUNIT 5669), top/bottom margins 15 mm (HWPUNIT 4252), header/footer 10 mm (HWPUNIT 2835), and gutter 0 as the default. The text width is width − left − right = 48190 (HWPUNIT, 170 mm); a table (`<hp:tbl>`) never exceeds the text width.
+
+- Basis: of 2,667 Korea.kr press releases (52 central agencies) measured, 2,640 used A4 with 20 mm left/right margins, and 1,817 used top 15 mm / bottom 15 mm / header 10 mm / footer 10 mm (the most common combination). Ministry of Science and ICT: 100 of 118; Ministry of the Interior and Safety: 120 of 135.
+- When an agency template (`templates/<agency>.json`, `page`) exists, its most common values (agency value) are used; if the sample is fewer than 10 documents, the common default is used. Agency values, with their basis, are recorded in `korean_report_hwpx/rules/_쪽설정.json` under `기관값`.
+- Draft approval documents use the same common values per Art. 7⑥ of the Regulation on Administrative Business Operation and Innovation (page size A4).
+- Rule file: `korean_report_hwpx/rules/_쪽설정.json`.
 
 ## Notes
 

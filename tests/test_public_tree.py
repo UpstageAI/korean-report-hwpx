@@ -10,7 +10,9 @@ TEMPLATE_KEYS = {"org", "page", "cover", "release", "title", "contact", "heading
 
 def files():
     for p in ROOT.rglob("*"):
-        if p.is_file() and not (set(p.relative_to(ROOT).parts) & SKIP): yield p
+        rel = p.relative_to(ROOT).parts
+        if rel[:2] == ("refs", "press_guides") and p.suffix.lower() in (".pdf", ".hwp", ".hwpx"): continue   # 지침 원문(로컬 보관, .gitignore)
+        if p.is_file() and not (set(rel) & SKIP): yield p
 
 
 def test_no_hwpx_or_images():
