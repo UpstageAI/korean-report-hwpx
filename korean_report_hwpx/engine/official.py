@@ -208,6 +208,8 @@ class OfficialComposer(Composer):
         counters = [0] * len(numbering)   # 각 번호 수준별 카운터
         indent = int(self._body.get("indent_per_level", 2))
         pt = float(self._body.get("pt", 15.0))
+        char_w = int(pt * 100)              # 한 글자 폭(HWPUNIT)
+        H = 2 * char_w                      # 항목 내어쓰기 거리(HWPUNIT): 한글 2자
         font = self._body.get("font", "휴먼명조")
         line = int(self._body.get("line", 160))
 
@@ -225,15 +227,13 @@ class OfficialComposer(Composer):
             return item_label(pat, c)
 
         def _왼쪽들여쓰기(level):
-            """둘째 계층(level≥1)부터 상위 번호 폭 + indent_per_level 타 오른쪽."""
+            """항목기호 시작 위치(공문서 작성 관행·행정업무규정 시행규칙 제2조): 첫째 항목은 왼쪽 기본선에서 바로,
+            둘째 항목부터 상위 항목기호 위치에서 오른쪽으로 indent_per_level타(2타 = 한글 1자)씩."""
             if level <= 0:
                 return 0
-            # 상위 레벨들의 번호 폭(한 글자 ≈ pt 단위) 합 + 각 레벨당 indent
-            widths = 0
-            for lv in range(level):
-                widths += pt * 100   # 한 글자 폭(HWPUNIT 근사)
-            widths += indent * pt * 100 * level
-            return int(widths)
+            return int(level * (indent / 2.0) * pt * 100)   # 2타 = 한글 1자 = pt×100 HWPUNIT
+
+        single_top = sum(1 for b in (self.doc.get("body") or []) if b.get("type") == "l1") == 1
 
         def _process(blocks):
             for b in blocks:
@@ -246,13 +246,24 @@ class OfficialComposer(Composer):
                     text_raw = b.get("text", "")
                     if _check_amount_needed(text_raw):
                         warnings.append(f"금액 한글 병기 필요(시행규칙 제2조②): {text_raw.strip()}")
-                    prefix = _번호(lvl)
-                    text = prefix + text
+                    prefix = "" if (lvl == 0 and single_top) else _번호(lvl)   # 항목이 하나뿐이면 번호 없이
                     left = _왼쪽들여쓰기(lvl)
-                    hang = int(pt * 100 * (0.55 * sum(1 for ch in prefix if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix if ord(ch) >= 0x3000)))   # 번호 폭(영문·숫자 반각, 한글 전각)
-                    pp = self.para_pr("JUSTIFY", line, indent=-hang, left=left + hang, word=False)   # 둘째 줄부터 번호 다음 글자 위치에 맞춤(내어쓰기)
+                    if prefix:
+                        # 번호 뒤 탭 + 내어쓰기 H = 2C(한글 2자)로 둘째 줄을 항목 내용 첫 글자에 맞춤
+                        # <hp:tab>은 <hp:t> 자식 요소로 raw 삽입(esc 시 &lt;로 깨짐)
+                        prefix_no_space = prefix.rstrip()              # "1. " → "1."
+                        num_width = int(pt * 100 * (0.55 * sum(1 for ch in prefix_no_space if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix_no_space if ord(ch) >= 0x3000)))
+                        tab_w = max(100, H - num_width)
+                        tab_xml = f'<hp:tab width="{tab_w}" leader="0" type="1"/>'
+                        text_content = prefix_no_space + tab_xml + C.esc(text.lstrip())   # 탭 뒤 공백 없음
+                        tab_id = self._tabs_pr([H])
+                        pp = self.para_pr("JUSTIFY", line, indent=-H, left=left, word=False, tab_ids=[tab_id])
+                    else:
+                        text_content = C.esc(text.lstrip())
+                        pp = self.para_pr("JUSTIFY", line, indent=0, left=0, word=False)
                     cp = self.char(font, pt)
-                    out.append(self.p(pp, [(cp, text)]))
+                    out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                                f'<hp:run charPrIDRef="{cp}"><hp:t>{text_content}</hp:t></hp:run></hp:p>')
                 elif typ == "table":
                     out.append(self._표(b))
                 elif typ == "lines":
@@ -319,39 +330,57 @@ class OfficialComposer(Composer):
     # ── 붙임 ──
 
     def _붙임(self, atts):
-        """붙임 표시. 1개면 "붙임  {명칭}", 2개 이상이면 "붙임  {번호}. {명칭}" / "      {번호}. {명칭}".
-        numbered_from: 첫 번째 항목의 번호는 numbered_from-1(≥1), 두 번째부터는 numbered_from부터.
-        반환: (문단 목록, 끝표시_포함_여부). 2개 이상일 때 마지막Attachment 줄에 "  끝." 포함."""
+        """붙임 표시. 1개면 "붙임{label_gap}명칭{gap}끝."(탭 없음, 내어쓰기 −3C),
+        2개 이상이면 첫 문단 "붙임{label_gap}1.{tab}명칭", 이어짐 " {tab}2.{tab}명칭",
+        마지막 문단 끝에 "{gap}끝." 포함. 내어쓰기 −5C, 탭 위치 3C·5C."""
         out = []
         label = self._att.get("label", "붙임")
         gap = self._att.get("label_gap", "  ")
         numbered_from = int(self._att.get("numbered_from", 2))
         first_num = max(1, numbered_from - 1)
         pt = float(self._body.get("pt", 15.0))
+        char_w = int(pt * 100)
+        H = 2 * char_w
         font = self._body.get("font", "휴먼명조")
         line = int(self._body.get("line", 160))
         cp = self.char(font, pt)
         end_gap = self._end.get("gap", "  ")
         end_txt = self._end.get("text", "끝.")
 
+        def _글자폭(t):
+            return int(pt * 100 * (0.55 * sum(1 for ch in t if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in t if ord(ch) >= 0x3000)))
+
         if len(atts) == 1:
-            pp = self.para_pr("JUSTIFY", line)
-            txt = f"{label}{gap}{atts[0]}{end_gap}{end_txt}"      # 제4조⑤1호: 붙임 마지막 글자에서 한 글자 띄우고 "끝."
+            # 탭 없음, 내어쓰기 −3char_w(붙임 라벨 2자 + 띄움 1자 = 3char_w 지점)
+            pp = self.para_pr("JUSTIFY", line, indent=-3 * char_w, left=0, word=False)
+            txt = f"{label}{gap}{atts[0]}{end_gap}{end_txt}"
             out.append(self.p(pp, [(cp, txt)]))
             끝표시_포함 = True
         else:
-            pp = self.para_pr("JUSTIFY", line)
-            out.append(self.p(pp, [(cp, f"{label}{gap}{first_num}. {atts[0]}")]))
-            remaining = list(atts[1:])
-            for idx, a in enumerate(remaining):
+            # 탭 모양: 위치 3char_w·5char_w (문단 왼쪽 여백 기준)
+            tab_id = self._tabs_pr([3 * char_w, 5 * char_w])
+            pp = self.para_pr("JUSTIFY", line, indent=-5 * char_w, left=0, word=False, tab_ids=[tab_id])
+            # 첫 문단: "붙임{label_gap}1.{tab}명칭"
+            first_prefix = f"{label}{gap}{first_num}."
+            first_num_w = _글자폭(first_prefix)
+            first_tab = f'<hp:tab width="{max(100, H - first_num_w)}" leader="0" type="1"/>'
+            first_text = first_prefix + first_tab + C.esc(atts[0])
+            out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                        f'<hp:run charPrIDRef="{cp}"><hp:t>{first_text}</hp:t></hp:run></hp:p>')
+            # 이어지는 문단: "{tab}{번호}.{tab}명칭" (앞 탭으로 3C, 번호, 뒤 탭으로 5C)
+            for idx, a in enumerate(atts[1:]):
                 i = numbered_from + idx
-                is_last = (idx == len(remaining) - 1)
+                is_last = (idx == len(atts) - 2)
+                num = f"{i}."
+                num_w = _글자폭(num)
+                t1 = f'<hp:tab width="{H}" leader="0" type="1"/>'
+                t2 = f'<hp:tab width="{max(100, H - num_w)}" leader="0" type="1"/>'
                 if is_last:
-                    txt = f"      {i}. {a}{end_gap}{end_txt}"
+                    txt = t1 + num + t2 + C.esc(a) + C.esc(end_gap + end_txt)
                 else:
-                    txt = f"      {i}. {a}"
-                pp2 = self.para_pr("JUSTIFY", line, left=0)
-                out.append(self.p(pp2, [(cp, txt)]))
+                    txt = t1 + num + t2 + C.esc(a)
+                out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
+                            f'<hp:run charPrIDRef="{cp}"><hp:t>{txt}</hp:t></hp:run></hp:p>')
             끝표시_포함 = True
         return out, 끝표시_포함
 

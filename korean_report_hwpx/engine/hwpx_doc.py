@@ -37,8 +37,16 @@ class Hwpx:
 
     @staticmethod
     def text(p, tables=False):
+        """본문 텍스트 추출. <hp:tab>은 공백 한 칸으로 읽는다(<hp:nbSpace/>와 같은 방식)."""
         body = p if tables else re.sub(r"<hp:tbl\b.*?</hp:tbl>", "", p, flags=re.S)
-        return "".join(html.unescape(re.sub(r"<[^>]+>", "", (m.group(1) or "").replace("<hp:nbSpace/>", " "))) for m in T_RE.finditer(body))
+        parts = []
+        for m in T_RE.finditer(body):
+            s = m.group(1) or ""
+            s = s.replace("<hp:nbSpace/>", " ")          # 묶음 빈칸 → 일반 공백
+            s = re.sub(r"<hp:tab\b[^>]*/>", " ", s)     # 탭 요소 → 공백 한 칸
+            s = re.sub(r"<[^>]+>", "", s)               # 나머지 태그 제거
+            parts.append(html.unescape(s))
+        return "".join(parts)
 
     # ── 모양 ──
     def char(self, cid):

@@ -83,10 +83,11 @@ def test_item_numbering(built):
 def test_indent_follows_level(built):
     r, z, sec, head, text = built
     # 2계층 문단의 왼쪽 여백이 1계층보다 크다(둘째 계층부터 2타 오른쪽, 규칙 indent_per_level)
-    def left_of(startswith):
-        m = re.search(r'<hp:p\b[^>]*paraPrIDRef="(\d+)"[^>]*>(?:(?!</hp:p>).)*?' + re.escape(startswith), sec, re.S)
-        assert m, startswith
-        pr = re.search(r'<hh:paraPr\b[^>]*id="%s"[^>]*>.*?</hh:paraPr>' % m.group(1), head, re.S).group(0)
+    def left_of(startswith):   # 번호 뒤 탭(<hp:tab/>) — 문단 글은 Hwpx.text로 읽어 찾는다(2026-10-28 탭 맞춤 반영)
+        p = next((p for p in re.findall(r"<hp:p\b[^>]*>.*?</hp:p>", sec, re.S) if Hwpx.text(p).startswith(startswith)), None)
+        assert p, startswith
+        pid = re.search(r'paraPrIDRef="(\d+)"', p).group(1)
+        pr = re.search(r'<hh:paraPr\b[^>]*id="%s"[^>]*>.*?</hh:paraPr>' % pid, head, re.S).group(0)
         mg = re.search(r'<hc:left\s+value="(\d+)"', pr)
         return int(mg.group(1)) if mg else 0
     assert left_of("가. 실증 기간") > left_of("1. 국산 AI 모델")
