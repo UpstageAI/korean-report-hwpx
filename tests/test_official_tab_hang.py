@@ -69,7 +69,8 @@ def test_mark_then_tab_no_space(built):
     assert len(items) >= 6                                   # 1. 가. 나. 1) 2) 2. 가. …
     for p in items:
         assert re.match(MARK + r'<hp:tab width="\d+" leader="0" type="1"/>\S', _first_t(p)), _first_t(p)[:40]
-    plain = [p for p in _paras(sec) if re.match(MARK + r" ", Hwpx.text(p))]
+    body = re.sub(r"<hp:tbl\b.*?</hp:tbl>", "", sec, flags=re.S)        # 표 칸(날짜 "2026. 10. 31." 등)은 항목이 아님
+    plain = [p for p in _paras(body) if re.match(MARK + r" ", Hwpx.text(p))]
     assert not [p for p in plain if re.match(MARK + " ", _first_t(p))]   # 번호 뒤 공백으로 띄운 항목이 남지 않음
 
 
