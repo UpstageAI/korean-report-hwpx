@@ -820,8 +820,9 @@ class Composer:
             has_sub_row = any(r["role"] == "subtitle" for r in t["rows"])
             h = max(row.get("h", 2000), need) if has_sub_row else need   # 부제 칸 없는 기관 서식 높이는 부제 포함 실물 값 → 제목만이면 내용 높이
             rows.append(self.cell(0, len(rows), width, h, paras, bf, margin=(850, 850, 566, 566))); H += h
-        if subs and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 상자 안, 제목 아래에 '- 부제'(왼쪽, 내어쓰기)
-            row = next(r for r in t["rows"] if r["role"] == "title")
+        title_row = next((r for r in t["rows"] if r["role"] == "title"), None)
+        if subs and title_row and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 상자 안, 제목 아래에 '- 부제'(왼쪽, 내어쓰기)
+            row = title_row
             spec, lines = self.fit_title(doc["title"], dict(row.get("char") or {}), width - 1700)
             tpt = float(spec.get("pt", 20))
             sspec = {"font": "휴먼명조", "pt": 15.0 if tpt >= 20 else 13.0, "bold": False}
