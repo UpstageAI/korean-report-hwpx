@@ -45,6 +45,39 @@ mcp = MCPServer(
                  "기관을 말하지 않으면 ministry를 비워 공통 서식(보고서)으로 만든다. 원고에 없는 사실·숫자·담당자는 지어내지 않는다.")
 
 
+from mcp.server.mcpserver.exceptions import ToolError
+import functools
+
+
+class _InputError(ToolError, ValueError):
+    """입력 오류: MCP 클라이언트에는 메시지가 그대로 가고(ToolError), 파이썬에서 직접 부를 때는 기존처럼 ValueError로 잡힌다."""
+
+# 자주 쓰는 기관 약칭 → 정식 이름(52개 기관 이름)
+_MINISTRY_ALIAS = {"과기정통부": "과학기술정보통신부", "과기부": "과학기술정보통신부", "행안부": "행정안전부", "복지부": "보건복지부",
+                   "고용부": "고용노동부", "노동부": "고용노동부", "국토부": "국토교통부", "산업부": "산업통상부", "중기부": "중소벤처기업부",
+                   "농식품부": "농림축산식품부", "해수부": "해양수산부", "문체부": "문화체육관광부", "여가부": "성평등가족부",
+                   "식약처": "식품의약품안전처", "공정위": "공정거래위원회", "금융위": "금융위원회", "권익위": "국민권익위원회",
+                   "개인정보위": "개인정보보호위원회", "인사처": "인사혁신처", "보훈부": "국가보훈부", "방통위": "방송미디어통신위원회",
+                   "원안위": "원자력안전위원회", "기후부": "기후에너지환경부", "재경부": "재정경제부", "기재부": "재정경제부", "국조실": "국무조정실"}
+
+
+def _tool():
+    """mcp.tool() + 예상한 입력 오류(ValueError 등)를 ToolError로 바꿔 메시지가 모델에게 그대로 가게 한다
+    (그대로 두면 MCP SDK가 'Error executing tool <이름>'만 돌려줘 모델이 원인을 모른 채 같은 호출을 반복함).
+    ministry 인자는 약칭(과기정통부·행안부 등)을 정식 이름으로 바꾼다."""
+    def deco(fn):
+        @functools.wraps(fn)
+        def inner(*a, **kw):
+            if isinstance(kw.get("ministry"), str):
+                kw["ministry"] = _MINISTRY_ALIAS.get(kw["ministry"].strip(), kw["ministry"].strip())
+            try:
+                return fn(*a, **kw)
+            except (ValueError, TypeError, KeyError, FileNotFoundError, json.JSONDecodeError) as e:
+                raise _InputError(str(e)) from e
+        return mcp.tool()(inner)
+    return deco
+
+
 def out_dir():
     d = Path(os.environ.get("KOREAN_REPORT_HWPX_OUT_DIR") or os.environ.get("KOREAN_GOV_DOCS_OUT_DIR") or Path.home() / "korean-report-hwpx")
     d.mkdir(parents=True, exist_ok=True); return d
@@ -192,7 +225,7 @@ def guide_text(doc_type="report", ministry=None, style="standard"):
     return "\n\n".join(parts)
 
 
-@mcp.tool()
+@_tool()
 def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str = "standard") -> dict:
     """원고를 공문서 구조 JSON으로 바꿀 때 지켜야 할 작성 규칙과 스키마·예시. build_document 전에 먼저 확인한다.
     보도자료를 쓸 때는 doc_type='press_release'와 ministry를 주면 작성 방법(리드·제목·인용·숫자·쉬운 말)과 사실 메모 양식, 기관별 가상 예시를 함께 준다.
@@ -685,14 +718,25 @@ def check(structure, doc_type="report", style="standard", ministry=""):
     return t, s, w
 
 
-@mcp.tool()
-def check_structure(structure: dict | str, doc_type: str = "report", style: str = "standard", ministry: str = "") -> dict:
+def _infer_doc_type(structure, doc_type):
+    """doc_type을 비우면 구조 키로 문서 종류를 정한다: release·subtitles·contact → 보도자료, to·sender → 기안문, 그 밖 → 보고서.
+    보도자료 구조를 doc_type 없이 넘겨 보고서로 만들어지던 문제 방지."""
+    if doc_type: return doc_type
+    if isinstance(structure, dict):
+        if any(k in structure for k in ("release", "subtitles", "distribute")): return "press_release"
+        if any(k in structure for k in ("to", "sender", "recipients")): return "official"
+    return "report"
+
+
+@_tool()
+def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "") -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
     □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
     보도자료를 ministry와 함께 점검하면 작성 점검(E1~E18: 리드·제목·인용·숫자·쉬운 말 등)을 추가로 수행한다.
     돌려주는 값: {ok, doc_type, warnings}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
     structure = _as_structure(structure)
+    doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     t, _, w = check(structure, doc_type, style, ministry)
@@ -882,7 +926,7 @@ def _contact_to_struct(contact):
     return {"dept": dept, "people": out_people}
 
 
-@mcp.tool()
+@_tool()
 def draft_press_structure(facts, ministry=""):
     """사실 메모(dict 또는 JSON 문자열)를 보도자료 구조 JSON 초안으로 옮긴다.
     메모에 없는 문장·숫자·이름을 만들지 않는다. 붙이는 고정 말은 조사(은/는), “ ”라고, ”라며, “, 인용 동사, 표 머리 구분·수치·기준·비교, 주요 수치, 참고 N뿐이다."""
@@ -952,9 +996,12 @@ def draft_press_structure(facts, ministry=""):
         bg = facts.get("background", [])
         if isinstance(bg, str):
             bg = [bg]
-        for b in bg:
-            if b and b.strip():
-                body.append({"type": bt, "text": b.strip()})
+        bg = [b.strip() for b in bg if b and b.strip()]
+        if bt == "p" and bg:   # 기사형(문단) 기관: 배경 문장들은 한 문단으로 이어 쓴다(실물 보도자료 문단은 2~3문장)
+            body.append({"type": bt, "text": " ".join(bg)})
+        else:
+            for b in bg:
+                body.append({"type": bt, "text": b})
 
         # points
         for pt in facts.get("points", []):
@@ -962,12 +1009,15 @@ def draft_press_structure(facts, ministry=""):
                 if pt and pt.strip():
                     body.append({"type": bt, "text": pt.strip()})
             elif isinstance(pt, dict):
-                txt = pt.get("text", "")
-                if txt and txt.strip():
-                    body.append({"type": bt, "text": txt.strip()})
-                for d in pt.get("details", []) or []:
-                    if d and d.strip():
-                        body.append({"type": "l2", "text": d.strip()})
+                txt = (pt.get("text", "") or "").strip()
+                det = [d.strip() for d in (pt.get("details", []) or []) if d and d.strip()]
+                if bt == "p" and txt:   # 기사형 기관: 세부 문장은 ○ 줄로 쪼개지 않고 같은 문단에 이어 쓴다
+                    body.append({"type": bt, "text": " ".join([txt] + det)})
+                else:
+                    if txt:
+                        body.append({"type": bt, "text": txt})
+                    for d in det:
+                        body.append({"type": "l2", "text": d})
                 if pt.get("note"):
                     body.append({"type": "note", "text": pt["note"].strip()})
 
@@ -1028,24 +1078,27 @@ def draft_press_structure(facts, ministry=""):
         items = ap.get("items", [])
         rows = ap.get("rows")
         body_blocks = ap.get("body")
-        title = f"참고 {appx_idx + 1}"
+        appx_title = f"참고 {appx_idx + 1}"
         appx_idx += 1
         if body_blocks is not None:
             # body가 이미 있으면 그대로
-            appendix.append({"title": title, "heading": heading, "body": body_blocks})
+            appendix.append({"title": appx_title, "heading": heading, "body": body_blocks})
         elif items:
-            appendix.append({"title": title, "heading": heading,
+            appendix.append({"title": appx_title, "heading": heading,
                              "body": [{"type": "l1", "text": str(it)} for it in items]})
         elif rows is not None:
-            appendix.append({"title": title, "heading": heading,
+            appendix.append({"title": appx_title, "heading": heading,
                              "body": [{"type": "caption", "text": heading},
                                       {"type": "table", "rows": [list(r) for r in rows]}]})
         else:
             # heading만 있는 경우 빈 body
-            appendix.append({"title": title, "heading": heading, "body": []})
+            appendix.append({"title": appx_title, "heading": heading, "body": []})
 
     # numbers → appendix 맨 뒤
     numbers = facts.get("numbers", [])
+    body_text = " ".join(b.get("text", "") for b in body)
+    if numbers and all(str(n.get("value") or "") in body_text for n in numbers) and not facts.get("numbers_heading"):
+        numbers = []   # 본문에 이미 다 나온 숫자는 '주요 수치' 참고 표로 되풀이하지 않는다
     if numbers:
         nheading = facts.get("numbers_heading") or "주요 수치"
         # basis가 모두 비었는지 확인 → 2열 또는 3열
@@ -1163,7 +1216,7 @@ def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placehold
     return dst
 
 
-@mcp.tool()
+@_tool()
 def list_ministries() -> list[dict]:
     """지원 기관과 문서 종류별 지원 여부. 보고서: 기관 규칙(42곳) 또는 공통 규칙, 보도자료: 52개 기관, 기안문: rules_official/_공통.json.
     보고서는 기관을 비우거나 '공통'으로 하면 기관 간 공통 서식으로 만든다. 기안문은 기관 지정 없이 공통 서식으로만 지원."""
@@ -1177,7 +1230,7 @@ def list_ministries() -> list[dict]:
     return out
 
 
-@mcp.tool()
+@_tool()
 def get_rules(ministry: str = "", doc_type: str = "report") -> dict:
     """기관·문서 종류별 서식 규칙값: 계층별 기호·기호 앞 공백·글꼴·크기·줄 간격, 계층 사이 빈 줄 크기,
     보고서는 제목 상자·표 머리 규칙 포함. ministry를 비우면 보고서 공통 규칙.
@@ -1259,8 +1312,8 @@ def _number_official_body_for_md(s):
     return s_md
 
 
-@mcp.tool()
-def build_document(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
+@_tool()
+def build_document(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                    logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                    style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
     """보고서·보도자료(보도참고·설명·해명자료 포함)·기안문을 기관 서식 HWPX(한글 파일)로 만든다.
@@ -1280,6 +1333,7 @@ def build_document(structure: dict | str, doc_type: str = "report", ministry: st
     report_kind: 'standard'(기본, 기존 보고서 서식) | 'internal'(내부 결재 보고서 — 제목 상자 라벨 없음, 쪽 번호 "- n -", 작성일·부서 "'26. 10. 8.(목) / 과·팀명" 형식, 표 머리 음영 없음/회색, □ 글꼴 HY헤드라인M).
     돌려주는 값: {hwpx, doc_type, 문서종류, 기관, warnings, structure(정리된 구조), md(export_markdown=True일 때)}. 같은 이름 .json에 구조도 저장."""
     structure = _as_structure(structure)
+    doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
     if report_kind not in REPORT_KINDS:
@@ -1506,8 +1560,8 @@ def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
     return str(md_path)
 
 
-@mcp.tool()
-def build_from_structure(structure: dict | str, doc_type: str = "report", ministry: str = "", out_path: str = "",
+@_tool()
+def build_from_structure(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                          logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
                          style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
     """build_document와 같다(별칭). structure는 JSON 문자열로 줘도 된다."""
