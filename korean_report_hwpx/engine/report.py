@@ -31,8 +31,9 @@ def _common():
     # 제목 상자·표 머리는 기관별 최빈값의 기관 간 최빈값(일치율 표: refs/보고서_서식_규칙.md 2절)
     r["title_box"] = dict(r.get("title_box", {}), font=v("상자.font", "HY헤드라인M"), pt=v("상자.pt", 16.0), fill=v("상자.fill", "#000080"),
                           bold=v("상자.bold", False), bracket=v("상자.bracket", "plain"))
-    r["table_head"] = dict(r.get("table_head", {}), font=v("표머리.font", "맑은 고딕"), pt=v("표머리.pt", 12.0), fill=v("표머리.fill", "#DFE6F7"),
+    r["table_head"] = dict(r.get("table_head", {}), font=v("표머리.font", "맑은 고딕"), pt=v("표머리.pt", 12.0), fill=v("표머리.fill", "#F2F2F2"),
                            bold=v("표머리.bold", True))
+    r["table_head"]["fill"] = "#F2F2F2"   # 보고서 표 머리 행: #F2F2F2 (공무원 문서 실측 기준)
     return r
 
 
@@ -279,6 +280,83 @@ class ReportComposer(C.Composer):
         import html
         B.save(dst, self.header, section, self.images, html.unescape(prv)[:1000], "보고서")
         return dst
+
+    def table(self, rows, head=None):
+        """보고서 표: 위·아래 굵은 선(0.5mm), 머리 아래 이중선(DOUBLE_SLIM 0.7mm), 안쪽 선(0.12mm),
+        좌우 바깥선 없음, 머리 행만 #F2F2F2 음영. compose.py 부모 table()로 기본 XML을 만든 뒤
+        셀별 borderFillIDRef를 새 규칙에 맞게 다시 매긴다."""
+        tbl_xml = super().table(rows, head=head)
+        nrow = len(rows)
+        if not nrow:
+            return tbl_xml
+        is_head_row = [False] * nrow
+        if self.TH.get("fill"):
+            is_head_row[0] = True
+        elif head:
+            is_head_row[0] = True
+        _bf_cache = {}
+        def _bf(top, bottom, left, right, fill):
+            key = (top, bottom, left, right, fill)
+            if key in _bf_cache:
+                return _bf_cache[key]
+            btype = lambda t: t if t in ("NONE",) else ("DOUBLE_SLIM" if t == "HEADER_BOTTOM" else "SOLID")   # HWPX 이중선 이름
+            bwidth = lambda t: {"HEADER_BOTTOM": "0.7 mm", "OUTER_TOP": "0.5 mm", "OUTER_BOTTOM": "0.5 mm"}.get(t, "0.12 mm")
+            t_def = (btype(top), bwidth(top)) if top != "NONE" else ("NONE", "0.1 mm")
+            b_def = (btype(bottom), bwidth(bottom)) if bottom != "NONE" else ("NONE", "0.1 mm")
+            l_def = (btype(left), bwidth(left)) if left != "NONE" else ("NONE", "0.1 mm")
+            r_def = (btype(right), bwidth(right)) if right != "NONE" else ("NONE", "0.1 mm")
+            el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">'
+                  '<hh:slash type="NONE" Crooked="0" isCounter="0"/>'
+                  '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
+                  f'<hh:leftBorder type="{l_def[0]}" width="{l_def[1]}" color="#000000"/>'
+                  f'<hh:rightBorder type="{r_def[0]}" width="{r_def[1]}" color="#000000"/>'
+                  f'<hh:topBorder type="{t_def[0]}" width="{t_def[1]}" color="#000000"/>'
+                  f'<hh:bottomBorder type="{b_def[0]}" width="{b_def[1]}" color="#000000"/>'
+                  '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>'
+                  + (f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else "") +
+                  '</hh:borderFill>')
+            _bf_cache[key] = self._add("borderFills", "borderFill", el)
+            return _bf_cache[key]
+        OUTER_TOP = "OUTER_TOP"; OUTER_BOTTOM = "OUTER_BOTTOM"; HEADER_BOTTOM = "HEADER_BOTTOM"
+        tbl = re.sub(r'<hp:tbl\b[^>]*>.*?</hp:tbl>', lambda m: self._rebuild_table(m.group(0), rows, is_head_row, _bf, OUTER_TOP, OUTER_BOTTOM, HEADER_BOTTOM), tbl_xml, count=1, flags=re.S)
+        return tbl
+
+    def _rebuild_table(self, tbl_xml, rows, is_head_row, _bf, OUTER_TOP, OUTER_BOTTOM, HEADER_BOTTOM):
+        ncol = max(len(r) for r in rows)
+        nrow = len(rows)
+        repl = []
+        for ri, r in enumerate(rows):
+            is_head = is_head_row[ri]
+            top = OUTER_TOP if ri == 0 else (HEADER_BOTTOM if is_head_row[ri - 1] else "INNER")   # 머리 바로 아래 행 위 선도 이중선
+            if is_head:
+                bottom = HEADER_BOTTOM
+            elif ri == nrow - 1:
+                bottom = OUTER_BOTTOM
+            else:
+                bottom = "INNER"
+            row_cells = []
+            for ci in range(ncol):
+                left = "INNER" if ci != 0 else "NONE"
+                right = "INNER" if ci != ncol - 1 else "NONE"
+                fill = self.TH.get("fill") if is_head else None
+                bf = _bf(top, bottom, left, right, fill)
+                row_cells.append(bf)
+            repl.append(row_cells)
+        def cell_repl(m):
+            tc_xml = m.group(0)
+            addr = re.search(r'<hp:cellAddr\b[^>]*/>', tc_xml)
+            if not addr:
+                return tc_xml
+            ra = re.search(r'rowAddr="(\d+)"', addr.group(0))
+            ca = re.search(r'colAddr="(\d+)"', addr.group(0))
+            if not ra or not ca:
+                return tc_xml
+            ri, ci = int(ra.group(1)), int(ca.group(1))
+            if ri >= len(repl) or ci >= len(repl[ri]):
+                return tc_xml
+            bf = repl[ri][ci]
+            return re.sub(r'borderFillIDRef="[^"]*"', f'borderFillIDRef="{bf}"', tc_xml, count=1)
+        return re.sub(r'<hp:tc\b[^>]*>.*?</hp:tc>', cell_repl, tbl_xml, flags=re.S)
 
     def _unroll_table_merges(self, rows):
         """간소화 모드: 표 셀 병합이 있으면 같은 값을 행마다 반복하도록 풀어 쓴다.
