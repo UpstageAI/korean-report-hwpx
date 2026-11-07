@@ -28,8 +28,8 @@ def test_one_line_column_all_center(tmp_path):
             ["라마바", "사아자차 카타파하 가나다라 마바사", "12월"],
             ["사아자", "차카타파", "1월"]]
     a = _cells(rows, tmp_path)
-    for v in ("라마바사 아자차카 타파하", "사아자차 카타파하 가나다라 마바사", "차카타파"):
-        assert a[v] == "CENTER", (v, a[v])
+    for v in ("라마바사 아자차카 타파하", "사아자차 카타파하 가나다라 마바사", "차카타파", "11월", "12월"):
+        assert a[v] == "CENTER", (v, a[v])        # 짧은 숫자·날짜 칸도 가운데
 
 
 def test_wrapping_column_all_justify(tmp_path):
