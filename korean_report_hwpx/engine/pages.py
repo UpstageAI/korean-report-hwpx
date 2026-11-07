@@ -22,6 +22,11 @@ W_EST["hangul"] = 0.8
 MARK_W = {"□": 1.0, "■": 1.0, "ㅇ": 1.0, "○": 1.0, "◦": 1.0, "❍": 1.0, "※": 1.0, "-": 0.5, "*": 0.5}
 
 
+def prefix_hang(c, lv):
+    """분량 예측용 앞머리(prefix)와 내어쓰기(hang). 생성 엔진 Composer.prefix_hang과 같은 값을 돌려준다."""
+    return c.prefix_hang(lv)
+
+
 def _page_body_height(org=""):
     """본문 영역 높이(HWPUNIT). blank.page_settings로 계산한 값(75684)과 한글 실측치의 차이 보정.
 
@@ -115,19 +120,11 @@ def _estimate_para_height(c, block):
     # ref_tag가 있으면 상자 폭만큼 tail 추가 (compose.py item()과 동일)
     tail = ("\u3000" + "가" * -(-3386 // int(pt * 100))) if ref_tag else ""
     line_pct = L_["line"]
-    lead = L_["lead"]
-    gap = L_["gap"]
-    mark = L_["mark"]
-    mark_w = MARK_W.get(mark, 1.0)
 
-    # prefix 폭 = lead 공백 + mark + gap 공백, 자간 0 (compose.py item()과 동일)
-    prefix_text = " " * lead + mark + " " * max(1, gap)
-    prefix_w = F.width(prefix_text, pt, 0, 100, W_EST)
+    # prefix·hang: compose.py Composer.prefix_hang과 같은 값
+    prefix, hang = prefix_hang(c, lv)
+    prefix_w = F.width(prefix, pt, 0, 100, W_EST)
     first_w = c.text_w - prefix_w
-
-    # 둘째 줄부터의 avail 폭 = text_w - hang (내어쓰기)
-    # hang = (0.5*lead + mark_w + 0.5*gap) * pt * 100 (compose.py item()과 동일)
-    hang = int(round((0.5 * lead + mark_w + 0.5 * max(1, gap)) * pt * 100))
     rest_w = c.text_w - hang
 
     lines = F.wrap(text + tail, pt, 0, first_w, rest_w, 100, W_EST)
