@@ -45,10 +45,12 @@ def _check(g):
     head, body, last = g[0], g[1:], g[-1]
     for c in head:
         assert _thick(c["top"]), c                       # 위 바깥선 굵게
-        assert c["bottom"][0].startswith("DOUBLE"), c    # 머리 행 아래 이중선
+        assert c["bottom"][0] == "DOUBLE_SLIM", c        # 머리 행 아래 이중선(HWPX 선 종류 이름 그대로)
         assert c["fill"] in ("#F2F2F2",), c              # 머리 행 옅은 회색
     for c in last:
         assert _thick(c["bottom"]), c                    # 아래 바깥선 굵게
+    for c in g[1]:
+        assert c["top"][0] == "DOUBLE_SLIM", c           # 머리 바로 아래 행의 위 선도 이중선
     for r in body:
         assert r[0]["fill"] in ("", "#FFFFFF", "NONE"), r[0]   # 첫 열 본문 칸은 칠하지 않음
     for r in body[:-1]:
@@ -65,3 +67,4 @@ def test_body_table_style(tmp_path):
 
 def test_appendix_table_style(tmp_path):
     _check(_grid(_doc(appendix=True), tmp_path))
+
