@@ -42,11 +42,14 @@ mcp = MCPServer(
                  "보도자료 순서: get_writing_guide(doc_type='press_release', ministry=기관) → draft_press_structure(사실 메모 → 구조 초안) → 문장 다듬기 → check_structure → build_document. "
                  "일반 순서: get_writing_guide로 작성 규칙과 구조 스키마 확인 → 원고를 구조 JSON으로 정리 → (선택) check_structure → build_document. "
                  "결과의 warnings가 있으면 구조를 고쳐 다시 build_document. "
-                 "기관을 말하지 않으면 ministry를 비워 공통 서식(보고서)으로 만든다. 원고에 없는 사실·숫자·담당자는 지어내지 않는다.")
+                 "기관을 말하지 않으면 ministry를 비워 공통 서식(보고서)으로 만든다. 원고에 없는 사실·숫자·담당자는 지어내지 않는다. "
+                 "보고서 분량을 말하면(예: 1쪽) check_structure·build_document에 target_pages로 넘겨 돌려받은 분량과 경고대로 고친다.")
 
 
 from mcp.server.mcpserver.exceptions import ToolError
 import functools
+
+import pages  # 분량 예측 (engine/ 디렉토리, sys.path에 추가됨)
 
 
 class _InputError(ToolError, ValueError):
@@ -210,10 +213,19 @@ OFFICIAL_RULES = """[기안문·시행문(별지 제1호서식) 규칙 — doc_t
 - export_markdown=True면 같은 내용을 .md로(제목 #, 항목은 번호 글자 그대로, 결문은 표 없이 줄로)."""
 
 
+ONE_PAGE_RULES = """[1쪽 보고서] 사용자가 "1쪽", "한 장", "1페이지" 보고서를 원하면 적용한다(N쪽이면 같은 방식으로 N쪽).
+- 목표는 보고받는 사람이 읽고 되묻지 않는 것이다. 짧게 줄이는 게 아니라 핵심을 압축해 본문 1쪽을 꽉 채운다.
+- 주요 내용 □마다 무엇을·왜·누가·언제·얼마(숫자)를 ㅇ과 -로 받친다. 한 줄짜리 □만 나열하지 않는다.
+- 안건·과제·일정처럼 여럿을 나열하는 것은 본문 표로 압축한다.
+- 본문에 다 못 담는 세부는 붙임으로 받친다: 주요 내용 하나당 붙임 하나(세부·표), 마지막 붙임은 출처(매체·제목·날짜). 본문 해당 □ 끝에 '붙임 N'을 적는다.
+- 시사점(조치 계획)은 우리 기관이 할 일을 기한과 함께 쓴다.
+- check_structure와 build_document에 target_pages=1을 넘겨 분량을 잰다. 돌려받은 '분량'(본문 쪽수·마지막 쪽 채움)과 경고를 보고, 넘치면 세부를 붙임으로 옮기고, 덜 차면 주요 내용 세부를 보강해 다시 만든다.
+- 끝내기 전에 보고받는 사람이 물을 질문 3개를 떠올려 본문이나 붙임에 답이 있는지 확인한다."""
+
 def guide_text(doc_type="report", ministry=None, style="standard"):
     t = _norm_type(doc_type)
     parts = [CHOOSE, COMMON_RULES]
-    if t in ("report", "auto"): parts.append(REPORT_RULES)
+    if t in ("report", "auto"): parts.append(REPORT_RULES); parts.append(ONE_PAGE_RULES)
     if t in ("press_release", "auto"):
         parts.append(PRESS_RULES)
         parts.append("\n".join(PRESS_GUIDE["guide"]))
@@ -729,18 +741,39 @@ def _infer_doc_type(structure, doc_type):
 
 
 @_tool()
-def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "") -> dict:
+def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "",
+                    target_pages: int = 0) -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
     □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
     보도자료를 ministry와 함께 점검하면 작성 점검(E1~E18: 리드·제목·인용·숫자·쉬운 말 등)을 추가로 수행한다.
-    돌려주는 값: {ok, doc_type, warnings}.
+    target_pages: 목표 본문 쪽수(예: 1). 주면 분량을 재서 넘침·덜 참·붙임 없음을 경고.
+    돌려주는 값: {ok, doc_type, warnings, 분량(report일 때)}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
     structure = _as_structure(structure)
     doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
-    t, _, w = check(structure, doc_type, style, ministry)
-    return {"ok": not w, "doc_type": t, "warnings": w}
+    t, s, w = check(structure, doc_type, style, ministry)
+    result = {"ok": not w, "doc_type": t, "warnings": w}
+    # 보고서일 때 분량 예측
+    if t == "report":
+        result["분량"] = pages.estimate(s, style=style, report_kind="standard", ministry=ministry)
+        if target_pages > 0:
+            q = result["분량"]
+            body_pages = q["본문_쪽수"]
+            fill = q["마지막쪽_채움"]
+            # 본문 쪽수 초과
+            if body_pages > target_pages:
+                w.append(f"본문이 {target_pages}쪽을 넘음(예상 {body_pages}쪽) — 세부는 붙임으로 옮기고 다시 만드세요")
+            # 목표 쪽수와 같지만 덜 참
+            if body_pages == target_pages and fill < 0.8:
+                pct = round(fill * 100)
+                w.append(f"본문 {target_pages}쪽이 덜 참(약 {pct}%) — 보고받는 사람이 되묻지 않게 주요 내용 세부(무엇·왜·누가·언제·숫자)를 보강하세요")
+            # 붙임 없음 + l1 2개 이상
+            if not s.get("appendix") and sum(1 for b in s.get("body", []) if b.get("type") == "l1") >= 2:
+                w.append("주요 내용을 받칠 붙임이 없음 — 주요 내용마다 붙임(세부·표)을 두고 마지막 붙임은 출처로 하세요")
+            result["ok"] = not w
+    return result
 
 
 def _default_file_name(name, doc_type, title):
@@ -1315,7 +1348,8 @@ def _number_official_body_for_md(s):
 @_tool()
 def build_document(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                    logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
-                   style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
+                   style: str = "standard", export_markdown: bool = False, report_kind: str = "standard",
+                   target_pages: int = 0) -> dict:
     """보고서·보도자료(보도참고·설명·해명자료 포함)·기안문을 기관 서식 HWPX(한글 파일)로 만든다.
     구조 JSON을 기관 서식 HWPX로 만든다(외부 전송 없음, 모두 로컬). 구조는 get_writing_guide 규칙대로 사용자 AI가 작성한다.
     structure는 JSON 문자열로 줘도 된다.
@@ -1331,7 +1365,8 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     style: 'standard'(기본, 기존 동작) | 'simplified'(간소화 모드 — 항목 번호 자동 부여, 제목 상자 없음, 표 머리 음영 없음, 표 제목 자동 번호, 서술식 허용).
     export_markdown: True이면 같은 구조로 .md 파일을 HWPX 옆에 함께 저장(GFM 표, 병합 없이, 번호 위계는 #, ##, ###와 번호 텍스트).
     report_kind: 'standard'(기본, 기존 보고서 서식) | 'internal'(내부 결재 보고서 — 제목 상자 라벨 없음, 쪽 번호 "- n -", 작성일·부서 "'26. 10. 8.(목) / 과·팀명" 형식, 표 머리 음영 없음/회색, □ 글꼴 HY헤드라인M).
-    돌려주는 값: {hwpx, doc_type, 문서종류, 기관, warnings, structure(정리된 구조), md(export_markdown=True일 때)}. 같은 이름 .json에 구조도 저장."""
+    target_pages: 목표 본문 쪽수(예: 1). 주면 분량을 재서 넘침·덜 참·붙임 없음을 경고.
+    돌려주는 값: {hwpx, doc_type, 문서종류, 기관, warnings, structure(정리된 구조), 분량(report일 때), md(export_markdown=True일 때)}. 같은 이름 .json에 구조도 저장."""
     structure = _as_structure(structure)
     doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
@@ -1352,6 +1387,23 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     # press_release: kind 기본값 — 템플릿 머리 이름이 '보도참고자료'·'보도설명자료'인 기관도 '보도자료'로
     if t == "press_release":
         s["kind"] = s.get("kind") or "보도자료"
+    result = {"hwpx": "", "doc_type": t, "문서종류": LABEL[t], "기관": ministry or "공통(미지정)", "warnings": w, "structure": s}
+    # 보고서일 때 분량 예측
+    if t == "report":
+        result["분량"] = pages.estimate(s, style=style, report_kind=report_kind, ministry=ministry)
+        if target_pages > 0:
+            q = result["분량"]
+            body_pages = q["본문_쪽수"]
+            fill = q["마지막쪽_채움"]
+            if body_pages > target_pages:
+                w.append(f"본문이 {target_pages}쪽을 넘음(예상 {body_pages}쪽) — 세부는 붙임으로 옮기고 다시 만드세요")
+            if body_pages == target_pages and fill < 0.8:
+                pct = round(fill * 100)
+                w.append(f"본문 {target_pages}쪽이 덜 참(약 {pct}%) — 보고받는 사람이 되묻지 않게 주요 내용 세부(무엇·왜·누가·언제·숫자)를 보강하세요")
+            if not s.get("appendix") and sum(1 for b in s.get("body", []) if b.get("type") == "l1") >= 2:
+                w.append("주요 내용을 받칠 붙임이 없음 — 주요 내용마다 붙임(세부·표)을 두고 마지막 붙임은 출처로 하세요")
+            result["ok"] = not w
+            result["warnings"] = w
     org = ministry if ministry and ministry != "공통" else ""
     _check_ministry(org, t)
     dst = _dst(org, s.get("title"), out_path, t)
@@ -1364,10 +1416,10 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     _build(t, org, s, dst, logo_path, slogan_path, placeholder_contact, polish, style, report_kind)
     # 저장용 구조는 변환 전 원본 유지
     dst.with_suffix(".json").write_text(json.dumps(s, ensure_ascii=False, indent=1), "utf-8")
+    result["hwpx"] = str(dst)
     md_path = ""
     if export_markdown:
         md_path = _export_markdown(s_for_md, dst, "standard", t)
-    result = {"hwpx": str(dst), "doc_type": t, "문서종류": LABEL[t], "기관": org or "공통(미지정)", "warnings": w, "structure": s}
     if md_path: result["md"] = md_path
     return result
 
