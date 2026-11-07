@@ -3,6 +3,7 @@
 계산은 실제 생성 엔진과 같은 규칙값(level, gap)과 fit.wrap(어절 단위 줄 바꿈)을 쓰고,
 쪽 높이는 blank.page_settings(편집 용지)에서 읽는다.
 """
+import re
 import fit as F
 import blank as B
 import compose as C
@@ -105,6 +106,14 @@ def _estimate_para_height(c, block):
     if not text:
         return 0, 0
     pt = L_["pt"]
+    # 문장 끝 참고·붙임 표시 제거 (compose.py item()과 동일 정규식)
+    m_ref = re.search(r"(?<=\S)\s+(참고|붙임)\s?(\d+)\s*$", text)
+    ref_tag = None
+    if m_ref:
+        ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"
+        text = text[:m_ref.start()]
+    # ref_tag가 있으면 상자 폭만큼 tail 추가 (compose.py item()과 동일)
+    tail = ("\u3000" + "가" * -(-3386 // int(pt * 100))) if ref_tag else ""
     line_pct = L_["line"]
     lead = L_["lead"]
     gap = L_["gap"]
@@ -121,7 +130,7 @@ def _estimate_para_height(c, block):
     hang = int(round((0.5 * lead + mark_w + 0.5 * max(1, gap)) * pt * 100))
     rest_w = c.text_w - hang
 
-    lines = F.wrap(text, pt, 0, first_w, rest_w, 100, W_EST)
+    lines = F.wrap(text + tail, pt, 0, first_w, rest_w, 100, W_EST)
     n_lines = len(lines)
 
     # 줄 높이 = pt * line% * 100
