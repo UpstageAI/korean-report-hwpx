@@ -24,20 +24,32 @@ ENDINGS = ["11월 말부터 가동 붙임 1", "복합데이터셋으로 활용 �
            "관계부처 협의로 추진 붙임 4", "범정부 입법 원칙 확정 붙임 5"]
 
 
+def _segment(sec, phrase):
+    """phrase가 들어 있는 본문 문단: phrase 위치부터 그 문단이 끝날 때까지(상자 안 subList의 </hp:p>는 건너뜀)."""
+    i = sec.index(phrase)
+    j = sec.find("</hp:rect>", i)
+    nxt = sec.find("<hp:p id=", i)
+    if j != -1 and (nxt == -1 or j < sec.find("</hp:p>", i) or "<hp:rect" in sec[i:sec.find("</hp:p>", i)]):
+        return sec[i:j + len("</hp:rect>")]
+    return sec[i:sec.find("</hp:p>", i)]
+
+
 def test_every_trailing_tag_is_boxed(tmp_path):
     sec = _sec(_doc(ENDINGS), tmp_path)
-    # 본문 문단마다 상자(hp:rect) 하나씩, 본문 글자로 '붙임 N'이 남지 않음
-    paras = [p for p in re.findall(r"<hp:p\b.*?</hp:p>", sec, re.S) if any(e.split(" 붙임")[0][-6:] in p for e in ENDINGS)]
-    assert len(paras) == 5, len(paras)
-    for p in paras:
-        assert "<hp:rect" in p, p[:300]
-        texts = "".join(re.findall(r"<hp:t>(.*?)</hp:t>", p, re.S))
-        assert not re.search(r"붙임\s?\d\s*$", re.sub(r"<[^>]+>", "", texts).strip()), texts
+    for k, e in enumerate(ENDINGS, 1):
+        phrase = e.split(" 붙임")[0]
+        seg = _segment(sec, phrase)
+        assert "<hp:rect" in seg, (e, seg[:300])
+        box = re.search(r"<hp:rect\b.*?</hp:rect>", seg, re.S).group(0)
+        assert f"<hp:t>붙임 {k}</hp:t>" in box, box[-400:]               # 상자 안에 '붙임 N' 글자
+        outside = re.sub(r"<hp:rect\b.*?</hp:rect>", "", seg, flags=re.S)
+        texts = re.sub(r"<[^>]+>", "", "".join(re.findall(r"<hp:t>(.*?)</hp:t>", outside, re.S)))
+        assert f"붙임 {k}" not in texts, texts                           # 상자 밖에는 글자로 남지 않음
 
 
 def test_tag_word_in_middle_not_boxed(tmp_path):
     sec = _sec(_doc(["붙임 1과 같이 세부 일정을 정리함", "관련 자료는 참고자료 붙임으로 제출"]), tmp_path)
-    paras = [p for p in re.findall(r"<hp:p\b.*?</hp:p>", sec, re.S) if ("세부 일정을 정리함" in p or "참고자료" in p)]
-    assert len(paras) == 2
-    for p in paras:
-        assert "<hp:rect" not in p
+    for phrase in ("세부 일정을 정리함", "참고자료 붙임으로 제출"):
+        i = sec.index(phrase)
+        para = sec[sec.rfind("<hp:p id=", 0, i):sec.find("</hp:p>", i)]
+        assert "<hp:rect" not in para, para[:300]
