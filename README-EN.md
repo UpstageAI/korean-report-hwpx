@@ -34,6 +34,8 @@
 
 **Flow** — ask your AI "turn this memo into a <agency name> report" → it reads `get_writing_guide` → writes the structure JSON → calls `build_document` → if `warnings` come back, it fixes the structure and builds again.
 
+**Length check**: with `target_pages=1` the server predicts body page count and last-page fill ratio, and warns when it overflows 1 page, is underfilled, or has no appendix. The prediction is tuned to Hangul HWPX measurements (20-line = 1-page boundary, etc.); font and agency formatting can shift it by a line or two.
+
 Type choice (in the guide): public announcement or distribution → press release; internal reporting, plans or reviews → report; for a draft approval document / official notice (별지 제1호서식) → `official`.
 
 ## Install
