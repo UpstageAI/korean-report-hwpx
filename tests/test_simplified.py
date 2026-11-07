@@ -388,8 +388,8 @@ class TestSimplifiedCheckWarnings:
         text = Hwpx.text(sec, True)
         # 1. 표준 모드 HWPX 본문에 □ 기호가 있음 (간소화 모드와 다름)
         assert "□" in sec, "표준 모드 HWPX에 □ 기호가 없음"
-        # 2. 표준 모드 표 머리 음영(#DFE6F7)이 header에 있음
-        assert "#DFE6F7" in head, "표준 모드 header에 표 머리 음영이 없음"
+        # 2. 표준 모드 표 머리 음영(#F2F2F2)이 header에 있음
+        assert "#F2F2F2" in head, "표준 모드 header에 표 머리 음영이 없음"
         # 3. 표준 모드 HWPX 문단에 outlineLevel 속성이 없음
         assert 'outlineLevel=' not in sec, "표준 모드 HWPX에 outlineLevel이 있음"
         # 4. 표준 모드(report_kind="standard")에는 footer가 없음
@@ -543,8 +543,8 @@ class TestSimplifiedNoTitleBox:
         R.compose("", SIMPLE_REPORT, dst, style="simplified")
         head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
         # 간소화 모드는 표 머리 fill이 None (음영 없음)
-        # #DFE6F7 (표준 표 머리 색)이 header에 없음
-        assert "#DFE6F7" not in head
+        # #F2F2F2 (표준 표 머리 색)이 header에 없음
+        assert "#F2F2F2" not in head
 
     def test_table_head_fill_in_standard(self, tmp_path):
         """표준 모드: 표 머리 음영 있음."""
@@ -552,7 +552,7 @@ class TestSimplifiedNoTitleBox:
         R.compose("", SIMPLE_REPORT, dst, style="standard")
         head = zipfile.ZipFile(dst).read("Contents/header.xml").decode()
         # 표준 모드는 표 머리 fill이 있음
-        assert "#DFE6F7" in head
+        assert "#F2F2F2" in head
 
 
 # ── get_writing_guide 테스트 ──
