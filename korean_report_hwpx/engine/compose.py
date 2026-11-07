@@ -268,7 +268,7 @@ class Composer:
         # Fix 3: 간소 모드 note/ref — prefix에 이미 mark가 있으므로 text 앞 mark 제거 (중복 방지)
         if simplified and lv in ("note", "ref") and text and text[0] in ("※", "*"):
             text = text[1:].lstrip()
-        m_ref = re.search(r"(?<=[.다\)함임됨음정요])\s*(참고|붙임)\s?(\d+)\s*$", text)   # 보고서 명사형 종결(~함·~임) 뒤도
+        m_ref = re.search(r"(?<=\S)[\s\u00a0]+(참고|붙임)\s?(\d+)\s*$", text)   # 문장 끝 '붙임/참고 N' — 앞 글자와 무관 (공백·\u00a0 모두 매칭)
         ref_tag = None
         if m_ref: ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"; text = text[:m_ref.start()]  # 문장 끝 참고 표시
         plain = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
@@ -516,29 +516,59 @@ class Composer:
         cm = '<hp:cellMargin left="510" right="510" top="141" bottom="141"/>'   # 모든 행 동일 셀 여백
         trs = []
         H = 0
+        # 1차: 모든 칸의 wrap 줄 수 계산 + 셀 정보 저장 (align 결정은 열 단위로 나중에)
+        cell_info = []  # [(ri, [(v, cp, ci, cell_h, is_head, num, is_date, n_wrap_lines), ...]), ...]
         for ri, r in enumerate(rows):
+            row_cells = []
             max_cell_h = 0
-            tcs = []
             for ci in range(ncol):
                 v = str(r[ci]) if ci < len(r) else ""
                 is_head = (head and ri == 0) or (label_col and ci == 0)
                 num = bool(re.fullmatch(r"[\d,.%△▲▽+\-~() ]+[^\s]{0,3}", v.strip())) and any(c.isdigit() for c in v)
                 is_date = bool(re.fullmatch(r"\d{4}\.\s?\d{1,2}\.\s?\d{1,2}\.?", v.strip()))   # 날짜 칸은 길이와 무관하게 가운데 (Claude 10-14)
-                align = "CENTER" if (is_head or is_date or len(v) <= 12 or ci == 0) else ("RIGHT" if num else "JUSTIFY")
                 cp = self.char(th.get("font") or "맑은 고딕", tpt if is_head else min(tpt, 11.0), -2, is_head and th.get("bold", True))
-                lines = v.split("\n") or [""]
-                n_lines = len(lines)
-                # 셀 높이 = 셀 여백 + 글자 높이 × 줄 간격 × 줄 수
-                cell_h = 141 + 141 + int(tpt * 100 * 1.3) * n_lines
+                # wrap 줄 수: 생성 엔진과 같은 계산 (칸 폭 = ws[ci] - 셀 좌우 여백 1020)
+                cell_w = ws[ci] - 1020
+                if cell_w <= 0:
+                    cell_w = 100
+                expl_lines = v.split("\n") or [""]
+                n_wrap = 0
+                w = WIDTHS.get(th.get("font") or "맑은 고딕") or WIDTHS.get("바탕")
+                for ln in expl_lines:
+                    n_wrap += len(F.wrap(ln, tpt if is_head else min(tpt, 11.0), -2, cell_w, cell_w, 100, w))
+                # 셀 높이 = 셀 여백 + 글자 높이 × 줄 간격 × (명시적 줄바꿈 기준)
+                n_explicit = len(expl_lines)
+                cell_h = 141 + 141 + int(tpt * 100 * 1.3) * n_explicit
                 max_cell_h = max(max_cell_h, cell_h)
+                row_cells.append((v, cp, ci, cell_h, is_head, num, is_date, n_wrap))
+            cell_info.append((ri, row_cells))
+            row_h = max_cell_h
+            H += row_h
+        # 2차: 본문 칸(머리·label_col·날짜 제외) 열 단위 정렬 결정
+        col_wraps = {}  # ci -> 최대 wrap 줄 수 (본문 칸만)
+        for ri, row_cells in cell_info:
+            for v, cp, ci, cell_h, is_head, num, is_date, n_wrap in row_cells:
+                if is_head or is_date or (label_col and ci == 0):
+                    continue  # 머리·날짜·label_col은 열 정렬 판단에서 제외
+                if ci not in col_wraps or n_wrap > col_wraps[ci]:
+                    col_wraps[ci] = n_wrap
+        justify_cols = {ci for ci, n in col_wraps.items() if n >= 2}  # 본문 칸 중 2줄 이상 wrap된 열
+        # 3차: 정렬 적용하여 문단·셀 XML 생성
+        for ri, row_cells in cell_info:
+            tcs = []
+            for v, cp, ci, cell_h, is_head, num, is_date, n_wrap in row_cells:
+                if is_head or is_date or (label_col and ci == 0):
+                    align = "CENTER"
+                elif ci in justify_cols:
+                    align = "JUSTIFY"
+                elif num and len(v) > 12:   # 긴 숫자만 오른쪽(짧은 숫자·날짜는 가운데 — 기존 규칙 그대로)
+                    align = "RIGHT"
+                else:
+                    align = "CENTER"
+                lines = v.split("\n") or [""]
                 ps = "".join(self.p(self.para_pr(align, 130), [(cp, ln)]) for ln in lines)
                 cw = ws[ci]
                 tcs.append((ps, cw, hb if is_head else bb, ci, cell_h))
-            for ps, cw, bf, ci, cell_h in tcs:
-                pass  # tcs 튜플에 cell_h 포함
-            # 행 높이 = 해당 행에서 가장 큰 셀 높이
-            row_h = max_cell_h
-            H += row_h
             cells_xml = "".join(
                 f'<hp:tc name="" header="{1 if (head and ri == 0) else 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
                 f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{ps}</hp:subList>'

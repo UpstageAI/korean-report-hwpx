@@ -740,6 +740,21 @@ def _infer_doc_type(structure, doc_type):
     return "report"
 
 
+def _size_warnings(s, w, target_pages, result):
+    """분량 예측 결과로부터 size 관련 경고를 warnings 목록에 추가한다 (check_structure·build_document 공용)."""
+    q = result["분량"]
+    body_pages = q["본문_쪽수"]
+    fill = q["마지막쪽_채움"]
+    if body_pages > target_pages:
+        w.append(f"본문이 {target_pages}쪽을 넘음(예상 {body_pages}쪽) — 세부는 붙임으로 옮기고 다시 만드세요")
+    if body_pages == target_pages and fill < 0.8:
+        pct = round(fill * 100)
+        w.append(f"본문 {target_pages}쪽이 덜 참(약 {pct}%) — 보고받는 사람이 되묻지 않게 주요 내용 세부(무엇·왜·누가·언제·숫자)를 보강하세요")
+    if not s.get("appendix") and sum(1 for b in s.get("body", []) if b.get("type") == "l1") >= 2:
+        w.append("주요 내용을 받칠 붙임이 없음 — 주요 내용마다 붙임(세부·표)을 두고 마지막 붙임은 출처로 하세요")
+    result["ok"] = not w
+
+
 @_tool()
 def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "",
                     target_pages: int = 0) -> dict:
@@ -759,20 +774,7 @@ def check_structure(structure: dict | str, doc_type: str = "", style: str = "sta
     if t == "report":
         result["분량"] = pages.estimate(s, style=style, report_kind="standard", ministry=ministry)
         if target_pages > 0:
-            q = result["분량"]
-            body_pages = q["본문_쪽수"]
-            fill = q["마지막쪽_채움"]
-            # 본문 쪽수 초과
-            if body_pages > target_pages:
-                w.append(f"본문이 {target_pages}쪽을 넘음(예상 {body_pages}쪽) — 세부는 붙임으로 옮기고 다시 만드세요")
-            # 목표 쪽수와 같지만 덜 참
-            if body_pages == target_pages and fill < 0.8:
-                pct = round(fill * 100)
-                w.append(f"본문 {target_pages}쪽이 덜 참(약 {pct}%) — 보고받는 사람이 되묻지 않게 주요 내용 세부(무엇·왜·누가·언제·숫자)를 보강하세요")
-            # 붙임 없음 + l1 2개 이상
-            if not s.get("appendix") and sum(1 for b in s.get("body", []) if b.get("type") == "l1") >= 2:
-                w.append("주요 내용을 받칠 붙임이 없음 — 주요 내용마다 붙임(세부·표)을 두고 마지막 붙임은 출처로 하세요")
-            result["ok"] = not w
+            _size_warnings(s, w, target_pages, result)
     return result
 
 
@@ -1392,17 +1394,7 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     if t == "report":
         result["분량"] = pages.estimate(s, style=style, report_kind=report_kind, ministry=ministry)
         if target_pages > 0:
-            q = result["분량"]
-            body_pages = q["본문_쪽수"]
-            fill = q["마지막쪽_채움"]
-            if body_pages > target_pages:
-                w.append(f"본문이 {target_pages}쪽을 넘음(예상 {body_pages}쪽) — 세부는 붙임으로 옮기고 다시 만드세요")
-            if body_pages == target_pages and fill < 0.8:
-                pct = round(fill * 100)
-                w.append(f"본문 {target_pages}쪽이 덜 참(약 {pct}%) — 보고받는 사람이 되묻지 않게 주요 내용 세부(무엇·왜·누가·언제·숫자)를 보강하세요")
-            if not s.get("appendix") and sum(1 for b in s.get("body", []) if b.get("type") == "l1") >= 2:
-                w.append("주요 내용을 받칠 붙임이 없음 — 주요 내용마다 붙임(세부·표)을 두고 마지막 붙임은 출처로 하세요")
-            result["ok"] = not w
+            _size_warnings(s, w, target_pages, result)
             result["warnings"] = w
     org = ministry if ministry and ministry != "공통" else ""
     _check_ministry(org, t)
