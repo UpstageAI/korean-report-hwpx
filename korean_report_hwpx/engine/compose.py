@@ -235,6 +235,28 @@ class Composer:
               '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>' + f + "</hh:borderFill>")
         self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
 
+    def prefix_hang(self, lv):
+        """문단 앞머리(prefix)와 내어쓰기(hang) 반환. item()과 같은 분기.
+
+        반환: (prefix: str, hang: int)
+          - prefix: 문단 앞에 붙는 문자열 (lead 공백 + mark + gap 공백)
+          - hang: 내어쓰기량(HWPUNIT) = 둘째 줄에서 content 첫 글자에 맞추는 indent
+        간소화 모드에서 l1/l2/l3는 mark 제외, p는 lead만·hang 0, note/ref는 mark 유지."""
+        L_ = self.level(lv)
+        simplified = getattr(self, "style", "standard") == "simplified"
+        if lv == "p":
+            prefix = " " * L_["lead"]; hang = 0
+        elif simplified and lv not in ("note", "ref"):
+            prefix = " " * L_["lead"] + " " * max(1, L_["gap"])
+            hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+        elif simplified and lv in ("note", "ref"):
+            prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
+            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+        else:
+            prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
+            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+        return prefix, hang
+
     # ── 문단 ──
     def p(self, pid, segs, pno="0", outline_level=None):
         """문단 생성. outline_level 지정 시 HWPX 문단 요소에 outlineLevel 속성 추가 (간소화 모드 개요 수준 지정)."""
@@ -250,20 +272,7 @@ class Composer:
         단, note 유형은 간소화 모드에서도 "*" 기호를 유지(정식 서식과 동일)."""
         L_ = self.level(lv)
         simplified = getattr(self, "style", "standard") == "simplified"
-        if lv == "p":
-            prefix = " " * L_["lead"]; hang = 0
-        elif simplified and lv not in ("note", "ref"):
-            # 간소화 모드: note/ref 제외, 기호(mark) 제외, lead+gap 공백으로만 들여쓰기
-            prefix = " " * L_["lead"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
-        elif simplified and lv in ("note", "ref"):
-            # 간소화 모드의 note/ref: prefix에 mark 포함, indent는 mark 폭 포함 (표준 모드와 동일 공식)
-            prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
-        else:
-            # 표준 모드(또는 내부결재): prefix에 mark 포함
-            prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+        prefix, hang = self.prefix_hang(lv)
         text = normalize(PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), text), lv)
         # Fix 3: 간소 모드 note/ref — prefix에 이미 mark가 있으므로 text 앞 mark 제거 (중복 방지)
         if simplified and lv in ("note", "ref") and text and text[0] in ("※", "*"):
@@ -293,7 +302,6 @@ class Composer:
             for j, bit in enumerate(re.split(r"(?<=\S)(\*{1,3})(?=[\s),.]|$)", part)):  # 문장 속 각주 표시 → 위첨자
                 if bit: segs.append((sup if j % 2 else (b if k % 2 else n), bit))
         # 간소화 모드: 개요(outline) 수준 지정 안 함 (6차 수정)
-        simplified = getattr(self, "style", "standard") == "simplified"
         internal = getattr(self, "report_kind", "standard") == "internal"
         outline_level = None
         heading_level = None
