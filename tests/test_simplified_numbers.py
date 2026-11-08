@@ -35,3 +35,11 @@ def test_existing_numbers_stripped():
     assert SV._strip_existing_number("Ⅺ. 가나다") == "가나다"
     assert SV._strip_existing_number("XIII. 가나다") == "가나다"
     assert SV._strip_existing_number("거. 가나다") == "가나다"
+
+
+def test_acronyms_not_stripped():
+    """CodeSolar 리뷰(PR #10): ASCII 로마 숫자 패턴이 약어까지 지우지 않게."""
+    for t in ("IT. 인프라 개선", "DX. 전환 추진", "VIP. 응대", "CI. 정비", "LCD. 교체", "I. 개요"):
+        assert SV._strip_existing_number(t) == t, t
+    for t, want in (("XIII. 가나다", "가나다"), ("XIV. 가나다", "가나다"), ("XX. 가나다", "가나다"), ("XXXIX. 가나다", "가나다")):
+        assert SV._strip_existing_number(t) == want, t
