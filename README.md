@@ -2,7 +2,11 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![데모: 메모 한 장 → 정식·간소화 보고서(HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
+![데모: Claude 앱(코워크)에 한 줄 요청 → 1쪽 보고서 + 붙임(HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
+
+<sub>영상: Claude 앱(코워크)에 "어제 국가AI전략위원회 3차 전체회의 결과를 과장님께 보고할 1쪽짜리 보고서로 만들어 줘" 요청 하나 → 기사 검색·정리 → 본문 1쪽 + 붙임 3개 한글 파일. **이 도구의 코드는 업스테이지 Solar Pro 4가 작성했습니다.**</sub>
+
+> ⭐ 써 보시고 도움이 되셨다면 별 하나 눌러 주세요. 무료 공개를 계속 이어 가는 힘이 됩니다.
 
 [![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
 
@@ -24,7 +28,7 @@
 - "아까 만든 보고서 구조에서 Ⅲ장 □ 문장만 바꿔서 다시 만들어 줘"
 - "산림청 보고서 서식 규칙(계층별 기호·글꼴·크기) 보여 줘"
 
-**설치 한 줄** — `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
+**설치** — Claude 앱(데스크톱·코워크)은 [3단계](#claude-앱데스크톱코워크에서-쓰기), Claude Code는 한 줄: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 
 ## 문서 종류
 
@@ -41,6 +45,17 @@
 문서 종류 판단 기준(가이드에 포함): 언론·국민 대상 발표·배포용이면 보도자료, 내부 보고·계획·검토면 보고서, 행정업무규정 별지 제1호서식 기안문·시행문이 필요하면 official.
 
 ## 설치
+
+### Claude 앱(데스크톱·코워크)에서 쓰기
+
+1. **uv 설치** (한 번만) — 맥은 터미널에, 윈도는 PowerShell에 붙여 넣습니다.
+   - 맥: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+   - 윈도: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+2. **Claude 앱 설정 → 개발자(Developer) → 구성 편집(Edit Config)** 으로 열린 `claude_desktop_config.json`에 아래 `mcpServers` 내용을 넣고 저장합니다.
+   앱이 `uvx`를 못 찾으면 `command`에 전체 경로를 씁니다(맥 터미널에서 `which uvx`로 확인, 예: `/Users/이름/.local/bin/uvx`).
+3. **Claude 앱을 완전히 종료했다가 다시 열고** "이 메모를 1쪽 보고서로 만들어 줘"라고 요청합니다. 만든 파일은 `~/korean-report-hwpx/`에 저장됩니다.
+
+### 설정 내용
 
 [uv](https://docs.astral.sh/uv/)가 있으면 설치 없이 바로 실행됩니다.
 
