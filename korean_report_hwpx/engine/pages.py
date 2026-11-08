@@ -180,10 +180,24 @@ def _parse_section(section_xml):
                         "top": int(marg.get('top', 0)) if marg is not None else 0,
                         "bottom": int(marg.get('bottom', 0)) if marg is not None else 0,
                     }
-                    # 셀 안 텍스트 (중첩 문단 포함)
-                    cell_text = "".join((t.text or "") for t in tc.iter(HP_T))
+                    # 셀 안 문단(subList) 파싱: 문단별 paraPrIDRef + 런별 charPrIDRef + 텍스트
+                    cell_paras = []
+                    sublist = tc.find('hp:subList', NS)
+                    if sublist is not None:
+                        for cp in sublist.findall('hp:p', NS):
+                            pp_ref = int(cp.get('paraPrIDRef', 0))
+                            cell_runs = []
+                            for cr in cp.findall('hp:run', NS):
+                                cr_ref = int(cr.get('charPrIDRef', 0))
+                                txt = "".join((t.text or "") for t in cr.findall('hp:t', NS))
+                                cell_runs.append((cr_ref, txt))
+                            cell_paras.append({"paraPrIDRef": pp_ref, "runs": cell_runs})
+                    if not cell_paras:
+                        # subList 없음(본문 외 표 등): 텍스트를 한 문단으로
+                        cell_text = "".join((t.text or "") for t in tc.iter(HP_T))
+                        cell_paras = [{"paraPrIDRef": 0, "runs": [(0, cell_text)]}]
                     cells.append({
-                        "text": cell_text,
+                        "paras": cell_paras,
                         "width": cell_w,
                         "height": cell_h,
                         "rowSpan": rowSpan,
@@ -372,34 +386,59 @@ def _para_height(runs, charPrs, paraPr, W, line, w=WIDTHS):
 
 # ── 표 높이 계산 ───────────────────────────────────────────────────────────────
 
-def _cell_content_height(cell, line_pct, w=WIDTHS):
-    """셀 안 문단을 셀 안쪽 폭(cellSz width − cellMargin left − right)의 1.03배로 줄 나눔해
-    쌓은 높이(마지막 줄의 줄간격 몫 제외) + cellMargin top + bottom."""
-    inner_w = (cell["width"] - cell["cellMargin"]["left"] - cell["cellMargin"]["right"]) * 1.03
-    if inner_w <= 0:
-        inner_w = 100
-    text = cell["text"].replace("\u00a0", " ")
-    if not text.strip():
+def _cell_content_height(cell, paraPrs, charPrs, W, w=WIDTHS):
+    """셀 안 문단을 셀 안쪽 폭 × 1.03(≤ W)으로 줄 나눔해 쌓은 높이
+    (마지막 줄의 줄간격 몫 제외) + cellMargin top + bottom.
+
+    SPEC 4) 방식: 셀 안 각 문단의 run별 charPr(글꼴·크기·자간·장평)와
+    해당 문단의 paraPr(line·intent·left)를 쓴다.
+    """
+    raw_w = cell["width"] - cell["cellMargin"]["left"] - cell["cellMargin"]["right"]
+    inner_w = min(raw_w * 1.03, W) if raw_w > 0 else 100
+
+    total_line_h = 0
+    last_line_h = 0
+    last_max_pt = 0.0
+    for para in (cell.get("paras") or []) or []:
+        pp_ref = para.get("paraPrIDRef", 0)
+        pp = paraPrs.get(pp_ref, {}) if paraPrs else {}
+        runs = para.get("runs", [])
+        # 빈 문단 처리: run의 charPr height로 줄 하나의 높이만 계산
+        if not runs or not any(txt.strip() for _, txt in runs):
+            pt = 15.0
+            for cr_ref, _ in runs:
+                cp = charPrs.get(cr_ref)
+                if cp:
+                    pt = cp["height"] / 100.0
+                    break
+            line_h = int(pt * pp.get("line", 130))
+            total_line_h += line_h
+            last_line_h = line_h
+            last_max_pt = pt
+            continue
+        wrapped = _wrap_paragraph(runs, charPrs, pp, inner_w, pp.get("line", 130), w)
+        if not wrapped:
+            continue
+        for _, max_pt, line_h in wrapped:
+            total_line_h += line_h
+            last_line_h = line_h
+            last_max_pt = max_pt
+
+    if total_line_h == 0:
         return cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
-    # 표 셀 글자 크기: 보통 11~12pt. charPrs에서 셀 문단의 charPr를 알 수 없으므로 기본 11pt 사용
-    pt = 11.0
-    spacing = 0
-    ratio = 100
-    wcfg = w.get("바탕")
-    lines = F.wrap(text, pt, spacing, inner_w, inner_w, ratio, wcfg)
-    n_lines = len(lines)
-    line_h = int(pt * 100 * line_pct / 100)
-    content_h = line_h * max(0, n_lines - 1)  # 마지막 줄 줄간격 몫 제외
+
+    last_h_char = int(last_max_pt * 100)
+    content_h = total_line_h - (last_line_h - last_h_char)
     return content_h + cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
 
 
-def _row_height(row_cells, line_pct, w=WIDTHS):
+def _row_height(row_cells, paraPrs, charPrs, W, w=WIDTHS):
     """한 행 높이 = rowSpan=1인 셀들 중 max(hp:cellSz height, 내용 높이)."""
     max_h = 0
     for cell in row_cells:
         if cell["rowSpan"] != 1:
             continue
-        ch = _cell_content_height(cell, line_pct, w)
+        ch = _cell_content_height(cell, paraPrs, charPrs, W, w)
         # hp:cellSz height와 내용 높이 중 큰 값
         cell_declared_h = cell.get("height", 0) or 0
         eff_h = max(cell_declared_h, ch)
@@ -477,11 +516,10 @@ def estimate(structure, style="standard", report_kind="standard", ministry=""):
                 pageBreak = tbl["pageBreak"]
                 repeat_header = tbl["repeatHeader"]
 
-                # 행 높이 계산 (표 셀 내 줄간격 130% 기준)
-                line_pct = 130
+                # 행 높이 계산 (셀 문단의 paraPr line 사용)
                 row_heights = []
                 for ri, row_cells in enumerate(rows):
-                    rh = _row_height(row_cells, line_pct, WIDTHS)
+                    rh = _row_height(row_cells, paraPrs, charPrs, W, WIDTHS)
                     row_heights.append(rh)
 
                 # 표 위 prev (표 문단의 paraPr prev)
