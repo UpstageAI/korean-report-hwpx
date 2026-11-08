@@ -430,11 +430,12 @@ class ReportComposer(C.Composer):
 _EXISTING_NUMBER_RE = re.compile(
     r"^\s*"  # 선행 공백
     r"(?:"  # 번호 패턴 그룹 시작
-    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\."  # 로마 숫자: Ⅰ. Ⅱ. 등
+    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]\."  # 로마 숫자: Ⅰ. Ⅱ. ... Ⅹ. Ⅺ. Ⅻ.
+    r"|[A-Z]{2,}\."  # ASCII 로마 숫자: XIII. XIV. 등 (13번째 이후)
     r"|[1-9][0-9]?\."  # 아라비아 숫자: 1. 2. 10. 등
-    r"|[가-힣]\."  # 한글 자음: 가. 나. 등
+    r"|[가-힣]\."  # 한글 자음: 가. 나. ... 하. 거. ... 허. 고. ... 호.
     r"|[1-9][0-9]?\)"  # 괄호 숫자: 1) 2) 등
-    r"|[가-힣]\)"  # 괄호 한글: 가) 나) 등
+    r"|[가-힣]\)"  # 괄호 한글: 가) 나) ... 하) 거) ... 허) 고) ... 호.)
     r")"
     r"\s*"  # 번호 뒤 공백
 )
@@ -448,6 +449,33 @@ def _strip_existing_number(text):
     return _EXISTING_NUMBER_RE.sub("", text, count=1)
 
 
+def _int_to_roman(n):
+    """13 이상의 정수를 ASCII 로마 숫자 문자열로 변환 (XIII, XIV, ...)."""
+    vals = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+            (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
+    out = []
+    for v, sym in vals:
+        while n >= v:
+            out.append(sym); n -= v
+    return "".join(out)
+
+
+# 간소화 모드 번호 목록 — 소제목(로마 숫자), 대항목(1.), 중항목(가.), 소항목(1)), 그 아래(가))
+_ROMAN_UNICODE = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ"]  # 1~10
+_ROMAN_UNICODE_EXTENDED = ["Ⅺ", "Ⅻ"]  # 11~12
+_GAJJA_ROUND1 = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]  # 1~14
+_GAJJA_ROUND2 = ["거", "너", "더", "러", "머", "버", "서", "어", "저", "처", "커", "터", "퍼", "허"]  # 15~28
+_GAJJA_ROUND3 = ["고", "노", "도", "로", "모", "보", "소", "오", "조", "초", "코", "토", "포", "호"]  # 29~42
+
+
+def _gajja_for(i):
+    """i번째(1-based) 중항목·소항목 아래 번호 글자. 42개 넘으면 반복."""
+    i = (i - 1) % 42
+    if i < 14: return _GAJJA_ROUND1[i]
+    if i < 28: return _GAJJA_ROUND2[i - 14]
+    return _GAJJA_ROUND3[i - 28]
+
+
 def _simplify_numbers(s):
     """구조 JSON의 body와 appendix에 간소화 모드 번호(Ⅰ. 1. 가. 1) 가))를 자동 부여.
     level은 h=0, l1=1, l2=2, l3=3, 그 아래는 4(가)로 처리. 사용자가 번호를 직접 쓰지 않음.
@@ -458,22 +486,26 @@ def _simplify_numbers(s):
         """수준에 따른 번호 문자열 반환. 리셋은 _process_body에서 처리."""
         if level == 0:  # h (소제목)
             counters[0] += 1
-            roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ"]
-            return f"{roman[counters[0] - 1]}. "
+            n = counters[0]
+            if n <= 10:
+                roman = _ROMAN_UNICODE[n - 1]
+            elif n <= 12:
+                roman = _ROMAN_UNICODE_EXTENDED[n - 11]
+            else:
+                roman = _int_to_roman(n)  # XIII, XIV, ...
+            return f"{roman}. "
         elif level == 1:  # l1
             counters[1] += 1
             return f"{counters[1]}. "
         elif level == 2:  # l2
             counters[2] += 1
-            gajja = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
-            return f"{gajja[counters[2] - 1]}. "
+            return f"{_gajja_for(counters[2])}. "
         elif level == 3:  # l3
             counters[3] += 1
             return f"{counters[3]}) "
         else:  # level >= 4: 가)
             counters[4] += 1
-            gajja = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
-            return f"{gajja[counters[4] - 1]}) "
+            return f"{_gajja_for(counters[4])}) "
         return ""
 
     def _process_body(body):

@@ -761,22 +761,25 @@ def _size_warnings(s, w, target_pages, result):
 
 @_tool()
 def check_structure(structure: dict | str, doc_type: str = "", style: str = "standard", ministry: str = "",
-                    target_pages: int = 0) -> dict:
+                    target_pages: int = 0, report_kind: str = "standard") -> dict:
     """구조 JSON을 만들기 전에 점검만 한다(파일 생성 없음): 필수 필드, 알 수 없는 블록, text 속 기호, 계층 건너뜀,
     □ 두 문장 이상, 보고서 명사형 종결이 아닌 문장, 긴 제목 등. structure는 JSON 문자열로 줘도 된다.
     보도자료를 ministry와 함께 점검하면 작성 점검(E1~E18: 리드·제목·인용·숫자·쉬운 말 등)을 추가로 수행한다.
     target_pages: 목표 본문 쪽수(예: 1). 주면 분량을 재서 넘침·덜 참·붙임 없음을 경고.
+    report_kind: 'standard'(기본, 일반 보고서 서식) | 'internal'(내부 결재 보고서 — 제목 상자 라벨 없음, 쪽 번호, 작성일·부서 "'26. 10. 8.(목) / 과·팀명" 형식).
     돌려주는 값: {ok, doc_type, warnings, 분량(report일 때)}.
     style: 'standard'(기본) | 'simplified'(간소화 모드 — 번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과 추가 점검)."""
     structure = _as_structure(structure)
     doc_type = _infer_doc_type(structure, doc_type)
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
+    if report_kind not in REPORT_KINDS:
+        raise ValueError(f"report_kind은 'standard' 또는 'internal': {report_kind}")
     t, s, w = check(structure, doc_type, style, ministry)
     result = {"ok": not w, "doc_type": t, "warnings": w}
     # 보고서일 때 분량 예측
     if t == "report":
-        result["분량"] = pages.estimate(s, style=style, report_kind="standard", ministry=ministry)
+        result["분량"] = pages.estimate(s, style=style, report_kind=report_kind, ministry=ministry)
         if target_pages > 0:
             _size_warnings(s, w, target_pages, result)
     return result
