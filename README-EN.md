@@ -2,7 +2,11 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![Demo: one memo → standard and simplified reports (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo.gif)
+![Demo: one request in the Claude app (Cowork) → 1-page report + attachments (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
+
+<sub>Demo: Claude app (Cowork) with this server. **The code of this tool is written by Upstage Solar Pro 4.**</sub>
+
+> ⭐ If it helps, a star keeps this free project going.
 
 [![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [한국어](README.md)
 
