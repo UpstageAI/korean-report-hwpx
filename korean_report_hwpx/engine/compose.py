@@ -105,6 +105,7 @@ class Composer:
         self.logo_path, self.slogan_path, self.placeholder_contact = logo_path, slogan_path, placeholder_contact
 
     TH = {"fill": "#DFE6F7", "font": "맑은 고딕", "pt": 11.0, "bold": True}   # 표 머리 행(보고서는 기관 규칙값으로 바꿈)
+    SHORT_TABLE_H = 23000   # 이 높이(HWPUNIT, A4 본문 약 70,000의 1/3) 이하 짧은 표는 쪽을 나누지 않음(pageBreak NONE) — 긴 표는 빈자리가 커지지 않게 줄 단위로 나눔
 
     def load(self, org):
         return load_rules(org), load_layout(org)
@@ -524,11 +525,13 @@ class Composer:
         cm = '<hp:cellMargin left="510" right="510" top="141" bottom="141"/>'   # 모든 행 동일 셀 여백
         trs = []
         H = 0
+        H_wrap = 0   # 줄바꿈(wrap)까지 넣은 표 높이 추정 — 쪽 나눔 방식 결정용
         # 1차: 모든 칸의 wrap 줄 수 계산 + 셀 정보 저장 (align 결정은 열 단위로 나중에)
         cell_info = []  # [(ri, [(v, cp, ci, cell_h, is_head, num, is_date, n_wrap_lines), ...]), ...]
         for ri, r in enumerate(rows):
             row_cells = []
             max_cell_h = 0
+            max_wrap_h = 0
             for ci in range(ncol):
                 v = str(r[ci]) if ci < len(r) else ""
                 is_head = (head and ri == 0) or (label_col and ci == 0)
@@ -548,10 +551,12 @@ class Composer:
                 n_explicit = len(expl_lines)
                 cell_h = 141 + 141 + int(tpt * 100 * 1.3) * n_explicit
                 max_cell_h = max(max_cell_h, cell_h)
+                max_wrap_h = max(max_wrap_h, 141 + 141 + int(tpt * 100 * 1.3) * max(n_explicit, n_wrap))
                 row_cells.append((v, cp, ci, cell_h, is_head, num, is_date, n_wrap))
             cell_info.append((ri, row_cells))
             row_h = max_cell_h
             H += row_h
+            H_wrap += max_wrap_h
         # 2차: 본문 칸(머리·label_col·날짜 제외) 열 단위 정렬 결정
         col_wraps = {}  # ci -> 최대 wrap 줄 수 (본문 칸만)
         for ri, row_cells in cell_info:
@@ -583,10 +588,15 @@ class Composer:
                 f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{cw}" height="{cell_h}"/>'
                 f'{cm}</hp:tc>' for ps, cw, bf, ci, cell_h in tcs)
             trs.append(f"<hp:tr>{cells_xml}</hp:tr>")
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="TABLE" repeatHeader="1" '
+        # 쪽 경계: 한 쪽 안에 넉넉히 들어가는 표(본문 높이의 1/3 이하)는 '나누지 않음' — 머리 줄만 앞 쪽 끝에 남고
+        # 본문이 다음 쪽으로 넘어가는 일을 막는다(표 제목은 keepWithNext로 함께 넘어감). 긴 표만 줄 단위로 나눠 머리 줄 반복.
+        brk = "NONE" if H_wrap <= self.SHORT_TABLE_H else "TABLE"
+        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="{brk}" repeatHeader="1" '
                f'rowCnt="{len(rows)}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bb}" noAdjust="0"><hp:sz width="{sum(ws)}" widthRelTo="ABSOLUTE" height="{H}" heightRelTo="ABSOLUTE" protect="0"/>'
-               '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="850"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(trs) + "</hp:tbl>")  # 글자처럼 취급 끔: 긴 표가 쪽을 넘겨 이어지게
+               f'<hp:pos treatAsChar="{1 if brk == "NONE" else 0}" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
+               '<hp:outMargin left="0" right="0" top="0" bottom="850"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(trs) + "</hp:tbl>")
+        # 긴 표: 글자처럼 취급 끔 — 쪽을 넘겨 줄 단위로 이어지게. 짧은 표: 글자처럼 취급 — 본문 흐름 안의 한 덩어리로 통째로 넘어감
+        # (떠 있는 표에 '나누지 않음'만 주면 표만 다음 쪽으로 가고 뒤 본문이 앞으로 올라와 순서가 바뀜 — 한글 실측)
         # 15차 Fix: 표 문단 next=0으로 변경, 대신 뒤따르는 5pt 빈 문단으로 간격 확보
         tbl_para = f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>'
         return tbl_para + self._tiny_gap()
