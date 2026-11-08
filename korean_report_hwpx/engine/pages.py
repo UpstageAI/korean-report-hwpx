@@ -1,370 +1,659 @@
 """분량 예측. 작성 Mia(윤승미)
+
 보고서(doc_type=report)만 대상. 본문 쪽수·마지막 쪽 채움·본문 줄 수·전체 쪽 수를 예측한다.
-계산은 실제 생성 엔진과 같은 규칙값(level, gap)과 fit.wrap(어절 단위 줄 바꿈)을 쓰고,
-쪽 높이는 blank.page_settings(편집 용지)에서 읽는다.
+
+이제는 근사 보정 상수(W_EST, 쪽 높이 73000 등) 대신 실제 생성 HWPX를 임시 파일로 만든 뒤
+header.xml(charPr·paraPr·글꼴)과 section0.xml(문단·표)을 읽어 한글 배치 규칙대로 쌓아 예측한다.
 """
+import json
 import re
+import tempfile
+import zipfile
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
 import fit as F
-import blank as B
 import compose as C
 import report as RP
 
-# 한글 실측 맞춤: l1(39자)·l2(31자)가 본문 폭 한 줄에 들어가도록 hangul 폭 비율 보정.
-# 근거: tests/fixtures_onepage 실측 — 표준 보고서(본문 폭 48190 HWPUNIT)에서
-#  휴먼명조 15pt l1 문항 "가나AI다라마바사 아3자 차카타파 하가, 3나 다라 마바 사아 자차 카타"(39자)가
-#  실제로 한 줄에 표시됨. widths.json W["hangul"]=1.0을 그대로 쓰면 width=58500으로 본문 폭을 초과해
-#  두 줄로 예측되므로, estimate에서만 hangul 비율을 0.8로 낮춰 한글 실측과 맞춘다.
-#  기존 생성 엔진(compose.py)은 widths.json W["hangul"]=1.0을 그대로 사용하며 변경하지 않는다.
-W_EST = dict(F.W)
-W_EST["hangul"] = 0.8
+WIDTHS = C.WIDTHS
 
-# 마크 폭(상수)
-MARK_W = {"□": 1.0, "■": 1.0, "ㅇ": 1.0, "○": 1.0, "◦": 1.0, "❍": 1.0, "※": 1.0, "-": 0.5, "*": 0.5}
+NS = {'hp': 'http://www.hancom.co.kr/hwpml/2011/paragraph',
+      'hh': 'http://www.hancom.co.kr/hwpml/2011/head',
+      'hc': 'http://www.hancom.co.kr/hwpml/2011/core'}
 
+HP_P = '{%s}p' % NS['hp']
+HP_RUN = '{%s}run' % NS['hp']
+HP_T = '{%s}t' % NS['hp']
+HP_TBL = '{%s}tbl' % NS['hp']
+HP_TC = '{%s}tc' % NS['hp']
+HP_CELLADDR = '{%s}cellAddr' % NS['hp']
+HP_CELLSPAN = '{%s}cellSpan' % NS['hp']
+HP_CELLSZ = '{%s}cellSz' % NS['hp']
+HP_CELLMARGIN = '{%s}cellMargin' % NS['hp']
+HP_TR = '{%s}tr' % NS['hp']
 
+# 기존 테스트 호환용: 생성 엔진 Composer.prefix_hang과 같은 값을 돌려준다.
 def prefix_hang(c, lv):
     """분량 예측용 앞머리(prefix)와 내어쓰기(hang). 생성 엔진 Composer.prefix_hang과 같은 값을 돌려준다."""
     return c.prefix_hang(lv)
 
 
-def _page_body_height(org=""):
-    """본문 영역 높이(HWPUNIT). blank.page_settings로 계산한 값(75684)과 한글 실측치의 차이 보정.
+# ── HWPX 파싱 ──────────────────────────────────────────────────────────────────
 
-    보정 근거: tests/fixtures_onepage 실측 — A4(84188), 위15mm(4252)·아래15mm(4252)일 때
-    겉보기 본문 높이 75684로는 lines20_body1(20문단)이 1쪽, lines21_body2(21문단)가 2쪽인
-    경계와 맞지 않음. 한글 실제 렌더링에서는 머리말·꼬리말이 여백 안에서 본문과 겹쳐 표시되는
-    방식과 문단 prev(간격)의 추가 반영 등으로 유효 본문 높이가 더 작게 작용한다.
-    실측 경계(20문단 ≤ H < 21문단 + title)로부터 역산한 값.
-      - title 요소(1줄 가정) ≈ 10450 HWPUNIT
-      - 20문단 높이 합계 ≈ 61600 HWPUNIT → 72050 ≤ H
-      - 21문단 높이 합계 ≈ 64200 HWPUNIT → 74650 > H
-    → H = 73000 (범위 중간이자 정수 근접값). 보고서 표준·내부결재 공통.
+def _font_id_to_face(header_xml, fid):
+    """글꼴 id → 글꼴 얼굴 이름 (HANGUL lang 기준). header_xml은 문자열."""
+    m = re.search(r'(<hh:fontface lang="HANGUL"[^>]*>)(.*?)(</hh:fontface>)', header_xml, re.S)
+    if not m:
+        return "바탕"
+    block = m.group(2)
+    fm = re.search(r'<hh:font id="%s" face="([^"]+)"' % re.escape(str(fid)), block)
+    return fm.group(1) if fm else "바탕"
+
+
+def _parse_charPr(header_xml):
+    """header.xml 문자열에서 charPr 목록을 파싱. 반환: {id: {height, font_face, spacing, ratio, bold}}."""
+    out = {}
+    for m in re.finditer(r'<hh:charPr id="(\d+)"[^>]*height="(\d+)"[^>]*>.*?</hh:charPr>', header_xml, re.S):
+        cid = int(m.group(1))
+        height = int(m.group(2))
+        fm = re.search(r'<hh:fontRef hangul="(\d+)"', m.group(0))
+        font_id = int(fm.group(1)) if fm else 0
+        sm = re.search(r'<hh:spacing hangul="(-?\d+)"', m.group(0))
+        spacing = int(sm.group(1)) if sm else 0
+        rm = re.search(r'<hh:ratio hangul="(\d+)"', m.group(0))
+        ratio = int(rm.group(1)) if rm else 100
+        bold = '<hh:bold/>' in m.group(0)
+        out[cid] = {
+            "height": height,
+            "font_face": _font_id_to_face(header_xml, font_id),
+            "spacing": spacing,
+            "ratio": ratio,
+            "bold": bold,
+        }
+    return out
+
+
+def _parse_paraPr(header_xml):
+    """header.xml 문자열에서 paraPr 목록을 파싱. 반환: {id: {line, prev, next, intent, left, widowOrphan, keepWithNext}}."""
+    out = {}
+    for m in re.finditer(r'<hh:paraPr id="(\d+)"[^>]*>.*?</hh:paraPr>', header_xml, re.S):
+        pid = int(m.group(1))
+        lm = re.search(r'<hh:lineSpacing type="PERCENT" value="(\d+)"', m.group(0))
+        line = int(lm.group(1)) if lm else 160
+        pm = re.search(r'<hc:prev value="(-?\d+)"', m.group(0))
+        prev = int(pm.group(1)) if pm else 0
+        nm = re.search(r'<hc:next value="(-?\d+)"', m.group(0))
+        nxt = int(nm.group(1)) if nm else 0
+        im = re.search(r'<hc:intent value="(-?\d+)"', m.group(0))
+        intent = int(im.group(1)) if im else 0
+        lm2 = re.search(r'<hc:left value="(-?\d+)"', m.group(0))
+        left = int(lm2.group(1)) if lm2 else 0
+        wm = re.search(r'widowOrphan="(\d+)"', m.group(0))
+        widow = int(wm.group(1)) if wm else 0
+        km = re.search(r'keepWithNext="(\d+)"', m.group(0))
+        keep = int(km.group(1)) if km else 0
+        out[pid] = {
+            "line": line,
+            "prev": prev,
+            "next": nxt,
+            "intent": intent,
+            "left": left,
+            "widowOrphan": widow,
+            "keepWithNext": keep,
+        }
+    return out
+
+
+def _parse_page_pr(section_xml):
+    """section0.xml 문자열에서 hp:pagePr / hp:margin을 뽑아 쪽 크기·여백 dict로 반환."""
+    pm = re.search(r'<hp:pagePr[^>]*width="(\d+)" height="(\d+)"[^>]*>', section_xml)
+    if not pm:
+        return {}
+    width = int(pm.group(1))
+    height = int(pm.group(2))
+    mm = re.search(r'<hp:margin[^>]*header="(\d+)" footer="(\d+)"[^>]*left="(\d+)" right="(\d+)" top="(\d+)" bottom="(\d+)"', section_xml)
+    if not mm:
+        return {}
+    return {
+        "width": width,
+        "height": height,
+        "header": int(mm.group(1)),
+        "footer": int(mm.group(2)),
+        "left": int(mm.group(3)),
+        "right": int(mm.group(4)),
+        "top": int(mm.group(5)),
+        "bottom": int(mm.group(6)),
+    }
+
+
+def _parse_section(section_xml):
+    """section0.xml 문자열을 ElementTree로 파싱하여 문단 목록 반환.
+
+    반환: [dict]
+      - paraPrIDRef, pageBreak
+      - runs: [(charPrIDRef, text), ...]  (표 문단이면 빈 목록)
+      - is_table_para: 표 문단이면 True
+      - tbl_info: 표 문단이면 {pageBreak, repeatHeader, rows: [{cells: [{text, width, height, rowSpan, colSpan, cellMargin, row, col}]}]}
     """
-    return 73000
+    root = ET.fromstring(section_xml)
+    out = []
+    for p in root.findall('hp:p', NS):
+        paraPrIDRef = int(p.get('paraPrIDRef', 0))
+        pageBreak = int(p.get('pageBreak', 0))
+
+        # Run 목록
+        runs = []
+        tbl_info = None
+        for run in p.findall('hp:run', NS):
+            charPrIDRef = int(run.get('charPrIDRef', 0))
+            # 표가 있으면 표 정보 추출
+            for tbl in run.findall('hp:tbl', NS):
+                if tbl_info is None:
+                    # 표 outMargin bottom 추출
+                    out_marg = tbl.find('hp:outMargin', NS)
+                    out_margin_bottom = int(out_marg.get('bottom', 0)) if out_marg is not None else 0
+                    tbl_info = {
+                        "pageBreak": tbl.get('pageBreak', 'NONE'),
+                        "repeatHeader": int(tbl.get('repeatHeader', 0)),
+                        "rows": [],
+                        "outMargin_bottom": out_margin_bottom,
+                    }
+                rowCnt = int(tbl.get('rowCnt', 0))
+                colCnt = int(tbl.get('colCnt', 0))
+                # 셀 추출
+                cells = []
+                for tc in tbl.findall('hp:tr/hp:tc', NS):
+                    addr = tc.find(HP_CELLADDR)
+                    row = int(addr.get('rowAddr', 0)) if addr is not None else 0
+                    col = int(addr.get('colAddr', 0)) if addr is not None else 0
+                    sz = tc.find(HP_CELLSZ)
+                    cell_w = int(sz.get('width', 0)) if sz is not None else 0
+                    cell_h = int(sz.get('height', 0)) if sz is not None else 0
+                    span = tc.find(HP_CELLSPAN)
+                    colSpan = int(span.get('colSpan', 1)) if span is not None else 1
+                    rowSpan = int(span.get('rowSpan', 1)) if span is not None else 1
+                    marg = tc.find(HP_CELLMARGIN)
+                    cellMargin = {
+                        "left": int(marg.get('left', 0)) if marg is not None else 0,
+                        "right": int(marg.get('right', 0)) if marg is not None else 0,
+                        "top": int(marg.get('top', 0)) if marg is not None else 0,
+                        "bottom": int(marg.get('bottom', 0)) if marg is not None else 0,
+                    }
+                    # 셀 안 텍스트 (중첩 문단 포함)
+                    cell_text = "".join((t.text or "") for t in tc.iter(HP_T))
+                    cells.append({
+                        "text": cell_text,
+                        "width": cell_w,
+                        "height": cell_h,
+                        "rowSpan": rowSpan,
+                        "colSpan": colSpan,
+                        "cellMargin": cellMargin,
+                        "row": row,
+                        "col": col,
+                    })
+                # 행별로 그룹화
+                rows = {}
+                for cell in cells:
+                    rows.setdefault(cell["row"], []).append(cell)
+                max_row = max(rows.keys()) if rows else -1
+                tbl_info["rows"] = [rows.get(r, []) for r in range(max_row + 1)] if max_row >= 0 else []
+                tbl_info["rowCnt"] = rowCnt
+                tbl_info["colCnt"] = colCnt
+            # 텍스트 런
+            texts = []
+            for t in run.findall('hp:t', NS):
+                if t.text:
+                    texts.append(t.text)
+            if texts or not tbl_info:
+                runs.append((charPrIDRef, "".join(texts)))
+
+        if tbl_info is not None:
+            out.append({
+                "paraPrIDRef": paraPrIDRef,
+                "pageBreak": pageBreak,
+                "runs": [],
+                "is_table_para": True,
+                "tbl_info": tbl_info,
+            })
+        else:
+            out.append({
+                "paraPrIDRef": paraPrIDRef,
+                "pageBreak": pageBreak,
+                "runs": runs,
+                "is_table_para": False,
+            })
+    return out
 
 
-def _estimate_title_height(c, structure, style):
-    """제목 요소 높이 추정(HWPUNIT).
-
-    표준·내부결재: title_box(표, 셀 여백 포함) + spacer(4pt) + byline(l2 한 줄) + title_gap(l1 한 줄).
-    간소화: 제목 상자 없이 일반 제목 문단만.
-
-    근거:
-      - title_box 높이 = compose.py title_box(): h = n_lines*pt*130 + 1700 (셀 내용 높이) + 셀 여백
-        cellMargin=(850,850,700,700) → top+bottom = 1400 HWPUNIT 추가.
-      - spacer(4pt) = 400 HWPUNIT (char("바탕",4.0), line=100)
-      - byline: l2 수준 pt=15, line=130% → 15*130 = 1950 HWPUNIT 한 줄 (compose.py byline)
-      - title_gap: compose.py title_gap() → level("l1") pt=15, line=160% → 15*160 = 2400 HWPUNIT
-    """
-    if style == "simplified":
-        tb = c.R["title_box"]
-        title_pt = float(tb.get("pt") or 16.0) + 4
-        title_text = structure.get("title", "")
-        w = C.WIDTHS.get(tb.get("font") or "HY헤드라인M") or C.WIDTHS.get("바탕")
-        title_w = F.width(title_text, title_pt, 0, 100, w)
-        n_title_lines = 2 if title_w > c.text_w else 1
-        line_h = int(title_pt * 130 / 100 * 100)
-        title_h = n_title_lines * line_h
-        bl = c.byline(structure)
-        title_h += (1950 if bl else 0)
-        L_ = c.level("l1")
-        title_h += int(max(12.0, L_["pt"]) * 160 / 100 * 100)
-        return title_h
-
-    # 표준·내부결재
-    tb = c.R["title_box"]
-    title_pt = float(tb.get("pt") or 16.0) + 4
-    title_text = structure.get("title", "")
-    # title_box 안 가용 폭 = text_w - 200(좌우 여백) - 1700(라벨 칸 여유) (compose.py title_box)
-    avail = c.text_w - 200 - 1700
-    w = C.WIDTHS.get(tb.get("font") or "HY헤드라인M") or C.WIDTHS.get("바탕")
-    title_w = F.width(title_text, title_pt, 0, 100, w)
-    n_title_lines = 2 if title_w > avail else 1
-    # title_box 표 높이: 셀 내용 + 셀 여백. compose.py: h = n_lines*pt*130 + 1700, cellMargin top+bottom=700+700
-    title_box_h = int(n_title_lines * title_pt * 130 + 1700) + 1400
-    title_h = title_box_h
-    # spacer(4pt) → 400 HWPUNIT
-    title_h += 400
-    # byline: l2 수준 한 줄. compose.py byline → char level("l2"), pt=12, line=130 → 12*130 = 1560?
-    #   실제 byline 문단 높이 ≈ 1950 HWPUNIT (l2 line=130, prev 포함 아니지만 문단 자체 높이)
-    bl = c.byline(structure)
-    title_h += (1950 if bl else 0)
-    # title_gap: compose.py title_gap() → level("l1") pt=15, line=160 → 15*160 = 2400 HWPUNIT
-    L_ = c.level("l1")
-    title_h += int(max(12.0, L_["pt"]) * 160 / 100 * 100)
-    return title_h
+def _build_temp_hwpx(structure, style, report_kind, ministry):
+    """실제 생성과 같은 구조로 임시 HWPX를 만들어 경로 반환. 입력 structure는 바꾸지 않는다."""
+    s = json.loads(json.dumps(structure or {}))
+    s.setdefault("body", [])
+    if not s.get("date", "").strip():
+        from datetime import date
+        s["date"] = date.today().strftime("%Y. %m. %d.")
+    # build_document와 같게 _convert_table_titles 적용
+    def _convert_table_titles(s):
+        def _process_body(body):
+            result = []
+            for b in body:
+                if b.get("type") == "table" and (b.get("title") or b.get("caption")):
+                    title = b.pop("title", None) or b.pop("caption", "")
+                    result.append({"type": "caption", "text": title})
+                result.append(dict(b))
+                if "body" in b:
+                    b["body"] = _process_body(b["body"])
+            return result
+        s = dict(s)
+        s["body"] = _process_body(s.get("body") or [])
+        s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
+        return s
+    s = _convert_table_titles(s)
+    with tempfile.NamedTemporaryFile(suffix=".hwpx", delete=False) as tf:
+        tmp_path = tf.name
+    try:
+        org = ministry or ""
+        RP.compose(org, s, tmp_path, style=style, report_kind=report_kind)
+        return tmp_path
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
 
-def _estimate_para_height(c, block):
-    """문단 블록(h/l1/l2/l3/note/ref/p/plain) 높이 + 줄 수 추정. (높이, 줄수) 반환.
-
-    'h'(소제목)는 compose.py heading()과 같이 l1 수준 글꼴·크기를 쓰므로 level('l1')로 가져온다.
-    """
-    t = block.get("type")
-    # h는 compose.py heading()에서 l1 수준 사용 → l1로 매핑 (제목 높이는 별도 처리)
-    lv_map = {"h": "l1", "l1": "l1", "l2": "l2", "l3": "l3", "note": "note", "ref": "ref", "p": "p", "plain": "p"}
-    lv = lv_map.get(t)
-    if not lv:
-        return 0, 0
-    L_ = c.level(lv)
-    text = block.get("text", "")
-    if not text:
-        return 0, 0
-    pt = L_["pt"]
-    # 문장 끝 참고·붙임 표시 제거 (compose.py item()과 동일 정규식)
-    m_ref = re.search(r"(?<=\S)\s+(참고|붙임)\s?(\d+)\s*$", text)
-    ref_tag = None
-    if m_ref:
-        ref_tag = f"{m_ref.group(1)} {m_ref.group(2)}"
-        text = text[:m_ref.start()]
-    # ref_tag가 있으면 상자 폭만큼 tail 추가 (compose.py item()과 동일)
-    tail = ("\u3000" + "가" * -(-3386 // int(pt * 100))) if ref_tag else ""
-    line_pct = L_["line"]
-
-    # prefix·hang: compose.py Composer.prefix_hang과 같은 값
-    prefix, hang = prefix_hang(c, lv)
-    prefix_w = F.width(prefix, pt, 0, 100, W_EST)
-    first_w = c.text_w - prefix_w
-    rest_w = c.text_w - hang
-
-    lines = F.wrap(text + tail, pt, 0, first_w, rest_w, 100, W_EST)
-    n_lines = len(lines)
-
-    # 줄 높이 = pt * line% * 100
-    line_h = int(pt * line_pct / 100 * 100)
-
-    # prev(위 간격): compose.py item()에서 PRESS_SPACING=False일 때 설정한 값
-    prev_map = {"h": 1000, "l1": 1000, "l2": 500, "l3": 500, "note": 300, "ref": 300, "p": 0, "plain": 0}
-    prev = prev_map.get(lv, 0)
-
-    para_h = n_lines * line_h + prev
-    return para_h, n_lines
+def _read_hwpx(tmp_path):
+    """임시 HWPX를 읽어 (header_xml_str, section_xml_str) 반환."""
+    with zipfile.ZipFile(tmp_path) as z:
+        header = z.read("Contents/header.xml").decode("utf-8")
+        section = z.read("Contents/section0.xml").decode("utf-8")
+    return header, section
 
 
-def _estimate_caption_height(c, block):
-    """caption 블록 높이 + 줄 수 추정. (높이, 줄수) 반환."""
-    text = block.get("text", "")
-    if not text:
-        return 0, 0
-    pt = 13.0  # 맑은 고딕 13pt (compose.py caption)
-    line_pct = 160
-    lines = F.wrap(text, pt, 0, c.text_w, c.text_w, 100, W_EST)
-    n_lines = len(lines)
-    line_h = int(pt * line_pct / 100 * 100)
-    para_h = n_lines * line_h + 1000  # caption prev=1000 (10pt, compose.py caption prev=1000)
-    return para_h, n_lines
+# ── 줄 나눔 / 폭 계산 helpers ──────────────────────────────────────────────────
+
+def _run_width(run_text, charPr, w=WIDTHS):
+    """한 런의 텍스트 폭(HWPUNIT)."""
+    if not run_text:
+        return 0
+    pt = charPr["height"] / 100.0
+    return F.width(run_text, pt, charPr["spacing"], charPr["ratio"], w.get(charPr["font_face"]) or w.get("바탕"))
 
 
-def _estimate_table_widths(rows, total_w, th):
-    """표 칸 폭 추정(HWPUNIT). compose.py table() 칸 폭 로직을 간소화한 버전."""
-    if not rows:
+def _para_first_rest_width(W, paraPr):
+    """문단의 첫 줄 폭 / 나머지 줄 폭(HWPUNIT)."""
+    left = paraPr.get("left", 0) or 0
+    intent = paraPr.get("intent", 0) or 0
+    first = W - left - (intent if intent > 0 else 0)
+    rest = W - left - (-intent if intent < 0 else 0)
+    return first, rest
+
+
+def _wrap_paragraph(runs, charPrs, paraPr, W, line, w=WIDTHS):
+    """문단 런 목록 → [(줄텍스트, 줄maxPt, 줄lineH), ...]."""
+    if not runs:
         return []
-    ncol = max(len(r) for r in rows)
-    tpt = float(th.get("pt") or 11.0)
-    ppc = int(tpt * 100)  # 글자 한 칸 폭 추정치
-    pad = 1100
 
-    def vlen(t):
-        """텍스트의 '글자 수 상당' 길이. 숫자·라틴·기호는 한글의 약 절반."""
-        return sum(0.5 if (ord(ch) < 0x1100 or ch in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,%△▲▽+~() -") else 1.0 for ch in t)
-
-    cells = [[str(r[c]) if c < len(r) else "" for r in rows] for c in range(ncol)]
-    maxlen = [max(max((vlen(ln) for ln in v.split("\n")), default=0) for v in col) for col in cells]
-    short = [maxlen[c] <= 12 for c in range(ncol)]
-
-    ws = [maxlen[c] * ppc + pad if short[c] else 0 for c in range(ncol)]
-    flex = [c for c in range(ncol) if not short[c]]
-
-    if flex:
-        avg = {c: sum(vlen(v) for v in cells[c][1:]) / max(1, len(cells[c]) - 1) for c in flex}
-        top = max(flex, key=lambda c: avg[c]) if flex else None
-        fmin = {c: min(max(vlen(v) for v in cells[c]), 12 if c == top else 6) * ppc + pad for c in flex}
-        need = sum(ws) + sum(fmin.values())
-        if need <= total_w:
-            rest = total_w - sum(ws) - sum(fmin.values())
-            weight = {c: avg[c] ** 1.5 for c in flex}
-            wsum = sum(weight.values())
-            if wsum > 0 and rest > 0:
-                for c in flex:
-                    ws[c] = fmin[c] + rest * weight[c] / wsum
-            elif wsum > 0:
-                for c in flex:
-                    ws[c] = fmin[c]
-            else:
-                for c in flex:
-                    ws[c] = fmin[c]
-        else:
-            room = [ws[c] - (min(max(vlen(v) for v in cells[c]), maxlen[c]) * ppc + pad) if short[c] else 0 for c in range(ncol)]
-            cut = min(need - total_w, sum(room)) if sum(room) > 0 else 0
-            if cut > 0:
-                for c in range(ncol):
-                    if room[c] > 0:
-                        ws[c] -= cut * room[c] / sum(room)
-            if sum(fmin.values()) > 0:
-                shortage = sum(ws) + sum(fmin.values()) - total_w
-                if shortage > 0:
-                    for c in flex:
-                        ws[c] -= shortage * fmin[c] / sum(fmin.values())
-        for c in range(ncol):
-            if ws[c] < 0:
-                ws[c] = 0
-
-    # 최소 폭 보장: 한 칸이 전체의 12% 미만이면 조정
-    min_w = total_w * 0.12
-    for i in range(ncol):
-        if ws[i] < min_w:
-            ws[i] = int(min_w)
-    if sum(ws) > total_w:
-        k = total_w / sum(ws)
-        ws = [w * k for w in ws]
-    ws = [int(w) for w in ws]
-    ws[-1] += total_w - sum(ws)
-    return ws
-
-
-def _estimate_table_height(c, block):
-    """table 블록 높이 + 줄 수 추정. (높이, 줄수) 반환."""
-    rows = block.get("rows") or []
-    if not rows:
-        return 0, 0
-    total_w = c.text_w - 200
-    ws = _estimate_table_widths(rows, total_w, c.TH)
-    if not ws:
-        return 0, 0
-    ncol = len(ws)
-    total_h = 0
-    total_lines = 0
-    for ri, row in enumerate(rows):
-        max_cell_h = 0
-        max_cell_lines = 0
-        for ci in range(ncol):
-            v = str(row[ci]) if ci < len(row) else ""
-            cell_w = ws[ci] - 1020  # cellMargin left+right = 510+510 (compose.py table)
-            if cell_w <= 0:
-                cell_w = 100
-            is_head = (ri == 0)
-            tpt = float(c.TH.get("pt") or 12.0) if is_head else min(float(c.TH.get("pt") or 12.0), 11.0)
-            lines = F.wrap(v, tpt, -2, cell_w, cell_w, 100, W_EST)
-            n_lines = len(lines)
-            max_cell_lines = max(max_cell_lines, n_lines)
-            # 셀 높이 = cellMargin top+bottom(141+141) + 글자높이 × 1.3(줄간격 130%) × 줄수
-            cell_h = 282 + int(tpt * 100 * 1.3) * n_lines
-            max_cell_h = max(max_cell_h, cell_h)
-        total_h += max_cell_h
-        total_lines += max_cell_lines
-    return total_h, total_lines
-
-
-def _estimate_block(c, block):
-    """블록 1개의 (높이, 줄수) 추정."""
-    t = block.get("type")
-    if t in ("h", "l1", "l2", "l3", "note", "ref", "p", "plain"):
-        return _estimate_para_height(c, block)
-    elif t == "caption":
-        return _estimate_caption_height(c, block)
-    elif t == "table":
-        return _estimate_table_height(c, block)
-    elif t == "box":
-        L_ = c.level("l1")
-        lines = block.get("lines", [])
-        n_lines = len(lines)
-        line_h = int(L_["pt"] * L_["line"] / 100 * 100)
-        para_h = n_lines * line_h + 1200  # box 내부 여백
-        return para_h, n_lines
-    return 0, 0
-
-
-def _estimate_appendix_pages(c, appx, page_body_h):
-    """붙임(appendix) 1개의 쪽 수 추정. appx_head(새 쪽 시작) + 본문 블록."""
-    pages = 1  # appx_head는 새 쪽에서 시작 → 최소 1쪽
-    current_h = 0  # 붙임 본문 영역에서 appx_head 높이만큼 이미 차지했다고 가정
-    appx_h = _estimate_appx_head_height(c, appx)
-    current_h = appx_h
-    for block in appx.get("body", []):
-        bh, _ = _estimate_block(c, block)
-        if bh == 0:
+    # prefix 런 찾기: spacing=0, ratio=100, 텍스트가 기호·공백만
+    prefix_runs = []
+    body_runs = []
+    for cpr_id, txt in runs:
+        cp = charPrs.get(cpr_id)
+        if cp is None:
+            body_runs.append((cpr_id, txt))
             continue
-        if current_h + bh > page_body_h:
-            pages += 1
-            current_h = bh
+        if cp["spacing"] == 0 and cp["ratio"] == 100 and txt and all(c in "□■ㅇ○◦❍※- *" or c == " " for c in txt):
+            prefix_runs.append((cpr_id, txt))
         else:
-            current_h += bh
-    return pages
+            body_runs.append((cpr_id, txt))
+
+    # prefix 폭
+    prefix_w = sum(_run_width(txt, charPrs.get(cpr_id) or {}, w) for cpr_id, txt in prefix_runs)
+
+    first_w, rest_w = _para_first_rest_width(W, paraPr)
+    first_text_w = max(0, first_w - prefix_w)
+
+    # 본문 텍스트 결합
+    body_text = "".join(txt for _, txt in body_runs).replace("\u00a0", " ")
+
+    if not body_text.strip():
+        # 빈 문단(공백만): 한 줄로 처리, 높이는 첫 런의 pt 사용
+        pt = 15.0
+        for cpr_id, txt in runs:
+            cp = charPrs.get(cpr_id)
+            if cp:
+                pt = cp["height"] / 100.0
+                break
+        line_h = int(pt * line)
+        return [("", pt, line_h)]
+
+    # 본문 대표 charPr (첫 body 런)
+    if body_runs:
+        rep_cpr_id, _ = body_runs[0]
+        rep_cp = charPrs.get(rep_cpr_id) or {}
+        pt = rep_cp.get("height", 1500) / 100.0
+        spacing = rep_cp.get("spacing", 0)
+        ratio = rep_cp.get("ratio", 100)
+        font = rep_cp.get("font_face", "바탕")
+        wcfg = w.get(font) or w.get("바탕")
+    else:
+        pt = 15.0
+        spacing = 0
+        ratio = 100
+        wcfg = w.get("바탕")
+
+    lines = F.wrap(body_text, pt, spacing, first_text_w, rest_w, ratio, wcfg)
+
+    result = []
+    for li, line_text in enumerate(lines):
+        max_pt = pt
+        if li == 0 and prefix_runs:
+            for cpr_id, _ in prefix_runs:
+                cp = charPrs.get(cpr_id)
+                if cp:
+                    max_pt = max(max_pt, cp["height"] / 100.0)
+        line_h = int(max_pt * line)
+        result.append((line_text, max_pt, line_h))
+    return result
 
 
-def _estimate_appx_head_height(c, appx):
-    """붙임/참고 쪽 머리(appx_head) 높이 추정. 1행 3칸 표."""
-    A = c.appx_rule()
-    lb = A["label"]; hd = A["heading"]
-    lpt = float(lb.get("pt") or 16.0)
-    hd_pt = float(hd.get("pt") or 16.0)
-    # 표 높이 = max(lpt, hd_pt) × 100 × 1.25 + 800 (compose.py appx_head)
-    h = int(max(lpt, hd_pt) * 100 * 1.25 + 800)
-    # appx_head 뒤 5pt 빈 문단 (_tiny_gap, compose.py 15차 Fix)
-    h += 500  # char("바탕", 5.0), line=100 → 5pt = 500 HWPUNIT
-    return h
+def _count_lines(runs, charPrs, paraPr, W, line, w=WIDTHS):
+    """문단 줄 수."""
+    return len(_wrap_paragraph(runs, charPrs, paraPr, W, line, w))
+
+
+def _para_height(runs, charPrs, paraPr, W, line, w=WIDTHS):
+    """문단 전체 높이(HWPUNIT). = 줄높이 합 + prev + next."""
+    wrapped = _wrap_paragraph(runs, charPrs, paraPr, W, line, w)
+    if not wrapped:
+        return paraPr.get("prev", 0) + paraPr.get("next", 0)
+    line_h_sum = sum(lh for _, _, lh in wrapped)
+    return line_h_sum + paraPr.get("prev", 0) + paraPr.get("next", 0)
+
+
+# ── 표 높이 계산 ───────────────────────────────────────────────────────────────
+
+def _cell_content_height(cell, line_pct, w=WIDTHS):
+    """셀 안 문단을 셀 안쪽 폭(cellSz width − cellMargin left − right)의 1.03배로 줄 나눔해
+    쌓은 높이(마지막 줄의 줄간격 몫 제외) + cellMargin top + bottom."""
+    inner_w = (cell["width"] - cell["cellMargin"]["left"] - cell["cellMargin"]["right"]) * 1.03
+    if inner_w <= 0:
+        inner_w = 100
+    text = cell["text"].replace("\u00a0", " ")
+    if not text.strip():
+        return cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
+    # 표 셀 글자 크기: 보통 11~12pt. charPrs에서 셀 문단의 charPr를 알 수 없으므로 기본 11pt 사용
+    pt = 11.0
+    spacing = 0
+    ratio = 100
+    wcfg = w.get("바탕")
+    lines = F.wrap(text, pt, spacing, inner_w, inner_w, ratio, wcfg)
+    n_lines = len(lines)
+    line_h = int(pt * 100 * line_pct / 100)
+    content_h = line_h * max(0, n_lines - 1)  # 마지막 줄 줄간격 몫 제외
+    return content_h + cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
+
+
+def _row_height(row_cells, line_pct, w=WIDTHS):
+    """한 행 높이 = rowSpan=1인 셀들 중 max(hp:cellSz height, 내용 높이)."""
+    max_h = 0
+    for cell in row_cells:
+        if cell["rowSpan"] != 1:
+            continue
+        ch = _cell_content_height(cell, line_pct, w)
+        # hp:cellSz height와 내용 높이 중 큰 값
+        cell_declared_h = cell.get("height", 0) or 0
+        eff_h = max(cell_declared_h, ch)
+        if eff_h > max_h:
+            max_h = eff_h
+    return max_h
+
+
+# ── 페이지 시뮬레이션 ──────────────────────────────────────────────────────────
+
+def _page_body_metrics(page_pr):
+    """본문 영역 높이 H와 폭 W(HWPUNIT)."""
+    H = page_pr["height"] - page_pr["top"] - page_pr["bottom"] - page_pr["header"] - page_pr["footer"]
+    W = page_pr["width"] - page_pr["left"] - page_pr["right"]
+    return H, W
 
 
 def estimate(structure, style="standard", report_kind="standard", ministry=""):
     """보고서(doc_type report) 분량 예측.
 
-    반환 dict 키(이름 그대로):
-      - "본문_쪽수": int — 붙임 앞 본문이 차지하는 쪽 수
-      - "마지막쪽_채움": float — 본문 마지막 쪽에서 쓴 높이 / 쪽 본문 높이 (0~1, 소수 둘째 자리 반올림)
-      - "본문_줄수": int — 본문 전체 예상 줄 수(문단별 줄 바꿈 결과 합)
-      - "전체_쪽수": int — 본문 쪽 수 + 붙임마다의 쪽 수 합
-
-    상수 조정 근거:
-      - page_body_height: blank.page_settings(본문 높이 75684 HWPUNIT) — A4, 위아래 15mm, 머리·꼬리 10mm.
-      - W_EST["hangul"]=0.8: tests/fixtures_onepage 실측(l1 39자·한 줄)에 맞춤. widths.json W["hangul"]=1.0은
-        생성 엔진용이며 estimate에서만 0.8로 보정.
-      - title_box 2줄 가정: title 폭(widths.json W 기준)이 사용 가능 폭(46290 HWPUNIT)을 초과하면
-        compose.py fit_title과 동일하게 2줄로 예측.
+    실제 생성 HWPX를 임시 파일로 만든 뒤 header.xml·section0.xml을 읽어 한글 배치 규칙대로
+    페이지를 쌓아 예측한다.
     """
     if not structure.get("body"):
         return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
-    org = ministry or ""
-    c = RP.ReportComposer(org, style=style, report_kind=report_kind)
-    page_body_h = _page_body_height(org)
+    tmp_path = _build_temp_hwpx(structure, style, report_kind, ministry)
+    try:
+        header_xml, section_xml = _read_hwpx(tmp_path)
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
-    # 제목 요소 높이
-    title_h = _estimate_title_height(c, structure, style)
+    charPrs = _parse_charPr(header_xml)
+    paraPrs = _parse_paraPr(header_xml)
+    page_pr = _parse_page_pr(section_xml)
+    if not page_pr:
+        Path(tmp_path).unlink(missing_ok=True)
+        return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
-    # 본문 쌓기
-    current_h = title_h
-    page_count = 1
-    total_lines = 0
+    H, W = _page_body_metrics(page_pr)
+    if H <= 0:
+        Path(tmp_path).unlink(missing_ok=True)
+        return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
-    for block in structure.get("body", []):
-        bh, lines = _estimate_block(c, block)
-        if bh == 0:
-            continue
-        total_lines += lines
-        if current_h + bh > page_body_h:
-            # 현재 페이지 채움 비율 (마지막 줄까지 포함)
-            last_fill = round((page_body_h - current_h) / page_body_h, 2)
-            current_h = bh  # 새 페이지 시작 (첫 블록)
-            page_count += 1
-        else:
-            current_h += bh
+    paragraphs = _parse_section(section_xml)
 
-    # 마지막 페이지 채움 (본문 끝 기준)
-    if current_h > 0:
-        last_fill = round(current_h / page_body_h, 2)
+    # 본문(첫 pageBreak="1" 문단 앞까지)과 전체 구분
+    # 첫 pageBreak="1"인 문단(붙임 머리 표 포함)을 찾으면 그 앞까지가 본문
+    first_pb_idx = None
+    for i, p in enumerate(paragraphs):
+        if p["pageBreak"] == 1:
+            first_pb_idx = i
+            break
+    # 첫 pageBreak가 표 문단의 CELL 등이면 본문 구분은 그대로(전체 문서)
+    # 실제 보고서에서는 붙임 머리(appx_head)가 pageBreak="1"인 일반 문단
 
-    본문_쪽수 = page_count
+    def simulate(start_idx, end_idx):
+        """문단[start_idx:end_idx]을 시뮬레이션. (최종쪽수, 마지막쪽_y, 총줄수, 마지막쪽번호) 반환."""
+        y = 0
+        page = 1
+        total_lines = 0
 
-    # 붙임
-    appendix_pages = 0
-    for appx in structure.get("appendix", []):
-        appendix_pages += _estimate_appendix_pages(c, appx, page_body_h)
+        for pi in range(start_idx, end_idx):
+            p = paragraphs[pi]
+            if p["is_table_para"]:
+                # ── 표 문단 ──
+                # 문단 pageBreak="1"이면 새 쪽에서 시작
+                if p["pageBreak"] == 1:
+                    page += 1
+                    y = 0
 
-    전체_쪽수 = 본문_쪽수 + appendix_pages
+                tbl = p["tbl_info"]
+                rows = tbl["rows"]
+                pageBreak = tbl["pageBreak"]
+                repeat_header = tbl["repeatHeader"]
 
+                # 행 높이 계산 (표 셀 내 줄간격 130% 기준)
+                line_pct = 130
+                row_heights = []
+                for ri, row_cells in enumerate(rows):
+                    rh = _row_height(row_cells, line_pct, WIDTHS)
+                    row_heights.append(rh)
+
+                # 표 위 prev (표 문단의 paraPr prev)
+                prev = paraPrs.get(p["paraPrIDRef"], {}).get("prev", 0) or 0
+                # 표 아래 next (표 문단의 paraPr next)
+                nxt = paraPrs.get(p["paraPrIDRef"], {}).get("next", 0) or 0
+
+                header_row_h = row_heights[0] if row_heights else 0
+
+                # 표 행 수를 본문_줄수에 추가
+                total_lines += len(rows)
+
+                if pageBreak in ("TABLE", "CELL"):
+                    # 행 단위 나눔
+                    # 표 위 prev 더하기
+                    y += prev
+
+                    # 첫 행(머리행) 처리
+                    if repeat_header and y == 0 and page > 1:
+                        # 새 쪽이고 머리행 반복: 머리행 높이 추가
+                        y += header_row_h
+                    elif row_heights:
+                        # 현재 쪽에 머리행 추가
+                        if y + header_row_h > H:
+                            page += 1
+                            y = 0
+                            if repeat_header:
+                                y += header_row_h
+                        else:
+                            y += header_row_h
+
+                    # 나머지 행 처리
+                    for ri in range(1, len(row_heights)):
+                        rh = row_heights[ri]
+                        is_last = (ri == len(row_heights) - 1)
+                        # 마지막 행은 outMargin까지 포함해야 그 쪽에 남음
+                        needed = rh + (tbl.get("outMargin_bottom", 0) if is_last else 0)
+                        if y + needed > H:
+                            page += 1
+                            y = 0
+                            if repeat_header:
+                                y += header_row_h
+                        y += rh
+                    y += tbl.get("outMargin_bottom", 0) + nxt  # 표 아래 outMargin + next
+                elif pageBreak == "NONE":
+                    # 통째로 다음 쪽으로
+                    total_tbl_h = prev + sum(row_heights) + tbl.get("outMargin_bottom", 0) + nxt
+                    if y + total_tbl_h > H:
+                        page += 1
+                        y = 0
+                    y += total_tbl_h
+                else:
+                    # 기본: 표 전체가 현재 쪽에 들어가면 그대로, 안 들어가면 통째로 다음 쪽
+                    total_tbl_h = prev + sum(row_heights) + tbl.get("outMargin_bottom", 0) + nxt
+                    if y + total_tbl_h > H:
+                        page += 1
+                        y = 0
+                    y += total_tbl_h
+
+                continue
+
+            # ── 일반 문단 ──
+            paraPr = paraPrs.get(p["paraPrIDRef"], {})
+            line = paraPr.get("line", 160)
+            prev = paraPr.get("prev", 0)
+            nxt = paraPr.get("next", 0)
+            widow = paraPr.get("widowOrphan", 0)
+            keep_next = paraPr.get("keepWithNext", 0)
+            page_break = p["pageBreak"]
+
+            # 줄 나눔
+            n_lines = _count_lines(p["runs"], charPrs, paraPr, W, line, WIDTHS)
+            total_lines += n_lines
+            para_h = _para_height(p["runs"], charPrs, paraPr, W, line, WIDTHS)
+
+            # pageBreak="1"이면 새 쪽
+            if page_break == 1:
+                page += 1
+                y = 0
+
+            # keepWithNext 처리
+            if keep_next and pi < end_idx - 1 and not paragraphs[pi + 1]["is_table_para"]:
+                next_p = paragraphs[pi + 1]
+                next_paraPr = paraPrs.get(next_p["paraPrIDRef"], {})
+                next_line = next_paraPr.get("line", 160)
+                next_n_lines = _count_lines(next_p["runs"], charPrs, next_paraPr, W, next_line, WIDTHS)
+                next_widow = next_paraPr.get("widowOrphan", 0)
+                if next_widow == 1 and next_n_lines >= 2:
+                    next_first_lines = 2
+                else:
+                    next_first_lines = 1
+                wrapped_next = _wrap_paragraph(next_p["runs"], charPrs, next_paraPr, W, next_line, WIDTHS)
+                next_first_h = 0
+                if wrapped_next:
+                    next_first_h = wrapped_next[0][2]
+                    if next_first_lines >= 2 and len(wrapped_next) >= 2:
+                        next_first_h += wrapped_next[1][2]
+                if y + para_h + next_first_h > H and y > 0:
+                    page += 1
+                    y = 0
+
+            # 외톨이줄 보호
+            if widow == 1 and n_lines >= 2 and y + para_h > H:
+                remaining = H - y
+                wrapped = _wrap_paragraph(p["runs"], charPrs, paraPr, W, line, WIDTHS)
+                if wrapped:
+                    last_line_h = wrapped[-1][2]
+                    if remaining < last_line_h + prev:
+                        page += 1
+                        y = 0
+
+            # 문단 쌓기: 줄 단위로 체크 (줄간격 몫은 넘쳐도 됨)
+            wrapped = _wrap_paragraph(p["runs"], charPrs, paraPr, W, line, WIDTHS)
+            if not wrapped:
+                # 빈 문단: prev + next만 더함
+                y += prev + nxt
+                continue
+
+            # 첫 줄 체크: y + prev + h <= H?
+            first_h = wrapped[0][2]  # 첫 줄의 line_h (이미 line_h = h + 줄간격)
+            # 실제로 체크할 것은 y + prev + h_char <= H (h_char = 첫 줄의 글자 높이)
+            # h_char = wrapped[0][1] * 100 (pt -> HWPUNIT)
+            h_char = int(wrapped[0][1] * 100)
+
+            if y + prev + h_char > H:
+                # 새 쪽으로
+                page += 1
+                y = 0
+
+            y += prev
+            for li, (_, _, line_h) in enumerate(wrapped):
+                if li > 0 and y + int(wrapped[li][1] * 100) > H:
+                    page += 1
+                    y = 0
+                    y += prev  # 새 쪽 맨 위에서도 prev 적용
+                y += line_h
+            y += nxt
+
+        return page, y, total_lines, page
+
+    # 본문 시뮬레이션
+    if first_pb_idx is not None:
+        body_paras = paragraphs[:first_pb_idx]
+    else:
+        body_paras = paragraphs
+
+    if body_paras:
+        _, body_last_y, body_lines, body_pages = simulate(0, len(body_paras))
+        본문_쪽수 = body_pages
+        본문_줄수 = body_lines
+        마지막쪽_채움_y = body_last_y
+    else:
+        본문_쪽수 = 0
+        본문_줄수 = 0
+        마지막쪽_채움_y = 0
+
+    if 본문_쪽수 == 0:
+        Path(tmp_path).unlink(missing_ok=True)
+        return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
+
+    마지막쪽_채움 = round(마지막쪽_채움_y / H, 2)
+
+    # 전체 시뮬레이션
+    if first_pb_idx is not None:
+        _, _, _, 전체_쪽수 = simulate(0, len(paragraphs))
+    else:
+        _, _, _, 전체_쪽수 = simulate(0, len(paragraphs))
+
+    Path(tmp_path).unlink(missing_ok=True)
     return {
         "본문_쪽수": 본문_쪽수,
-        "마지막쪽_채움": last_fill,
-        "본문_줄수": total_lines,
+        "마지막쪽_채움": 마지막쪽_채움,
+        "본문_줄수": 본문_줄수,
         "전체_쪽수": 전체_쪽수,
     }
