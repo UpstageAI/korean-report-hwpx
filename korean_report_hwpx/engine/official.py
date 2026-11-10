@@ -5,6 +5,7 @@ import copy, html, re
 
 from . import blank as B
 from . import compose as C
+from . import xml as X
 from .compose import Composer
 from .report import _strip_existing_number  # 항목 번호 접두사 제거 — report.py 한 곳에서만 정의
 
@@ -171,7 +172,7 @@ class OfficialComposer(Composer):
         counters = [0] * len(numbering)   # 각 번호 수준별 카운터
         indent = int(self._body.get("indent_per_level", 2))
         pt = float(self._body.get("pt", 15.0))
-        char_w = int(pt * 100)              # 한 글자 폭(HWPUNIT)
+        char_w = int(pt * X.PT)             # 한 글자 폭(HWPUNIT)
         H = 2 * char_w                      # 항목 내어쓰기 거리(HWPUNIT): 한글 2자
         font = self._body.get("font", "휴먼명조")
         line = int(self._body.get("line", 160))
@@ -194,7 +195,7 @@ class OfficialComposer(Composer):
             둘째 항목부터 상위 항목기호 위치에서 오른쪽으로 indent_per_level타(2타 = 한글 1자)씩."""
             if level <= 0:
                 return 0
-            return int(level * (indent / 2.0) * pt * 100)   # 2타 = 한글 1자 = pt×100 HWPUNIT
+            return int(level * (indent / 2.0) * pt * X.PT)   # 2타 = 한글 1자 = pt×100 HWPUNIT
 
         single_top = sum(1 for b in (self.doc.get("body") or []) if b.get("type") == "l1") == 1
 
@@ -211,7 +212,7 @@ class OfficialComposer(Composer):
                         # 번호 뒤 탭 + 내어쓰기 H = 2C(한글 2자)로 둘째 줄을 항목 내용 첫 글자에 맞춤
                         # <hp:tab>은 <hp:t> 자식 요소로 raw 삽입(esc 시 &lt;로 깨짐)
                         prefix_no_space = prefix.rstrip()              # "1. " → "1."
-                        num_width = int(pt * 100 * (0.55 * sum(1 for ch in prefix_no_space if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix_no_space if ord(ch) >= 0x3000)))
+                        num_width = int(pt * X.PT * (0.55 * sum(1 for ch in prefix_no_space if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in prefix_no_space if ord(ch) >= 0x3000)))
                         tab_w = max(100, H - num_width)
                         tab_xml = f'<hp:tab width="{tab_w}" leader="0" type="1"/>'
                         text_content = prefix_no_space + tab_xml + C.esc(text.lstrip())   # 탭 뒤 공백 없음
@@ -221,8 +222,7 @@ class OfficialComposer(Composer):
                         text_content = C.esc(text.lstrip())
                         pp = self.para_pr("JUSTIFY", line, indent=0, left=0, word=False)
                     cp = self.char(font, pt)
-                    out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                                f'<hp:run charPrIDRef="{cp}"><hp:t>{text_content}</hp:t></hp:run></hp:p>')
+                    out.append(X.para_xml(pp, X.run_xml(cp, f"<hp:t>{text_content}</hp:t>")))
                 elif typ == "table":
                     out.append(self._표(b))
                 elif typ == "lines":
@@ -298,7 +298,7 @@ class OfficialComposer(Composer):
         numbered_from = int(self._att.get("numbered_from", 2))
         first_num = max(1, numbered_from - 1)
         pt = float(self._body.get("pt", 15.0))
-        char_w = int(pt * 100)
+        char_w = int(pt * X.PT)
         H = 2 * char_w
         font = self._body.get("font", "휴먼명조")
         line = int(self._body.get("line", 160))
@@ -307,7 +307,7 @@ class OfficialComposer(Composer):
         end_txt = self._end.get("text", "끝.")
 
         def _글자폭(t):
-            return int(pt * 100 * (0.55 * sum(1 for ch in t if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in t if ord(ch) >= 0x3000)))
+            return int(pt * X.PT * (0.55 * sum(1 for ch in t if ord(ch) < 0x3000) + 1.0 * sum(1 for ch in t if ord(ch) >= 0x3000)))
 
         if len(atts) == 1:
             # 탭 없음, 내어쓰기 −3char_w(붙임 라벨 2자 + 띄움 1자 = 3char_w 지점)
@@ -324,8 +324,7 @@ class OfficialComposer(Composer):
             first_num_w = _글자폭(first_prefix)
             first_tab = f'<hp:tab width="{max(100, H - first_num_w)}" leader="0" type="1"/>'
             first_text = first_prefix + first_tab + C.esc(atts[0])
-            out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                        f'<hp:run charPrIDRef="{cp}"><hp:t>{first_text}</hp:t></hp:run></hp:p>')
+            out.append(X.para_xml(pp, X.run_xml(cp, f"<hp:t>{first_text}</hp:t>")))
             # 이어지는 문단: "{tab}{번호}.{tab}명칭" (앞 탭으로 3C, 번호, 뒤 탭으로 5C)
             for idx, a in enumerate(atts[1:]):
                 i = numbered_from + idx
@@ -338,8 +337,7 @@ class OfficialComposer(Composer):
                     txt = t1 + num + t2 + C.esc(a) + C.esc(end_gap + end_txt)
                 else:
                     txt = t1 + num + t2 + C.esc(a)
-                out.append(f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                            f'<hp:run charPrIDRef="{cp}"><hp:t>{txt}</hp:t></hp:run></hp:p>')
+                out.append(X.para_xml(pp, X.run_xml(cp, f"<hp:t>{txt}</hp:t>")))
             끝표시_포함 = True
         return out, 끝표시_포함
 
@@ -380,7 +378,7 @@ class OfficialComposer(Composer):
         # 실제 sender 규칙: _공통.json의 sender 키
         snd = self.R.get("sender", self._org_r)
         cp = self.ch({"font": snd.get("font"), "pt": float(snd.get("pt")), "bold": False})
-        pp = self.para_pr("CENTER", 100, prev=int(snd.get("before_pt", 20.0) * 100), keep=True)
+        pp = self.para_pr("CENTER", 100, prev=int(snd.get("before_pt", 20.0) * X.PT), keep=True)
         out.append(self.p(pp, [(cp, sender)]))
 
         # 2. to가 "수신자 참조"면 수신자란
@@ -401,8 +399,8 @@ class OfficialComposer(Composer):
     def _가로선(self, width="0.12 mm", height=80):
         """가로선 한 줄(아래 변만 있는 1칸 표). 별지 제1호서식의 두문 아래·결문 아래 선."""
         bf = self.border_sides(("bottom",), width=width)
-        W = int(self.text_w - 200)
-        cell = self.cell(0, 0, W, height, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), bf, margin=(0, 0, 0, 0))
+        W = int(self.text_w - X.TEXT_PAD)
+        cell = self.cell(0, 0, W, height, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), bf, margin=X.NO_MARGIN)
         return self._표블록([cell], 1, 1, W, height, bf)
 
     def _결문표(self, approval, doc_no, contact):
@@ -413,7 +411,7 @@ class OfficialComposer(Composer):
         cpa = self.char(ap.get("font", "맑은 고딕"), float(ap.get("pt", 11.0)))
         none = self.border_sides(())                                   # 선 없음
         bottom = self.border_sides(("bottom",), width="0.12 mm")      # 마지막 줄 아래 가로선
-        W = int(self.text_w - 200)
+        W = int(self.text_w - X.TEXT_PAD)
         def para(text, cpx=cp, align="LEFT"):
             return self.p(self.para_pr(align, 130), [(cpx, text)])
         drafter = approval.get("drafter", {}); reviewers = approval.get("reviewers", []); approver = approval.get("approver", {})
@@ -422,11 +420,11 @@ class OfficialComposer(Composer):
                  [f"{r.get('title', '')}{opinion if r.get('opinion') else ''}" for r in reviewers] + [approver.get("title", "")]
         names = [drafter.get("name", "") or ""] + [r.get("name", "") or "" for r in reviewers] + [approver.get("name", "") or ""]
         k = max(1, len(titles)); w = W // k
-        h1 = int(float(fl.get("pt", 11.0)) * 100 * 1.5) + 200
+        h1 = int(float(fl.get("pt", 11.0)) * X.PT * 1.5) + 200
         rows, H, r = [], 0, 0
         # 회색 구분선(서식의 굵은 회색 띠)
         bar_h = int(2.2 * C.HU_MM)
-        rows.append(self.cell(0, r, W, bar_h, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), self.border_sides((), fill="#BFBFBF"), colspan=k, margin=(0, 0, 0, 0))); H += bar_h; r += 1
+        rows.append(self.cell(0, r, W, bar_h, self.p(self.para_pr("LEFT", 100), [(self.char("바탕", 2.0), "")]), self.border_sides((), fill="#BFBFBF"), colspan=k, margin=X.NO_MARGIN)); H += bar_h; r += 1
         # 기안자·검토자·결재권자: 직위 (서명은 성명이 있으면 뒤에)
         rows.append("".join(self.cell(i, r, w, h1, para(f"{t}  {n}".rstrip(), cpa), none) for i, (t, n) in enumerate(zip(titles, names)))); H += h1; r += 1
         coords = approval.get("coordinators", [])
@@ -450,12 +448,8 @@ class OfficialComposer(Composer):
     def _표블록(self, rows, nrow, ncol, W, H, bf, page_break="CELL"):
         """compose.table과 같은 배치(글자처럼 취급 끔, 쪽 넘김 가능)로 표 문단을 만든다 — 결문 표가 통째로 다음 쪽으로 밀리지 않게 (Claude 10-14)."""
         from .compose import _rid
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="{page_break}" repeatHeader="0" '
-               f'rowCnt="{nrow}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bf}" noAdjust="0"><hp:sz width="{int(W)}" widthRelTo="ABSOLUTE" height="{int(H)}" heightRelTo="ABSOLUTE" protect="0"/>'
-               '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(f"<hp:tr>{r}</hp:tr>" for r in rows) + "</hp:tbl>")
-        return (f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-                f'<hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>')
+        tbl = X.tbl_xml(_rid(), bf, nrow, ncol, int(W), int(H), "".join(f"<hp:tr>{r}</hp:tr>" for r in rows), page_break=page_break, treat_as_char=0, in_margin=X.TBL_MARGIN)
+        return X.para_xml(self.para_pr("CENTER", 100, nxt=0), X.run_xml(self.char("맑은 고딕", 11.0), f"{tbl}<hp:t/>"))
 
     def _빈줄(self, pt):
         """고정 pt 간격 빈 문단."""

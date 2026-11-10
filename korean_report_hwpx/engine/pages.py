@@ -15,6 +15,7 @@ from xml.etree import ElementTree as ET
 from . import fit as F
 from . import compose as C
 from . import report as RP
+from . import xml as X
 
 WIDTHS = C.WIDTHS
 
@@ -411,7 +412,7 @@ def _cell_content_height(cell, paraPrs, charPrs, W, w=WIDTHS):
     if total_line_h == 0:
         return cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
 
-    last_h_char = int(last_max_pt * 100)
+    last_h_char = int(last_max_pt * X.PT)
     content_h = total_line_h - (last_line_h - last_h_char)
     return content_h + cell["cellMargin"]["top"] + cell["cellMargin"]["bottom"]
 
@@ -627,7 +628,7 @@ def _estimate_xml(header_xml, section_xml):
             # 첫 줄 체크: y + prev + h <= H?
             # 실제로 체크할 것은 y + prev + h_char <= H (h_char = 첫 줄의 글자 높이)
             # h_char = wrapped[0][1] * 100 (pt -> HWPUNIT)
-            h_char = int(wrapped[0][1] * 100)
+            h_char = int(wrapped[0][1] * X.PT)
 
             if y + prev + h_char > H:
                 # 새 쪽으로
@@ -636,7 +637,7 @@ def _estimate_xml(header_xml, section_xml):
 
             y += prev
             for li, (_, _, line_h) in enumerate(wrapped):
-                if li > 0 and y + int(wrapped[li][1] * 100) > H:
+                if li > 0 and y + int(wrapped[li][1] * X.PT) > H:
                     page += 1
                     y = 0
                     y += prev  # 새 쪽 맨 위에서도 prev 적용

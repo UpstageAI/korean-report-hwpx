@@ -3,6 +3,7 @@
 실물 HWPX의 lineseg(줄 시작 위치)로 폭 비율을 보정해 두고, 생성 시 문단마다 자간을 골라
 ① 줄 수를 최소로 ② 마지막 줄이 너무 짧지 않게(한두 어절 고아 줄 방지) 한다."""
 import re, unicodedata
+from .xml import PT
 
 # 글자 종류별 폭(em). 보정값은 calibrate()로 갱신
 W = {"hangul": 1.0, "space": 0.5, "digit": 0.5, "latin": 0.5, "upper": 0.62, "narrow": 0.3, "punct": 0.5, "wide": 1.0}
@@ -28,7 +29,7 @@ SP_PROP = True   # 자간을 글자 폭에 비례로 적용(한글 실측 줄 �
 
 def width(s, pt, spacing, ratio=100, w=W):
     """글자 폭 합(HWPUNIT). 자간은 글자 폭의 spacing% (SP_PROP) — 한글 2020 맥 실측 lineseg 대조로 정함."""
-    em = pt * 100  # HWPUNIT (1pt = 100)
+    em = pt * PT  # HWPUNIT (1pt = 100)
     g = lambda c: w.get(kind(c), w.get("narrow", 0.35) if kind(c) == "middot" else 0.5)
     if SP_PROP: return sum(em * g(c) * ratio / 100 * (1 + spacing / 100) for c in s)
     return sum(em * (g(c) * ratio / 100 + spacing / 100) for c in s)
