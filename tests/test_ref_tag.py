@@ -1,11 +1,6 @@
 """문장 끝 '붙임 N'·'참고 N' 표시는 앞 글자와 상관없이 상자로 그린다(명사형 종결이 '~가동', '~확대'여도). 작성 Mia(윤승미)"""
-import re, sys, zipfile
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine")]
-import report as R  # noqa: E402
+import re, zipfile
+from korean_report_hwpx.engine import report as R
 
 
 def _sec(doc, tmp_path):

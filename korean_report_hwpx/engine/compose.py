@@ -11,8 +11,8 @@
   logo_path·slogan_path를 주면 그 자리에 그림을 넣는다."""
 import copy, html, json, random, re, struct
 from pathlib import Path
-import fit as F
-import blank as B
+from . import fit as F
+from . import blank as B
 
 PUA = re.compile("[\U000F0000-\U000FFFFD-]")
 PUA_MAP = {"\U000f007e": "☞ ", "\U000f02b1": "①", "\U000f02b2": "②", "\U000f02b3": "③"}  # 한컴 전용 문자 → 표준 문자, 나머지는 제거

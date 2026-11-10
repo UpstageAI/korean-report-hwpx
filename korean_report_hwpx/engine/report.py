@@ -8,8 +8,8 @@
 import copy
 import re
 
-import blank as B
-import compose as C
+from . import blank as B
+from . import compose as C
 
 ROOT = C.ROOT
 COMMON = "공통"

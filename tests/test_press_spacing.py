@@ -105,7 +105,7 @@ def test_no_blank_line_before_caption_heading_appendix(tmp_path):
 
 
 def test_spacing_rules_read_once():
-    import compose as C
+    from korean_report_hwpx.engine import compose as C
     src = Path(C.__file__).read_text("utf-8")
     body = src[src.index("    def item(self"):src.index("    RATIOS")]
     assert "_문단위간격.json" not in body   # 문단마다 파일을 읽지 않는다(모듈 또는 인스턴스에서 한 번)

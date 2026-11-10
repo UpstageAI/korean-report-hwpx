@@ -1,7 +1,7 @@
 """가상 원고(sample_release)로 전 기관 생성: 열림·예시 번호 외 전화번호 0건·그림 0건."""
 import re, zipfile
 import pytest
-import compose as C
+from korean_report_hwpx.engine import compose as C
 from sample_release import SAMPLE
 from test_sanitize import PHONE, ALLOWED_PHONES
 

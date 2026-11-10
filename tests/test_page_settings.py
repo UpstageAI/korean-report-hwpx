@@ -101,7 +101,7 @@ def test_wide_official_table_fits(tmp_path):
 
 
 def test_blank_page_settings_helper():
-    import blank as B
+    from korean_report_hwpx.engine import blank as B
     assert B.page_settings("") == D
     p = B.page_settings("과학기술정보통신부")
     for k in KEYS: assert abs(p[k] - tpl_page("과학기술정보통신부")[k]) <= 0

@@ -1,7 +1,7 @@
 """줄 나눔·정규화 회귀 확인. 작성 Mia(윤승미)"""
 import re, zipfile
-import compose as C
-import report as RP
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine import report as RP
 from sample_release import SAMPLE
 
 

@@ -14,8 +14,8 @@ import json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "korean_report_hwpx" / "engine"))
-from hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from korean_report_hwpx.engine.hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
 
 APPX = re.compile(r"^[\s<〈《\[［【(「]*(참\s*고|붙\s*임|별\s*첨)\s*(\d{0,2})\s*[>〉》\]］】)」.:：]?")
 CONTACT = re.compile(r"담당\s*부서|책임자|담당자")

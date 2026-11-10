@@ -2,11 +2,10 @@
 문제 문단(단어 중간 끊김 / 마지막 줄이 너무 짧음)마다 자간 후보(0~-10)를 실제 한글 줄 배치로 시험하고 가장 깔끔한 값을 고른다.
 문단끼리는 독립이라 한 번 배치에 여러 문단의 후보를 동시에 시험한다.
 - macOS + 한컴오피스 한글 필요. Windows·리눅스에서는 polish=True여도 다듬기 없이 생성만 수행."""
-import re, sys, platform
+import re, platform
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
-from hwpx_doc import Hwpx
-import compose as C
+from .hwpx_doc import Hwpx
+from . import compose as C
 
 IS_MAC = platform.system() == "Darwin"
 
@@ -34,7 +33,7 @@ def polish(org, doc, dst, max_rounds=12, log=print, build=None, **kw):
         build = build or C.compose
         c = build(org, doc, dst, **kw)
         return dst, {}, {}
-    import hancom
+    from . import hancom
     build = build or C.compose   # 보고서는 report.compose
     override, best, tried = {}, {}, {}
     for r in range(max_rounds):

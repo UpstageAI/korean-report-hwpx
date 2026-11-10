@@ -1,10 +1,10 @@
 """규칙 JSON 캐시(blank.load_json) — 공개 로더는 같은 값·다른 객체를 돌려주고, 돌려받은 것을 고쳐도 다음 호출에 새지 않는다. 작성 Claude"""
 import pytest
 
-import blank as B
-import compose as C
-import official as O
-import report as RP
+from korean_report_hwpx.engine import blank as B
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine import official as O
+from korean_report_hwpx.engine import report as RP
 
 LOADERS = {
     "press_rules": lambda: C.load_rules("행정안전부"),

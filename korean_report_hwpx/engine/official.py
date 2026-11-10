@@ -3,10 +3,10 @@
 서식 값: rules_official/_공통.json에서만 읽는다(코드 상수 금지)."""
 import copy, html, re
 
-import blank as B
-import compose as C
-from compose import Composer
-from report import _strip_existing_number  # 항목 번호 접두사 제거 — report.py 한 곳에서만 정의
+from . import blank as B
+from . import compose as C
+from .compose import Composer
+from .report import _strip_existing_number  # 항목 번호 접두사 제거 — report.py 한 곳에서만 정의
 
 ROOT = C.ROOT
 
@@ -449,7 +449,7 @@ class OfficialComposer(Composer):
 
     def _표블록(self, rows, nrow, ncol, W, H, bf, page_break="CELL"):
         """compose.table과 같은 배치(글자처럼 취급 끔, 쪽 넘김 가능)로 표 문단을 만든다 — 결문 표가 통째로 다음 쪽으로 밀리지 않게 (Claude 10-14)."""
-        from compose import _rid
+        from .compose import _rid
         tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="{page_break}" repeatHeader="0" '
                f'rowCnt="{nrow}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bf}" noAdjust="0"><hp:sz width="{int(W)}" widthRelTo="ABSOLUTE" height="{int(H)}" heightRelTo="ABSOLUTE" protect="0"/>'
                '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'

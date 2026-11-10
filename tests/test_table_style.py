@@ -1,11 +1,7 @@
 """보고서 표 선·음영 — 기준: 공무원 보도·보고 문서 실측(과기정통부 2026-10-29 보도자료 표). 작성 Mia(윤승미)
 위·아래 바깥선 굵게(0.5mm), 머리 행 아래 이중선, 안쪽 선 얇게(0.12mm), 좌우 바깥선 없음, 머리 행만 옅은 회색(#F2F2F2)."""
-import re, sys, zipfile
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine")]
-import report as R  # noqa: E402
+import re, zipfile
+from korean_report_hwpx.engine import report as R
 
 ROWS = [["구분", "내용", "일정"], ["가나다", "라마바사 아자차카", "11월"], ["라마바", "사아자차 카타파", "12월"], ["사아자", "차카타파", "1월"]]
 

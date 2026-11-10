@@ -3,9 +3,9 @@ import re, zipfile
 
 import pytest
 
-import compose as C
-import report as R
-from hwpx_doc import Hwpx, balanced
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine import report as R
+from korean_report_hwpx.engine.hwpx_doc import Hwpx, balanced
 from sample_report import SAMPLE_REPORT as S
 from test_sanitize import PHONE, ALLOWED_PHONES, NAME_TITLE
 

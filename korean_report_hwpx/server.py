@@ -16,16 +16,14 @@
 import json
 import os
 import re
-import sys
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
 ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT / "engine"))
-import compose as C  # noqa: E402
-import report as RP  # noqa: E402
-import official as O  # noqa: E402 — _정규화날짜, _check_amount_needed, item_label 등
+from .engine import compose as C
+from .engine import report as RP
+from .engine import official as O  # _정규화날짜, _check_amount_needed, item_label 등
 
 PRESS_GUIDE = json.loads((ROOT / "guides" / "press_writing.json").read_text("utf-8"))
 
@@ -48,7 +46,7 @@ mcp = MCPServer(
 from mcp.server.mcpserver.exceptions import ToolError
 import functools
 
-import pages  # 분량 예측 (engine/ 디렉토리, sys.path에 추가됨)
+from .engine import pages  # 분량 예측
 
 
 class _InputError(ToolError, ValueError):
@@ -805,7 +803,7 @@ def _dst(ministry, title, out_path, doc_type):
 
 
 # 중복 정의 제거 — report.py에서 import
-from report import _strip_existing_number, _simplify_numbers, _add_table_numbers, _convert_table_titles, _unroll_table_merges  # noqa: F401
+from .engine.report import _strip_existing_number, _simplify_numbers, _add_table_numbers, _convert_table_titles, _unroll_table_merges  # noqa: F401
 
 
 def _norm_type(doc_type):
@@ -1214,21 +1212,21 @@ def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placehold
         if composed is not None:   # build_document가 분량 예측에 쓴 조립 결과 — 다시 조립하지 않고 저장만
             composed.save(dst)
         elif polish:
-            import polish as PL
+            from .engine import polish as PL
             PL.polish(ministry, doc, dst, log=lambda m: None, build=RP.compose, logo_path=logo_path or None, style=style, report_kind=report_kind)
         else:
             RP.compose(ministry, doc, dst, logo_path=logo_path or None, style=style, report_kind=report_kind)
     elif doc_type == "official":
         # 날짜 정규화는 build_document에서 이미 완료 (s_for_md용)
         if polish:
-            import polish as PL
+            from .engine import polish as PL
             PL.polish(ministry, doc, dst, log=lambda m: None, build=O.compose, logo_path=logo_path or None)
         else:
             O.compose(ministry, doc, dst, logo_path=logo_path or None)
     else:
         kw = dict(logo_path=logo_path or None, slogan_path=slogan_path or None, placeholder_contact=placeholder_contact)
         if polish:
-            import polish as PL
+            from .engine import polish as PL
             PL.polish(ministry, doc, dst, log=lambda m: None, **kw)
         else:
             C.compose(ministry, doc, dst, **kw)
@@ -1309,7 +1307,7 @@ def _number_official_body_for_md(s):
                 for i in range(lvl + 1, len(counters)):
                     counters[i] = 0
                 counters[lvl] += 1
-                from official import item_label
+                from .engine.official import item_label
                 new_b["text"] = f"{item_label(numbering[lvl], counters[lvl])}{_strip_existing_number(b.get('text', ''))}"
             if "body" in b:
                 new_b["body"] = _process(b.get("body", []))
