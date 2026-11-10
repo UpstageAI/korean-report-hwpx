@@ -7,8 +7,6 @@
 - 간소화 모드(style="simplified"): 제목 상자 없음(일반 제목 문단), 표 머리 음영 없음, 번호 자동 부여, 표 병합 금지."""
 import json
 import re
-import sys
-from pathlib import Path
 
 import blank as B
 import compose as C
@@ -92,21 +90,6 @@ class ReportComposer(C.Composer):
             self._add_internal_footer()
 
 
-    def _add_outline_numbering(self):
-        """간소화 모드: header.xml에 개요 번호(outline numbering) 정의 추가 (항목 3).
-        기본 paraPr(id=0)는 heading type="NONE" 유지 — OUTLINE은 번호 항목(l1~l4) paraPr에만 지정.
-        본문 텍스트에 이미 글자 번호("1. ", "가. " 등)가 있으므로 HWPX 개요 번호가 중복되지 않도록
-        para_pr()에서 heading_level이 지정된 paraPr만 OUTLINE으로 설정."""
-        outline_xml = (
-            '<hh:outlineNumber id="0">'
-            '<hh:numberingLevel level="0"><hh:startNumber value="1"/><hh:format format="1"/><hh:jumpStyle value="1"/></hh:numberingLevel>'
-            '<hh:numberingLevel level="1"><hh:startNumber value="1"/><hh:format format="가"/><hh:jumpStyle value="1"/></hh:numberingLevel>'
-            '<hh:numberingLevel level="2"><hh:startNumber value="1"/><hh:format format="1"/><hh:jumpStyle value="1"/></hh:numberingLevel>'
-            '<hh:numberingLevel level="3"><hh:startNumber value="1"/><hh:format format="가"/><hh:jumpStyle value="1"/></hh:numberingLevel>'
-            '</hh:outlineNumber>'
-        )
-        self.header = re.sub(r'(</hh:refList>)', outline_xml + r'\1', self.header)
-
     def _add_internal_footer(self):
         """내부 결재 보고서용 footer 추가: 페이지 하단 가운데 '- N -' 형식."""
         footer_xml = (
@@ -164,30 +147,12 @@ class ReportComposer(C.Composer):
         return self.p(pid, [(self.char(L_["font"], pt), "")])
 
     # ── 보고서 머리 ──
-    def box_char(self, **kw):
-        tb = self.R["title_box"]
-        return self.ch({"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0), "bold": bool(tb.get("bold")), **kw})
-
     def title_box(self, doc):
         """제목 상자: 1행 1칸 표, 위·아래 굵은 선(기관 상자 색), 제목 서체(상자 라벨 서체) +4pt 가운데.
         간소화 모드(style="simplified"): 제목 상자 없이 일반 제목 문단으로 표시.
-        내부 결재 보고서(report_kind="internal"): 1×3 라벨 칸 없이 제목만 있는 단순 상자."""
+        내부 결재 보고서(report_kind="internal")도 같은 상자(라벨 칸 없음)."""
         if self.style == "simplified":
             return self._simplified_title(doc)
-        if self.report_kind == "internal":
-            return self._internal_title_box(doc)
-        tb = self.R["title_box"]; width = self.text_w - 200
-        spec, lines = self.fit_title(doc.get("title") or "", {"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0) + 4,
-                                                             "bold": False, "spacing": -3}, width - 1700)
-        cp = self.ch(spec)
-        paras = "".join(self.p(self.para_pr("CENTER", 130), [(cp, ln)]) for ln in lines)
-        h = int(len(lines) * spec["pt"] * 130 + 1700)
-        bf = self.border_sides(("top", "bottom"), "0.5 mm", tb.get("fill") or "#000080")
-        cell = self.cell(0, 0, width, h, paras, bf, margin=(850, 850, 700, 700))
-        return self.tbl_para([cell], 1, 1, width, h, self.border(None, "NONE"))
-
-    def _internal_title_box(self, doc):
-        """내부 결재 보고서 제목 상자: 라벨 칸 없이 제목만, HY헤드라인M, 위·아래 선."""
         tb = self.R["title_box"]; width = self.text_w - 200
         spec, lines = self.fit_title(doc.get("title") or "", {"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0) + 4,
                                                              "bold": False, "spacing": -3}, width - 1700)
@@ -358,73 +323,6 @@ class ReportComposer(C.Composer):
             return re.sub(r'borderFillIDRef="[^"]*"', f'borderFillIDRef="{bf}"', tc_xml, count=1)
         return re.sub(r'<hp:tc\b[^>]*>.*?</hp:tc>', cell_repl, tbl_xml, flags=re.S)
 
-    def _unroll_table_merges(self, rows):
-        """간소화 모드: 표 셀 병합이 있으면 같은 값을 행마다 반복하도록 풀어 쓴다.
-        병합 셀은 {'text': '값', 'merge': {'row': N, 'col': M}} 형식.
-        row=N은 세로 병합 행 수, col=M은 가로 병합 열 수."""
-        if not rows: return rows
-        nrows = len(rows)
-        ncol = max(len(r) for r in rows)
-        # 병합 정보: (ri, ci) -> (rowspan, colspan, text)
-        merges = {}
-
-        for ri, row in enumerate(rows):
-            for ci, cell in enumerate(row):
-                if isinstance(cell, dict) and cell.get("merge"):
-                    merge = cell["merge"]
-                    rowspan = merge.get("row", 1)
-                    colspan = merge.get("col", 1)
-                    text = cell.get("text", "")
-                    merges[(ri, ci)] = (rowspan, colspan, text)
-
-        # 병합을 풀어서 각 행에 값 채우기
-        result = []
-        for ri in range(nrows):
-            row_data = rows[ri]
-            new_row = []
-            for ci in range(ncol):
-                cell = row_data[ci] if ci < len(row_data) else ""
-                if isinstance(cell, dict) and cell.get("merge"):
-                    # 병합 시작 위치: 해당 텍스트 사용
-                    new_row.append(cell.get("text", ""))
-                elif isinstance(cell, dict):
-                    new_row.append(cell.get("text", ""))
-                else:
-                    # 일반 셀 또는 병합 대상 위치
-                    val = str(cell) if cell else ""
-                    if not val:
-                        # 위쪽 병합 확인
-                        for look_ri in range(ri - 1, -1, -1):
-                            if (look_ri, ci) in merges:
-                                rowspan, colspan, text = merges[(look_ri, ci)]
-                                if ri < look_ri + rowspan:
-                                    val = text
-                                    break
-                            # 중간에 일반 값이 있으면 중단
-                            if look_ri < len(rows) and ci < len(rows[look_ri]):
-                                c = rows[look_ri][ci]
-                                if not (isinstance(c, dict) and c.get("merge")):
-                                    if isinstance(c, dict):
-                                        if c.get("text"): break
-                                    elif str(c) if c else "": break
-                    if not val:
-                        # 왼쪽 병합 확인
-                        for look_ci in range(ci - 1, -1, -1):
-                            if (ri, look_ci) in merges:
-                                rowspan, colspan, text = merges[(ri, look_ci)]
-                                if ci < look_ci + colspan:
-                                    val = text
-                                    break
-                            if look_ci < len(row_data):
-                                c = row_data[look_ci]
-                                if not (isinstance(c, dict) and c.get("merge")):
-                                    if isinstance(c, dict):
-                                        if c.get("text"): break
-                                    elif str(c) if c else "": break
-                    new_row.append(val)
-            result.append(new_row)
-        return result
-
 
 # 기존 번호 접두사 제거용 정규식: 텍스트 앞에 이미 붙은 번호(Ⅰ. 1. 가. 1) 가) 등)를 제거
 _EXISTING_NUMBER_RE = re.compile(
@@ -506,7 +404,6 @@ def _simplify_numbers(s):
         else:  # level >= 4: 가)
             counters[4] += 1
             return f"{_gajja_for(counters[4])}) "
-        return ""
 
     def _process_body(body):
         result = []
@@ -568,6 +465,97 @@ def _add_table_numbers(s):
     return s
 
 
+# server.build_document·pages._build_temp_hwpx 공용 — 표 제목 키를 caption 블록으로
+def _convert_table_titles(s):
+    """table 블록의 title/caption 키를 caption 블록으로 변환.
+    table.title 또는 table.caption이 있으면 표 바로 앞에 caption 블록을 삽입하고
+    table 블록에서는 해당 키를 제거한다. 모든 스타일(standard·internal·simplified)에서
+    표 제목이 자동으로 출력되도록 한다."""
+    def _process_body(body):
+        result = []
+        for b in body:
+            if b.get("type") == "table" and (b.get("title") or b.get("caption")):
+                title = b.pop("title", None) or b.pop("caption", "")
+                result.append({"type": "caption", "text": title})
+            result.append(dict(b))
+            if "body" in b:
+                b["body"] = _process_body(b["body"])
+        return result
+
+    s = dict(s)
+    s["body"] = _process_body(s.get("body") or [])
+    s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
+    return s
+
+
+def _unroll_table_merges(rows):
+    """간소화 모드(보고서·기안문 마크다운 공용): 표 셀 병합이 있으면 같은 값을 행마다 반복하도록 풀어 쓴다.
+    병합 셀은 {'text': '값', 'merge': {'row': N, 'col': M}} 형식.
+    row=N은 세로 병합 행 수, col=M은 가로 병합 열 수."""
+    if not rows: return rows
+    nrows = len(rows)
+    ncol = max(len(r) for r in rows)
+    # 병합 정보: (ri, ci) -> (rowspan, colspan, text)
+    merges = {}
+
+    for ri, row in enumerate(rows):
+        for ci, cell in enumerate(row):
+            if isinstance(cell, dict) and cell.get("merge"):
+                merge = cell["merge"]
+                rowspan = merge.get("row", 1)
+                colspan = merge.get("col", 1)
+                text = cell.get("text", "")
+                merges[(ri, ci)] = (rowspan, colspan, text)
+
+    # 병합을 풀어서 각 행에 값 채우기
+    result = []
+    for ri in range(nrows):
+        row_data = rows[ri]
+        new_row = []
+        for ci in range(ncol):
+            cell = row_data[ci] if ci < len(row_data) else ""
+            if isinstance(cell, dict) and cell.get("merge"):
+                # 병합 시작 위치: 해당 텍스트 사용
+                new_row.append(cell.get("text", ""))
+            elif isinstance(cell, dict):
+                new_row.append(cell.get("text", ""))
+            else:
+                # 일반 셀 또는 병합 대상 위치
+                val = str(cell) if cell else ""
+                if not val:
+                    # 위쪽 병합 확인
+                    for look_ri in range(ri - 1, -1, -1):
+                        if (look_ri, ci) in merges:
+                            rowspan, colspan, text = merges[(look_ri, ci)]
+                            if ri < look_ri + rowspan:
+                                val = text
+                                break
+                        # 중간에 일반 값이 있으면 중단
+                        if look_ri < len(rows) and ci < len(rows[look_ri]):
+                            c = rows[look_ri][ci]
+                            if not (isinstance(c, dict) and c.get("merge")):
+                                if isinstance(c, dict):
+                                    if c.get("text"): break
+                                elif str(c) if c else "": break
+                if not val:
+                    # 왼쪽 병합 확인
+                    for look_ci in range(ci - 1, -1, -1):
+                        if (ri, look_ci) in merges:
+                            rowspan, colspan, text = merges[(ri, look_ci)]
+                            if ci < look_ci + colspan:
+                                val = text
+                                break
+                        if look_ci < len(row_data):
+                            c = row_data[look_ci]
+                            if not (isinstance(c, dict) and c.get("merge")):
+                                if isinstance(c, dict):
+                                    if c.get("text"): break
+                                elif str(c) if c else "": break
+                new_row.append(val)
+        result.append(new_row)
+    return result
+
+
 def compose(org, doc, dst, override=None, logo_path=None, style="standard", report_kind="standard", **kw):
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
@@ -582,11 +570,11 @@ def compose(org, doc, dst, override=None, logo_path=None, style="standard", repo
         doc["body"] = [dict(b) for b in doc.get("body", [])]
         for b in doc["body"]:
             if b.get("type") == "table":
-                b["rows"] = c._unroll_table_merges(b.get("rows", []))
+                b["rows"] = _unroll_table_merges(b.get("rows", []))
         for a in doc.get("appendix", []):
             a = dict(a)
             a["body"] = [dict(b) for b in a.get("body", [])]
             for b in a["body"]:
                 if b.get("type") == "table":
-                    b["rows"] = c._unroll_table_merges(b.get("rows", []))
+                    b["rows"] = _unroll_table_merges(b.get("rows", []))
     c.build(doc, dst); return c

@@ -5,8 +5,6 @@
 - export_markdown: .md 파일 동시 출력
 - check_structure: 간소화 규칙 점검(번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과)
 """
-import json
-import re
 import sys
 import zipfile
 from pathlib import Path
@@ -210,7 +208,6 @@ class TestSimplifiedTableMerge:
         dst = tmp_path / "test.hwpx"
         # 표준 모드에서는 병합 셀 처리가 다를 수 있음 (간소화만 풀어씀)
         R.compose("", MERGED_TABLE_REPORT, dst, style="standard")
-        sec = zipfile.ZipFile(dst).read("Contents/section0.xml").decode()
         # 표준 모드는 병합 구문(cellSpan)이 있을 수 있음
         # 간소화 모드와 비교하여 검증
 
@@ -371,7 +368,7 @@ class TestSimplifiedCheckWarnings:
     def test_standard_mode_preserves_original_behavior(self, tmp_path):
         """표준 모드: 기존 동작 그대로 (간소화 규칙이 적용되지 않음)."""
         # 표준 모드에서는 번호 부여가 적용되지 않음
-        result = build_document(SIMPLE_REPORT, doc_type="report", style="standard", out_path=str(tmp_path / "test.hwpx"))
+        build_document(SIMPLE_REPORT, doc_type="report", style="standard", out_path=str(tmp_path / "test.hwpx"))
         sec = zipfile.ZipFile(tmp_path / "test.hwpx").read("Contents/section0.xml").decode()
         text = Hwpx.text(sec, True)
         # 표준 모드에서는 □ 기호가 사용됨
@@ -511,7 +508,6 @@ class TestSimplifiedCheckWarnings:
         assert 'outlineLevel=' not in sec
         # 출력 예: 생성된 paraPr 중 lineSpacing=200인 것 확인
         import re
-        paras = re.findall(r'<hh:paraPr id="(\d+)"[^>]*>.*?</hh:paraPr>', head, re.S)
         for pid, pxml in re.findall(r'<hh:paraPr id="(\d+)"[^>]*>(.*?)</hh:paraPr>', head, re.S):
             ls = re.search(r'lineSpacing type="PERCENT" value="(\d+)"', pxml)
             pv = re.search(r'<hc:prev value="(\d+)"', pxml)

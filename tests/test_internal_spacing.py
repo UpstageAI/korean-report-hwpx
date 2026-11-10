@@ -1,7 +1,6 @@
 """내부결재(report_kind="internal") 보고서 문단 위 간격 검증.
 SPEC_internal_fix7.md 3항 검증: 내부결재 샘플 생성 → 각 항목 문단의 paraPr prev 값 (□=1000, ○/-=500), 빈 gap 문단 수 0
 """
-import json
 import re
 import sys
 import zipfile
@@ -12,7 +11,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine"), str(Path(__file__).parent)]
 
 import report as R
-from hwpx_doc import Hwpx
 
 
 # ── 검증용 구조 ──

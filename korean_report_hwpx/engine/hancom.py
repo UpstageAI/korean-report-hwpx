@@ -1,8 +1,8 @@
 """맥 한컴 한글 제어 — 메뉴 클릭만 사용(키보드 입력 없음). 작성 Mia(윤승미)
-한 번 쓸 때마다: 한글 종료 → 문서 하나만 열기 → 창이 뜨고 맨 앞인지 확인 → '파일 > 저장하기' → 저장 확인 → 한글 종료.
-(맥 한글은 문서를 탭으로 쌓아 30개 제한에 걸리므로 매번 종료한다)
+한 번 쓸 때마다: 열린 문서 탭 모두 닫기 → 문서 하나만 열기 → 창이 뜨고 맨 앞인지 확인 → '파일 > 저장하기' → 저장 확인 → 문서 닫기.
+(한글 앱은 종료하지 않는다 — 재실행 시 한컴 계정 로그인 창이 뜸. 맥 한글은 문서를 탭으로 쌓아 30개 제한에 걸리므로 매번 닫는다)
 사용자가 맥을 쓰는 중(최근 90초 입력)이면 한글을 띄우지 않고 기다린다."""
-import os, re, subprocess, time, unicodedata, zipfile
+import re, subprocess, time, unicodedata, zipfile
 from pathlib import Path
 
 APP = "Hancom Office HWP"
@@ -32,16 +32,6 @@ def wait_idle(sec=90):
 
 def running():
     return subprocess.run(["pgrep", "-f", BIN], capture_output=True).returncode == 0
-
-
-def quit_app(timeout=30):
-    if not running(): return True
-    osa(f'tell application "{APP}" to quit')
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        if not running(): return True
-        time.sleep(1)
-    return False  # 저장 안 된 문서 확인창 등으로 안 닫힘 → 강제 종료하지 않음
 
 
 def front_name():
@@ -98,8 +88,4 @@ def capture(path, png, settle=3):
     time.sleep(settle)
     if front_name() != APP: close_docs(); raise RuntimeError("캡처 직전 다른 앱이 앞에 옴")
     subprocess.run(["screencapture", "-x", str(png)])
-    close_docs()
-
-
-def close_all():  # 이전 코드 호환
     close_docs()

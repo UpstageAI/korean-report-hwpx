@@ -303,7 +303,6 @@ class Composer:
             for j, bit in enumerate(re.split(r"(?<=\S)(\*{1,3})(?=[\s),.]|$)", part)):  # 문장 속 각주 표시 → 위첨자
                 if bit: segs.append((sup if j % 2 else (b if k % 2 else n), bit))
         # 간소화 모드: 개요(outline) 수준 지정 안 함 (6차 수정)
-        internal = getattr(self, "report_kind", "standard") == "internal"
         outline_level = None
         heading_level = None
         # 문단 위 간격(prev): 보도자료는 기관·전체 간격표 기관값→전체값, 보고서·기안문은 고정값
@@ -443,12 +442,6 @@ class Composer:
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         return self.p(self.para_pr("JUSTIFY", L_["line"]), [(self.char(L_["font"], pt), "")])
 
-    def gap_fixed(self, pt, prev=None):
-        """고정 pt 간격의 빈 문단. prev 지정 시 해당 prev 값의 paraPr 사용 (간격 조정용)."""
-        L_ = self.level("p" if self.R.get("style") == "para" else "l1")
-        pid = self.para_pr("JUSTIFY", L_["line"], prev=prev) if prev is not None else self.para_pr("JUSTIFY", L_["line"])
-        return self.p(pid, [(self.char(L_["font"], pt), "")])
-
     def _tiny_gap(self):
         """표·상자 뒤 5pt 빈 문단: 글자 크기 5pt, 줄 간격 100%, 문단 위·아래 0. (15차 Fix)"""
         pid = self.para_pr("JUSTIFY", 100, prev=0, nxt=0)
@@ -518,10 +511,8 @@ class Composer:
             ws = [int(w * k) for w in ws]
             ws[-1] += total - sum(ws)
         th = self.TH; hb, bb = self.border(th.get("fill")), self.border(None)
-        tpt = float(th.get("pt") or 11.0); ppc = int(tpt * 100)   # 글자 한 칸 폭(HWPUNIT) 추정
-        # 1번: 행 높이 = 셀 위·아래 여백(cellMargin top+bottom) + 글자 크기 × 줄 간격 × 줄 수
-        # 한 줄 기준 높이: tpt*100*1.3(줄간격130%) + 141(top) + 141(bottom)
-        line_h = int(tpt * 100 * 1.3) + 141 + 141   # 한 줄 셀 높이 (글자 높이 + 상하 여백)
+        tpt = float(th.get("pt") or 11.0)
+        # 행 높이 = 셀 위·아래 여백(cellMargin top+bottom 141) + 글자 크기 × 줄 간격(130%) × 줄 수
         cm = '<hp:cellMargin left="510" right="510" top="141" bottom="141"/>'   # 모든 행 동일 셀 여백
         trs = []
         H = 0
@@ -817,13 +808,6 @@ class Composer:
         return ws
 
     # ── 제목·부제 ──
-    def fit_spacing(self, text, spec, width):
-        spec = dict(DEFAULT_CHAR, **{k: v for k, v in (spec or {}).items() if v is not None})
-        w = WIDTHS.get(spec["font"]) or WIDTHS.get("바탕")
-        for sp in range(int(spec.get("spacing") or 0), -16, -1):
-            if F.width(text, float(spec["pt"]), sp, int(spec.get("ratio") or 100), w) <= width: return sp
-        return int(spec.get("spacing") or 0)
-
     def fit_title(self, text, spec, width):
         """제목 맞춤: ① 자간을 규칙 하한까지 ② 글자 크기를 규칙 크기의 80%까지 1pt씩 ③ 어절 경계에서 두 줄.
         반환 (spec, 줄 목록). 글자 폭은 widths.json 추정값에 12% 여유를 둔다(한글 실제 글꼴 대체 대비)."""

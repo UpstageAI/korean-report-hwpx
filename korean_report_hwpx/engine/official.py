@@ -2,53 +2,17 @@
 근거: 행정업무의 운영 및 혁신에 관한 규정 제7조④⑤⑥, 시행규칙 제2조·제4조·제6조(법제처 2026-01-01 시행본).
 서식 값: rules_official/_공통.json에서만 읽는다(코드 상수 금지)."""
 import html, json, re
-from pathlib import Path
 
 import blank as B
 import compose as C
 from compose import Composer
+from report import _strip_existing_number  # 항목 번호 접두사 제거 — report.py 한 곳에서만 정의
 
 ROOT = C.ROOT
 
 
 def _common():
     return json.loads((ROOT / "rules_official" / "_공통.json").read_text("utf-8"))
-
-
-# 본문용 항목 번호 접두사 제거 정규식 — report.py/_strip_existing_number와 동일
-_EXISTING_NUMBER_RE = re.compile(
-    r"^\s*"
-    r"(?:"
-    r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\."
-    r"|[1-9][0-9]?\."
-    r"|[가-힣]\."
-    r"|[1-9][0-9]?\)"
-    r"|[가-힣]\)"
-    r")"
-    r"\s*"
-)
-
-
-def _strip_existing_number(text):
-    """텍스트 앞에 이미 붙은 번호 접두사(Ⅰ. 1. 가. 1) 가) 등)를 제거."""
-    if not text:
-        return text
-    return _EXISTING_NUMBER_RE.sub("", text, count=1)
-
-
-# 간소화 모드 표 병합 풀어쓰기 — report.py의 ReportComposer._unroll_table_merges 재사용
-def _unroll_table_rows(rows):
-    """표 행의 병합 셀 풀어쓰기. 병합 dicts를 일반 문자열로 변환."""
-    if not rows:
-        return rows
-    from report import ReportComposer
-    rc = ReportComposer("")
-    rc.R, rc.L = rc.load("")
-    rc.header = C.B.header_xml()
-    rc.cache = {}
-    rc.text_w = rc.L.get("page", {}).get("width", 59528) - rc.L.get("page", {}).get("left", 5669) - rc.L.get("page", {}).get("right", 5669)
-    rc._seq = 7000000
-    return rc._unroll_table_merges(rows)
 
 
 _HANGUL_ORDER = "가나다라마바사아자차카타파하"
@@ -117,7 +81,7 @@ class OfficialComposer(Composer):
         out.extend(self._두문())
 
         # ── 본문 (항목 번호 자동 부여) ──
-        body_out, warnings = self._본문()
+        body_out = self._본문()
         out.extend(body_out)
 
         # ── 붙임 (마지막 줄에 "끝." 포함) ──
@@ -201,9 +165,8 @@ class OfficialComposer(Composer):
     # ── 본문 ──
 
     def _본문(self):
-        """body 블록을 렌더링하고 warnings(경고)를 반환."""
+        """body 블록을 렌더링. 금액 한글 병기 경고는 server.build_document가 _check_amount_needed로 낸다."""
         out = []
-        warnings = []
         numbering = self._body.get("numbering", ["1.", "가.", "1)", "가)", "(1)", "(가)", "①", "㉮"])
         counters = [0] * len(numbering)   # 각 번호 수준별 카운터
         indent = int(self._body.get("indent_per_level", 2))
@@ -242,10 +205,6 @@ class OfficialComposer(Composer):
                     lvl_map = {"l1": 0, "l2": 1, "l3": 2, "l4": 3, "l5": 4, "l6": 5}
                     lvl = lvl_map[typ]
                     text = _strip_existing_number(b.get("text", ""))
-                    # 금액 한글 병기 점검 (제2조②)
-                    text_raw = b.get("text", "")
-                    if _check_amount_needed(text_raw):
-                        warnings.append(f"금액 한글 병기 필요(시행규칙 제2조②): {text_raw.strip()}")
                     prefix = "" if (lvl == 0 and single_top) else _번호(lvl)   # 항목이 하나뿐이면 번호 없이
                     left = _왼쪽들여쓰기(lvl)
                     if prefix:
@@ -298,7 +257,7 @@ class OfficialComposer(Composer):
                     _process(b["body"])
 
         _process(self.doc.get("body", []))
-        return out, warnings
+        return out
 
     def _표(self, block):
         """table 블록 렌더링 (Composer.table 재사용)."""
@@ -418,7 +377,6 @@ class OfficialComposer(Composer):
         contact = self.doc.get("contact", {})
 
         # 1. sender 가운데 정렬 큰 글씨
-        s = self._org_r  # 오타로 self._org_r를 썼지만 sender 규칙이 별도로 없음 —sender는 _org_r와 동일 폰트라 가정
         # 실제 sender 규칙: _공통.json의 sender 키
         snd = self.R.get("sender", self._org_r)
         cp = self.ch({"font": snd.get("font"), "pt": float(snd.get("pt")), "bold": False})
@@ -498,84 +456,6 @@ class OfficialComposer(Composer):
                '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(f"<hp:tr>{r}</hp:tr>" for r in rows) + "</hp:tbl>")
         return (f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
                 f'<hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>')
-
-    def _결재란(self, approval):
-        """결재란: 첫 행에 기안자·검토자·결재권자 직위(마크+의견), 둘째 행에 서명(name 또는 빈 줄)."""
-        out = []
-        drafter = approval.get("drafter", {})
-        reviewers = approval.get("reviewers", [])
-        approver = approval.get("approver", {})
-        opinion_text = self._appr.get("opinion_text", "(의견 있음)")
-        pt = float(self._appr.get("pt", 11.0))
-        font = self._appr.get("font", "맑은 고딕")
-
-        # 첫 행: 직위
-        titles = []
-        titles.append(f"{drafter.get('mark', '')}{drafter.get('title', '')}")
-        for rv in reviewers:
-            r_title = rv.get("title", "")
-            r_opinion = opinion_text if rv.get("opinion") else ""
-            titles.append(f"{r_title}{r_opinion}")
-        titles.append(approver.get("title", ""))
-        title_line = "  ".join(t for t in titles if t)
-
-        # 둘째 행: 서명 (name이 있으면 표시, 없으면 빈 줄)
-        names = []
-        names.append(drafter.get("name", "") or "")
-        for rv in reviewers:
-            names.append(rv.get("name", "") or "")
-        names.append(approver.get("name", "") or "")
-        name_line = "  ".join(n for n in names if n)
-
-        cp = self.char(font, pt)
-        line = int(self._foot.get("line", 150))
-        pp = self.para_pr("JUSTIFY", line)
-        out.append(self.p(pp, [(cp, title_line)]))
-        if name_line:
-            out.append(self.p(pp, [(cp, name_line)]))
-        else:
-            # name이 모두 비어 있으면 빈 줄(서명 자리 표시 아님 — 빈 줄)
-            out.append(self.p(pp, [(cp, "")]))
-        return out
-
-    def _시행접수(self, doc_no):
-        """시행 {issue} ({issue_date}) [같은 줄 오른쪽 접수 {receive} ({receive_date})]."""
-        out = []
-        issue = doc_no.get("issue", "")
-        issue_date = _정규화날짜(doc_no.get("issue_date", ""))
-        receive = doc_no.get("receive", "")
-        receive_date = _정규화날짜(doc_no.get("receive_date", ""))
-        fl = self._foot
-        txt_issue = f"{fl.get('issue', '시행')}  {issue} ({issue_date})"
-        if receive:
-            txt_receive = f"{fl.get('receive', '접수')}  {receive} ({receive_date})"
-            combined = f"{txt_issue}     {txt_receive}"
-        else:
-            combined = txt_issue
-        cp = self.char(fl.get("font", "맑은 고딕"), float(fl.get("pt", 11.0)))
-        line = int(fl.get("line", 150))
-        pp = self.para_pr("JUSTIFY", line)
-        out.append(self.p(pp, [(cp, combined)]))
-        return out
-
-    def _주소연락처(self, contact):
-        """우 {zip}  {address}  /  {homepage}  다음 줄 전화번호 {phone}  팩스번호 {fax}  /  {email}  /  {disclosure}."""
-        out = []
-        fl = self._foot
-        cp = self.char(fl.get("font", "맑은 고딕"), float(fl.get("pt", 11.0)))
-        line = int(fl.get("line", 150))
-        sep = fl.get("sep", "  /  ")
-
-        # 우 {zip}  {address}  /  {homepage}
-        addr = f"{fl.get('zip', '우')} {contact.get('zip', '')}  {contact.get('address', '')}  /  {contact.get('homepage', '')}"
-        pp1 = self.para_pr("JUSTIFY", line)
-        out.append(self.p(pp1, [(cp, addr)]))
-
-        # 전화번호 {phone}  팩스번호 {fax}  /  {email}  /  {disclosure}
-        cnt = f"{fl.get('phone', '전화번호')} {contact.get('phone', '')}  {fl.get('fax', '팩스번호')} {contact.get('fax', '')}  /  {contact.get('email', '')}  /  {contact.get('disclosure', '')}"
-        pp2 = self.para_pr("JUSTIFY", line)
-        out.append(self.p(pp2, [(cp, cnt)]))
-        return out
 
     def _빈줄(self, pt):
         """고정 pt 간격 빈 문단."""

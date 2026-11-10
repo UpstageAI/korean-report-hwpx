@@ -52,20 +52,6 @@ def wrap(text, pt, spacing, first_w, rest_w, ratio=100, w=W, keep_word=True):
     return lines
 
 
-def choose_spacing(text, pt, base, first_w, rest_w, ratio=100, lo=-8, hi=3, keep_word=True):
-    """후보 자간 중 (줄 수 최소, 마지막 줄 충분히 참, 원래 자간에 가까움) 순으로 고른다."""
-    best = None
-    for s in range(base + lo, base + hi + 1):
-        if s < -10: continue
-        ls = wrap(text, pt, s, first_w, rest_w, ratio, keep_word=keep_word)
-        lw = rest_w if len(ls) > 1 else first_w
-        fill = width(ls[-1].rstrip(), pt, s, ratio) / lw
-        orphan = len(ls) > 1 and fill < 0.30
-        key = (len(ls), orphan, abs(s - base) + (0 if s <= base else 0.5))
-        if best is None or key < best[0]: best = (key, s, ls)
-    return best[1], best[2]
-
-
 def calibrate(samples, grid=None):
     """samples: [(text, pt, spacing, ratio, first_w, rest_w, 실제 줄 시작 위치 목록)] → 맞춘 비율 W와 일치율."""
     import itertools
