@@ -43,3 +43,14 @@ def test_acronyms_not_stripped():
         assert SV._strip_existing_number(t) == t, t
     for t, want in (("XIII. 가나다", "가나다"), ("XIV. 가나다", "가나다"), ("XX. 가나다", "가나다"), ("XXXIX. 가나다", "가나다")):
         assert SV._strip_existing_number(t) == want, t
+
+
+def test_official_strips_extended_roman(tmp_path):
+    """기안문 HWPX·마크다운도 report.py의 같은 정규식을 쓴다 — Ⅺ.·XIII. 접두사가 지워진 뒤 1. 2.가 붙는다."""
+    from sample_official import SAMPLE_OFFICIAL
+    doc = dict(SAMPLE_OFFICIAL, body=[{"type": "l1", "text": "Ⅺ. 가나다라"}, {"type": "l1", "text": "XIII. 마바사아"}])
+    r = SV.build_document(doc, doc_type="official", out_path=str(tmp_path / "o"), export_markdown=True)
+    t = re.sub(r"<[^>]+>", "", zipfile.ZipFile(r["hwpx"]).read("Contents/section0.xml").decode("utf-8"))  # 번호 뒤 <hp:tab/> 포함
+    md = Path(r["md"]).read_text("utf-8")
+    assert "Ⅺ." not in t and "XIII." not in t and "1.가나다라" in t and "2.마바사아" in t
+    assert "1. 가나다라" in md and "2. 마바사아" in md and "Ⅺ." not in md and "XIII." not in md

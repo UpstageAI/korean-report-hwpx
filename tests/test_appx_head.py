@@ -67,7 +67,7 @@ def test_rule_common_is_measured_mode():
 
 
 def test_topbottom_org_has_no_vertical_lines(tmp_path):
-    c = C.compose("과학기술정보통신부", SAMPLE, tmp_path / "a.hwpx")
+    C.compose("과학기술정보통신부", SAMPLE, tmp_path / "a.hwpx")
     z = zipfile.ZipFile(tmp_path / "a.hwpx"); h = z.read("Contents/header.xml").decode()
     tcs = re.findall(r'<hp:tc\b.*?</hp:tc>', _head_tbl(z.read("Contents/section0.xml").decode()), re.S)
     s = _sides(h, re.search(r'borderFillIDRef="(\d+)"', tcs[2]).group(1))

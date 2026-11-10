@@ -4,7 +4,6 @@ import json, re
 import pytest
 
 import compose as C
-import fit as F
 import report as R
 
 

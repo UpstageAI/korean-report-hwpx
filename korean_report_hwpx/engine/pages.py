@@ -247,23 +247,7 @@ def _build_temp_hwpx(structure, style, report_kind, ministry):
     if not s.get("date", "").strip():
         from datetime import date
         s["date"] = date.today().strftime("%Y. %m. %d.")
-    # build_document와 같게 _convert_table_titles 적용
-    def _convert_table_titles(s):
-        def _process_body(body):
-            result = []
-            for b in body:
-                if b.get("type") == "table" and (b.get("title") or b.get("caption")):
-                    title = b.pop("title", None) or b.pop("caption", "")
-                    result.append({"type": "caption", "text": title})
-                result.append(dict(b))
-                if "body" in b:
-                    b["body"] = _process_body(b["body"])
-            return result
-        s = dict(s)
-        s["body"] = _process_body(s.get("body") or [])
-        s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
-        return s
-    s = _convert_table_titles(s)
+    s = RP._convert_table_titles(s)   # build_document와 같게 표 제목 키 → caption 블록
     with tempfile.NamedTemporaryFile(suffix=".hwpx", delete=False) as tf:
         tmp_path = tf.name
     try:
@@ -639,7 +623,6 @@ def estimate(structure, style="standard", report_kind="standard", ministry=""):
                 continue
 
             # 첫 줄 체크: y + prev + h <= H?
-            first_h = wrapped[0][2]  # 첫 줄의 line_h (이미 line_h = h + 줄간격)
             # 실제로 체크할 것은 y + prev + h_char <= H (h_char = 첫 줄의 글자 높이)
             # h_char = wrapped[0][1] * 100 (pt -> HWPUNIT)
             h_char = int(wrapped[0][1] * 100)

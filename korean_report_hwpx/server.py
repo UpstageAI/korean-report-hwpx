@@ -15,7 +15,6 @@
 """
 import json
 import os
-import platform
 import re
 import sys
 from pathlib import Path
@@ -26,7 +25,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "engine"))
 import compose as C  # noqa: E402
 import report as RP  # noqa: E402
-import official as O  # noqa: E402 — _정규화날짜, _unroll_table_rows, _strip_existing_number 등
+import official as O  # noqa: E402 — _정규화날짜, _check_amount_needed, item_label 등
 
 PRESS_GUIDE = json.loads((ROOT / "guides" / "press_writing.json").read_text("utf-8"))
 
@@ -561,8 +560,7 @@ def _check_number_units(s, CK):
     for txt in text_blocks:
         if hit_count >= 3:
             break
-        # 블록마다 최대 1개
-        block_has_hit = False
+        # 블록마다 최대 1개(block_hit)
         # 숫자 토큰 찾기
         for m in re.finditer(r"(?<![\w.,’'‘])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?", txt):
             if hit_count >= 3 or id(txt) in block_hit:
@@ -807,29 +805,7 @@ def _dst(ministry, title, out_path, doc_type):
 
 
 # 중복 정의 제거 — report.py에서 import
-from report import _strip_existing_number, _simplify_numbers, _add_table_numbers  # noqa: F401
-
-
-def _convert_table_titles(s):
-    """table 블록의 title/caption 키를 caption 블록으로 변환.
-    table.title 또는 table.caption이 있으면 표 바로 앞에 caption 블록을 삽입하고
-    table 블록에서는 해당 키를 제거한다. 모든 스타일(standard·internal·simplified)에서
-    표 제목이 자동으로 출력되도록 한다."""
-    def _process_body(body):
-        result = []
-        for b in body:
-            if b.get("type") == "table" and (b.get("title") or b.get("caption")):
-                title = b.pop("title", None) or b.pop("caption", "")
-                result.append({"type": "caption", "text": title})
-            result.append(dict(b))
-            if "body" in b:
-                b["body"] = _process_body(b["body"])
-        return result
-
-    s = dict(s)
-    s["body"] = _process_body(s.get("body") or [])
-    s["appendix"] = [dict(a, body=_process_body(a.get("body") or [])) for a in s.get("appendix") or []]
-    return s
+from report import _strip_existing_number, _simplify_numbers, _add_table_numbers, _convert_table_titles, _unroll_table_merges  # noqa: F401
 
 
 def _norm_type(doc_type):
@@ -1306,31 +1282,21 @@ def _prepare_simplified_for_md(s, style="standard"):
     s_md["body"] = [dict(b) for b in s_md.get("body", [])]
     for b in s_md["body"]:
         if b.get("type") == "table":
-            b["rows"] = _unroll_table_rows(b.get("rows", []))
+            b["rows"] = _unroll_table_merges(b.get("rows", []))
     for a in s_md.get("appendix", []):
         a = dict(a)
         a["body"] = [dict(b) for b in a.get("body", [])]
         for b in a["body"]:
             if b.get("type") == "table":
-                b["rows"] = _unroll_table_rows(b.get("rows", []))
+                b["rows"] = _unroll_table_merges(b.get("rows", []))
     return s_md
 
 
 def _number_official_body_for_md(s):
     """기안문 body에 항목 번호(1. 가. 1) …)를 부여한 구조 복사본을 반환 (마크다운 export용).
     OfficialComposer._본문()과 동일한 번호 부여 로직을 따른다."""
-    import re as _re
     numbering = ["1.", "가.", "1)", "가)", "(1)", "(가)", "①", "㉮"]
     counters = [0] * len(numbering)
-
-    def _strip_num(text):
-        if not text:
-            return text
-        m = _re.match(
-            r"^\s*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]\.|[1-9][0-9]?\.|[가-힣]\.|[1-9][0-9]?\)|[가-힣]\))\s*",
-            text,
-        )
-        return text[m.end():] if m else text
 
     def _process(blocks):
         result = []
@@ -1343,7 +1309,7 @@ def _number_official_body_for_md(s):
                     counters[i] = 0
                 counters[lvl] += 1
                 from official import item_label
-                new_b["text"] = f"{item_label(numbering[lvl], counters[lvl])}{_strip_num(b.get('text', ''))}"
+                new_b["text"] = f"{item_label(numbering[lvl], counters[lvl])}{_strip_existing_number(b.get('text', ''))}"
             if "body" in b:
                 new_b["body"] = _process(b.get("body", []))
             result.append(new_b)
@@ -1386,12 +1352,10 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     # 기안문 날짜 정규화 (제7조⑤) — HWPX·마크다운 공통
     if t == "official":
         s = _normalize_official_dates(s)
-        # 금액 한글 병기 경고 (제2조②) — 본문 직접 점검
-        amt_re = re.compile(r"금\d|\d{1,3}(?:,\d{3})+원")
-        kr_re = re.compile(r"\(금[^\)]+원\)")
+        # 금액 한글 병기 경고 (제2조②) — 판정은 official._check_amount_needed 한 곳
         for b in s.get("body") or []:
             txt = b.get("text", "")
-            if txt and amt_re.search(txt) and not kr_re.search(txt):
+            if O._check_amount_needed(txt):
                 w.append(f"금액 한글 병기 필요(시행규칙 제2조②): {txt.strip()}")
     # press_release: kind 기본값 — 템플릿 머리 이름이 '보도참고자료'·'보도설명자료'인 기관도 '보도자료'로
     if t == "press_release":
@@ -1421,12 +1385,6 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
         md_path = _export_markdown(s_for_md, dst, "standard", t)
     if md_path: result["md"] = md_path
     return result
-
-
-def _unroll_table_rows(rows):
-    """표 행의 병합 셀 풀어쓰기 (간소화 모드용). 병합 dicts를 일반 문자열로 변환."""
-    if not rows: return rows
-    return O._unroll_table_rows(rows)
 
 
 def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
