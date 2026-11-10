@@ -2,9 +2,9 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![데모: Claude 앱(코워크)에 한 줄 요청 → 1쪽 보고서 + 붙임(HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
+![데모: 회의 메모 한 장 → 다른 기관 사례 조사 → 과장님 보고용 1쪽 보고서 + 교육 실시 계획 기안문(내부결재) 한글 파일](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
 
-<sub>영상: Claude 앱(코워크)에 "어제 국가AI전략위원회 3차 전체회의 결과를 과장님께 보고할 1쪽짜리 보고서로 만들어 줘" 요청 하나 → 기사 검색·정리 → 본문 1쪽 + 붙임 3개 한글 파일. **이 도구의 코드는 업스테이지 Solar Pro 4가 작성했습니다.**</sub>
+<sub>영상: Claude 앱(코워크)에 "회의메모 보고 다른 기관 AI 교육 사례 찾아서 과장님 보고용 1쪽 보고서 만들어 줘. 교육 실시 계획 기안문도 같이 한글 파일로 줘" 요청 하나 → 사례 표·우리 기관 계획 1쪽 보고서 + 그 보고서를 붙임으로 단 내부결재 기안문(예산 '금1,200,000원(금일백이십만원)' 한글 병기)까지(2026-11-08 공개, 회의 메모는 가상 예시). **이 도구의 코드는 업스테이지 Solar Pro 4가 작성했습니다.**</sub>
 
 > ⭐ 써 보시고 도움이 되셨다면 별 하나 눌러 주세요. 무료 공개를 계속 이어 가는 힘이 됩니다.
 

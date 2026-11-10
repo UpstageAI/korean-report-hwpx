@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
-![Demo: one request in the Claude app (Cowork) → 1-page report + attachments (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
+![Demo: one meeting memo → case research → 1-page report for the director + internal approval draft (HWPX)](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
 
 <sub>Demo: Claude app (Cowork) with this server. **The code of this tool is written by Upstage Solar Pro 4.**</sub>
 
