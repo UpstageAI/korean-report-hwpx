@@ -7,6 +7,7 @@ import functools
 import json
 import zipfile
 from pathlib import Path
+from . import xml as X
 
 NS = ('xmlns:ha="http://www.hancom.co.kr/hwpml/2011/app" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" '
       'xmlns:hp10="http://www.hancom.co.kr/hwpml/2016/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
@@ -41,11 +42,7 @@ def page_settings(org=""):
 
 
 def _border_fill(i, line="NONE", width="0.1 mm"):
-    side = lambda s: f'<hh:{s}Border type="{line}" width="{width}" color="#000000"/>'
-    return (f'<hh:borderFill id="{i}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">'
-            '<hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
-            + side("left") + side("right") + side("top") + side("bottom") +
-            '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/></hh:borderFill>')
+    return X.border_xml([(line, width, "#000000")] * 4, i=i)
 
 
 def _margin(k=1):

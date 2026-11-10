@@ -13,6 +13,7 @@ import copy, html, json, random, re, struct
 from pathlib import Path
 from . import fit as F
 from . import blank as B
+from . import xml as X
 
 PUA = re.compile("[\U000F0000-\U000FFFFD-]")
 PUA_MAP = {"\U000f007e": "☞ ", "\U000f02b1": "①", "\U000f02b2": "②", "\U000f02b3": "③"}  # 한컴 전용 문자 → 표준 문자, 나머지는 제거
@@ -171,7 +172,7 @@ class Composer:
         key = ("c", face, pt, spacing, bold, color, ratio, sup)
         if key in self.cache: return self.cache[key]
         base = re.search(r'<hh:charPr id="%s"[^>]*>.*?</hh:charPr>' % self.base_char, self.header, re.S).group(0)
-        el = re.sub(r'height="\d+"', f'height="{int(pt * 100)}"', base, count=1)
+        el = re.sub(r'height="\d+"', f'height="{int(pt * X.PT)}"', base, count=1)
         el = re.sub(r'textColor="[^"]+"', f'textColor="{color}"', el, count=1)
         el = re.sub(r"<hh:fontRef [^>]*/>", "<hh:fontRef " + " ".join(f'{l}="{self.font_id(face, l.upper())}"' for l in LANGS) + "/>", el)
         el = re.sub(r"<hh:spacing [^>]*/>", "<hh:spacing " + " ".join(f'{l}="{spacing}"' for l in LANGS) + "/>", el)
@@ -230,11 +231,7 @@ class Composer:
     def border(self, fill=None, line="SOLID", width="0.12 mm", color="#000000"):
         key = ("b", fill, line, width, color)
         if key in self.cache: return self.cache[key]
-        f = f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else ""
-        side = lambda s: f'<hh:{s}Border type="{line}" width="{width}" color="{color}"/>'
-        el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/>'
-              '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>' + side("left") + side("right") + side("top") + side("bottom") +
-              '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>' + f + "</hh:borderFill>")
+        el = X.border_xml([(line, width, color)] * 4, fill)
         self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
 
     def prefix_hang(self, lv):
@@ -250,13 +247,13 @@ class Composer:
             prefix = " " * L_["lead"]; hang = 0
         elif simplified and lv not in ("note", "ref"):
             prefix = " " * L_["lead"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+            hang = int(round((0.5 * L_["lead"] + 0.5 * max(1, L_["gap"])) * L_["pt"] * X.PT))
         elif simplified and lv in ("note", "ref"):
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * X.PT))
         else:
             prefix = " " * L_["lead"] + L_["mark"] + " " * max(1, L_["gap"])
-            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * 100))
+            hang = int(round((0.5 * L_["lead"] + MARK_W.get(L_["mark"], 1.0) + 0.5 * max(1, L_["gap"])) * L_["pt"] * X.PT))
         return prefix, hang
 
     # ── 문단 ──
@@ -286,7 +283,7 @@ class Composer:
         self._seq += 1; pno = str(self._seq)
         ov = self.override.get(pno)
         ov = list(ov) if isinstance(ov, (tuple, list)) else ([ov, 100] if ov is not None else None)
-        tail = ("\u3000" + "가" * -(-3386 // int(L_["pt"] * 100))) if ref_tag else ""   # 참고 표시 자리(빈칸+상자 폭)
+        tail = ("\u3000" + "가" * -(-3386 // int(L_["pt"] * X.PT))) if ref_tag else ""   # 참고 표시 자리(빈칸+상자 폭)
         m_lab = HEAD_LABEL.match(text)   # 문단 앞머리 라벨 '(목적)' 등: 기호처럼 자간 0·장평 100 고정
         label = m_lab.group(0) if m_lab else ""
         if label: text = text[len(label):]; plain = plain[len(label):]
@@ -378,13 +375,8 @@ class Composer:
         ws = dict(sides) if isinstance(sides, dict) else {s: width for s in sides}
         key = ("bs", tuple(sorted(ws.items())), color, fill)
         if key in self.cache: return self.cache[key]
-        f = f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else ""
         wc = lambda s: ws[s] if isinstance(ws[s], tuple) else (ws[s], color)   # 변별 (굵기, 색)
-        side = lambda s: (f'<hh:{s}Border type="SOLID" width="{wc(s)[0]}" color="{wc(s)[1]}"/>' if s in ws
-                          else f'<hh:{s}Border type="NONE" width="0.1 mm" color="#000000"/>')
-        el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/>'
-              '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>' + "".join(side(s) for s in ("left", "right", "top", "bottom")) +
-              '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>' + f + "</hh:borderFill>")
+        el = X.border_xml([("SOLID", *wc(s)) if s in ws else ("NONE", "0.1 mm", "#000000") for s in X.SIDES], fill)
         self.cache[key] = self._add("borderFills", "borderFill", el); return self.cache[key]
 
     HEAD_LINES = {"box": ("left", "right", "top", "bottom"), "topbottom": ("top", "bottom"), "bottom": ("bottom",), "none": ()}
@@ -399,13 +391,13 @@ class Composer:
         """참고·붙임 쪽 머리(원본 실측 형태): 1행 3칸 표 = 라벨 칸(기관 색 바탕·흰 글자) | 좁은 간격 칸(위아래 선 없음) | 제목 칸.
         제목 칸 선은 기관 실측(공통: 네 변 가는 선, 과기정통부 등: 위아래만, 관세청 등: 아래만). 간격 칸이 라벨과 제목을 떼어 놓는다."""
         A = self.appx_rule(); lb, hd = A["label"], A["heading"]
-        tw = self.text_w - 200; ratio = A["ratio"] if A.get("cols", 3) == 3 else [A["ratio"][0], 0.016, 1 - A["ratio"][0] - 0.016]
+        tw = self.text_w - X.TEXT_PAD; ratio = A["ratio"] if A.get("cols", 3) == 3 else [A["ratio"][0], 0.016, 1 - A["ratio"][0] - 0.016]
         mm = lambda v: f"{float(v):g} mm"
         fill = lb.get("fill"); lpt = float(lb.get("pt") or 16.0); lfont = lb.get("font") or "HY헤드라인M"
         wd = WIDTHS.get(lfont) or WIDTHS["바탕"]
         w1 = max(int(tw * ratio[0]), int(F.width(label, lpt, 0, 100, wd) * 1.15 + 600))   # 라벨이 한 줄에 들어가게
         w2 = max(400, int(tw * ratio[1])); w3 = tw - w1 - w2
-        h = int(max(lpt, float(hd.get("pt") or 16.0)) * 100 * 1.25 + 800)
+        h = int(max(lpt, float(hd.get("pt") or 16.0)) * X.PT * 1.25 + 800)
         lab_cp = self.char(lfont, lpt, 0, bool(lb.get("bold")), (lb.get("color") or "#FFFFFF") if fill else "#000000")
         head_spec, _ = self.fit_title(heading, {"font": hd.get("font") or "HY헤드라인M", "pt": float(hd.get("pt") or 16.0), "bold": bool(hd.get("bold"))}, w3 - 900)
         head_cp = self.ch(head_spec)
@@ -415,7 +407,7 @@ class Composer:
         bf3 = self.border_sides({s: hw for s in hs})
         bf2 = self.border_sides({**({"left": (lw, fill or "#000000")} if lw else {}), **({"right": (hw, "#000000")} if "left" in hs else {})}) if (lw or "left" in hs) else self.border(None, "NONE")
         c1 = self.cell(0, 0, w1, h, self.p(self.para_pr("CENTER", 100), [(lab_cp, label)]), bf1)
-        c2 = self.cell(1, 0, w2, h, self.p(self.para_pr("CENTER", 100), [(self.char("바탕", 10.0), "")]), bf2, margin=(0, 0, 0, 0))
+        c2 = self.cell(1, 0, w2, h, self.p(self.para_pr("CENTER", 100), [(self.char("바탕", 10.0), "")]), bf2, margin=X.NO_MARGIN)
         c3 = self.cell(2, 0, w3, h, self.p(self.para_pr("LEFT", 100), [(head_cp, heading)]), bf3, margin=(566, 141, 141, 141))
         tbl = self.tbl_para([c1 + c2 + c3], 1, 3, tw, h, self.border(None, "NONE"), align="LEFT")
         tbl = re.sub(r'(<hp:p\b[^>]*?)pageBreak="0"', r'\1pageBreak="1"', tbl, count=1)   # 새 쪽에서 시작
@@ -430,9 +422,8 @@ class Composer:
                 f'<hp:rotationInfo angle="0" centerX="{w // 2}" centerY="{h // 2}" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>'
                 '<hp:lineShape color="#000000" width="33" style="SOLID" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" headfill="1" tailfill="1" headSz="MEDIUM_MEDIUM" tailSz="MEDIUM_MEDIUM" outlineStyle="NORMAL" alpha="0"/>'
                 '<hc:fillBrush><hc:winBrush faceColor="#F9F7F1" hatchColor="#000000" alpha="0"/></hc:fillBrush><hp:shadow type="NONE" color="#B2B2B2" offsetX="0" offsetY="0" alpha="0"/>'
-                f'<hp:drawText lastWidth="{w}" name="" editable="0"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
-                f'<hp:p id="0" paraPrIDRef="{pp}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{cp}"><hp:t>{esc(label)}</hp:t></hp:run></hp:p></hp:subList>'
-                '<hp:textMargin left="141" right="141" top="141" bottom="141"/></hp:drawText>'
+                f'<hp:drawText lastWidth="{w}" name="" editable="0">{X.sublist_xml(X.para_xml(pp, X.run_xml(cp, f"<hp:t>{esc(label)}</hp:t>")))}'
+                f'<hp:textMargin left="{X.CELL_MARGIN}" right="{X.CELL_MARGIN}" top="{X.CELL_MARGIN}" bottom="{X.CELL_MARGIN}"/></hp:drawText>'
                 f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{w}" y="0"/><hc:pt2 x="{w}" y="{h}"/><hc:pt3 x="0" y="{h}"/><hp:sz width="{w}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/>'
                 '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
                 '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>사각형입니다.</hp:shapeComment></hp:rect>')
@@ -468,9 +459,9 @@ class Composer:
         rows = [[PUA.sub(lambda m: PUA_MAP.get(m.group(0), ""), str(c)) for c in r] for r in rows]
         if head is None: head = len(rows) > 1 and all(len(c.replace("\n", "")) <= 12 for c in rows[0]) and not all(len(r[0]) <= 8 and len(r) == 2 and len(r[1]) > 20 for r in rows)
         label_col = (not head) and max(len(r) for r in rows) >= 2 and all(len(r[0].replace("\n", "")) <= 8 for r in rows)
-        ncol = max(len(r) for r in rows); total = self.text_w - 200
+        ncol = max(len(r) for r in rows); total = self.text_w - X.TEXT_PAD
         # 칸 폭: 짧은 칸(날짜·법원·구분)은 내용 한 줄 폭만 주고, 남는 폭을 긴 글 칸에 글자 수 비례로 나눈다
-        ppc_ = int(float(self.TH.get("pt") or 11.0) * 100); pad = 1100
+        ppc_ = int(float(self.TH.get("pt") or 11.0) * X.PT); pad = 1100
         cells = [[str(r[c]) if c < len(r) else "" for r in rows] for c in range(ncol)]
         vlen = lambda t: sum(0.5 if ord(ch) < 0x1100 else 1.0 for ch in t)   # 숫자·영문·기호는 한글의 약 절반 폭
         maxlen = [max(max((vlen(ln) for ln in v.split("\n")), default=0) for v in col) for col in cells]
@@ -514,7 +505,6 @@ class Composer:
         th = self.TH; hb, bb = self.border(th.get("fill")), self.border(None)
         tpt = float(th.get("pt") or 11.0)
         # 행 높이 = 셀 위·아래 여백(cellMargin top+bottom 141) + 글자 크기 × 줄 간격(130%) × 줄 수
-        cm = '<hp:cellMargin left="510" right="510" top="141" bottom="141"/>'   # 모든 행 동일 셀 여백
         trs = []
         H = 0
         H_wrap = 0   # 줄바꿈(wrap)까지 넣은 표 높이 추정 — 쪽 나눔 방식 결정용
@@ -541,9 +531,9 @@ class Composer:
                     n_wrap += len(F.wrap(ln, tpt if is_head else min(tpt, 11.0), -2, cell_w, cell_w, 100, w))
                 # 셀 높이 = 셀 여백 + 글자 높이 × 줄 간격 × (명시적 줄바꿈 기준)
                 n_explicit = len(expl_lines)
-                cell_h = 141 + 141 + int(tpt * 100 * 1.3) * n_explicit
+                cell_h = 2 * X.CELL_MARGIN + int(tpt * X.PT * 1.3) * n_explicit
                 max_cell_h = max(max_cell_h, cell_h)
-                max_wrap_h = max(max_wrap_h, 141 + 141 + int(tpt * 100 * 1.3) * max(n_explicit, n_wrap))
+                max_wrap_h = max(max_wrap_h, 2 * X.CELL_MARGIN + int(tpt * X.PT * 1.3) * max(n_explicit, n_wrap))
                 row_cells.append((v, cp, ci, cell_h, is_head, num, is_date, n_wrap))
             cell_info.append((ri, row_cells))
             row_h = max_cell_h
@@ -574,23 +564,17 @@ class Composer:
                 ps = "".join(self.p(self.para_pr(align, 130), [(cp, ln)]) for ln in lines)
                 cw = ws[ci]
                 tcs.append((ps, cw, hb if is_head else bb, ci, cell_h))
-            cells_xml = "".join(
-                f'<hp:tc name="" header="{1 if (head and ri == 0) else 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
-                f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{ps}</hp:subList>'
-                f'<hp:cellAddr colAddr="{ci}" rowAddr="{ri}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{cw}" height="{cell_h}"/>'
-                f'{cm}</hp:tc>' for ps, cw, bf, ci, cell_h in tcs)
+            cells_xml = "".join(X.tc_xml(bf, ps, ci, ri, cw, cell_h, X.TBL_MARGIN, header=1 if (head and ri == 0) else 0, has_margin=0)   # 모든 행 동일 셀 여백
+                                for ps, cw, bf, ci, cell_h in tcs)
             trs.append(f"<hp:tr>{cells_xml}</hp:tr>")
         # 쪽 경계: 한 쪽 안에 넉넉히 들어가는 표(본문 높이의 1/3 이하)는 '나누지 않음' — 머리 줄만 앞 쪽 끝에 남고
         # 본문이 다음 쪽으로 넘어가는 일을 막는다(표 제목은 keepWithNext로 함께 넘어감). 긴 표만 줄 단위로 나눠 머리 줄 반복.
         brk = "NONE" if H_wrap <= self.SHORT_TABLE_H else "TABLE"
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="{brk}" repeatHeader="1" '
-               f'rowCnt="{len(rows)}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bb}" noAdjust="0"><hp:sz width="{sum(ws)}" widthRelTo="ABSOLUTE" height="{H}" heightRelTo="ABSOLUTE" protect="0"/>'
-               f'<hp:pos treatAsChar="{1 if brk == "NONE" else 0}" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="850"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>' + "".join(trs) + "</hp:tbl>")
+        tbl = X.tbl_xml(_rid(), bb, len(rows), ncol, sum(ws), H, "".join(trs), page_break=brk, repeat_header=1, treat_as_char=1 if brk == "NONE" else 0, out_bottom=850, in_margin=X.TBL_MARGIN)
         # 긴 표: 글자처럼 취급 끔 — 쪽을 넘겨 줄 단위로 이어지게. 짧은 표: 글자처럼 취급 — 본문 흐름 안의 한 덩어리로 통째로 넘어감
         # (떠 있는 표에 '나누지 않음'만 주면 표만 다음 쪽으로 가고 뒤 본문이 앞으로 올라와 순서가 바뀜 — 한글 실측)
         # 15차 Fix: 표 문단 next=0으로 변경, 대신 뒤따르는 5pt 빈 문단으로 간격 확보
-        tbl_para = f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100, nxt=0)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{self.char("맑은 고딕", 11.0)}">{tbl}<hp:t/></hp:run></hp:p>'
+        tbl_para = X.para_xml(self.para_pr("CENTER", 100, nxt=0), X.run_xml(self.char("맑은 고딕", 11.0), f"{tbl}<hp:t/>"))
         return tbl_para + self._tiny_gap()
 
     def box(self, lines):
@@ -599,12 +583,9 @@ class Composer:
         bf = self.border("#F2F2F2"); cp = self.char(L_["font"], L_["pt"] - 1, -2)
         ps = "".join(self.p(self.para_pr("JUSTIFY", 150), [(cp, ln)]) for ln in lines)
         h = int(len(lines) * (L_["pt"] - 1) * 150 + 1200)
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="0" rowCnt="1" colCnt="1" cellSpacing="0" borderFillIDRef="{bf}" noAdjust="0">'
-               f'<hp:sz width="{self.text_w - 200}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="850" right="850" top="566" bottom="566"/>'
-               f'<hp:tr><hp:tc name="" header="0" hasMargin="1" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{ps}</hp:subList>'
-               f'<hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="{self.text_w - 200}" height="{h}"/><hp:cellMargin left="850" right="850" top="566" bottom="566"/></hp:tc></hp:tr></hp:tbl>')
-        box_para = f'<hp:p id="0" paraPrIDRef="{self.para_pr("CENTER", 100)}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{cp}">{tbl}<hp:t/></hp:run></hp:p>'
+        w = self.text_w - X.TEXT_PAD
+        tbl = X.tbl_xml(_rid(), bf, 1, 1, w, h, f"<hp:tr>{X.tc_xml(bf, ps, 0, 0, w, h, X.BOX_MARGIN)}</hp:tr>", in_margin=X.BOX_MARGIN)
+        box_para = X.para_xml(self.para_pr("CENTER", 100), X.run_xml(cp, f"{tbl}<hp:t/>"))
         return box_para + self._tiny_gap()
 
     # ── 본문 조립 ──
@@ -637,7 +618,7 @@ class Composer:
                 out.append(self.appx_head(b["text"], b.get("heading", "")))
             elif t == "image":
                 bid, w, h = self.add_image(b["path"])
-                out.append(self.p_raw(self.para_pr("CENTER", 100), self.char("맑은 고딕", 10.0), self.picture(bid, w, h, min(b.get("width_mm", 150) * HU_MM, self.text_w - 200))))
+                out.append(self.p_raw(self.para_pr("CENTER", 100), self.char("맑은 고딕", 10.0), self.picture(bid, w, h, min(b.get("width_mm", 150) * HU_MM, self.text_w - X.TEXT_PAD))))
             prev = "box" if t == "box" else lv
 
     def heading(self, text, prev=None):
@@ -670,31 +651,22 @@ class Composer:
                 f'<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>그림입니다.</hp:shapeComment></hp:pic>')
 
     def p_raw(self, pid, cid, inner, page_break=False):
-        return (f'<hp:p id="0" paraPrIDRef="{pid}" styleIDRef="0" pageBreak="{int(page_break)}" columnBreak="0" merged="0">'
-                f'<hp:run charPrIDRef="{cid}">{inner}<hp:t/></hp:run></hp:p>')
+        return X.para_xml(pid, X.run_xml(cid, f"{inner}<hp:t/>"), int(page_break))
 
     # ── 머리·담당 표 공통 ──
     def ch(self, spec, **kw):
         s = dict(DEFAULT_CHAR); s.update({k: v for k, v in (spec or {}).items() if v is not None}); s.update(kw)
         return self.char(s["font"] or "바탕", float(s["pt"]), int(s.get("spacing") or 0), bool(s.get("bold")), s.get("color") or "#000000", int(s.get("ratio") or 100))
 
-    def cell(self, col, row, w, h, paras, bf, colspan=1, rowspan=1, margin=(141, 141, 141, 141)):
-        l, r, t, b = margin
-        return (f'<hp:tc name="" header="0" hasMargin="1" protect="0" editable="0" dirty="0" borderFillIDRef="{bf}">'
-                f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">{paras}</hp:subList>'
-                f'<hp:cellAddr colAddr="{col}" rowAddr="{row}"/><hp:cellSpan colSpan="{colspan}" rowSpan="{rowspan}"/><hp:cellSz width="{int(w)}" height="{int(h)}"/>'
-                f'<hp:cellMargin left="{l}" right="{r}" top="{t}" bottom="{b}"/></hp:tc>')
+    def cell(self, col, row, w, h, paras, bf, colspan=1, rowspan=1, margin=(X.CELL_MARGIN,) * 4):
+        return X.tc_xml(bf, paras, col, row, int(w), int(h), margin, colspan, rowspan)
 
     def tbl_para(self, rows, nrow, ncol, width, height, bf, align="CENTER"):
-        tbl = (f'<hp:tbl id="{_rid()}" zOrder="1" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="0" '
-               f'rowCnt="{nrow}" colCnt="{ncol}" cellSpacing="0" borderFillIDRef="{bf}" noAdjust="0"><hp:sz width="{int(width)}" widthRelTo="ABSOLUTE" height="{int(height)}" heightRelTo="ABSOLUTE" protect="0"/>'
-               f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="{align}" vertOffset="0" horzOffset="0"/>'
-               '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="141" right="141" top="141" bottom="141"/>'
-               + "".join(f"<hp:tr>{r}</hp:tr>" for r in rows) + "</hp:tbl>")
+        tbl = X.tbl_xml(_rid(), bf, nrow, ncol, int(width), int(height), "".join(f"<hp:tr>{r}</hp:tr>" for r in rows), align=align)
         return self.p_raw(self.para_pr(align, 100), self.char("바탕", 10.0), tbl)
 
     def fit_widths(self, ws):
-        tot = sum(ws); lim = self.text_w - 200
+        tot = sum(ws); lim = self.text_w - X.TEXT_PAD
         return [int(w * lim / tot) for w in ws] if tot > lim else [int(w) for w in ws]
 
     def title_gap(self):
@@ -787,7 +759,7 @@ class Composer:
             w = WIDTHS.get(ch["font"]) or F.W
             return F.width(txt_of(c), float(ch["pt"]), int(ch.get("spacing") or 0) if sp is None else sp, int(ch.get("ratio") or 100) if ra is None else ra, w) * 1.15 + 600
         ws = [float(c["w"]) for c in cs]; nd = [need(c) for c in cs]
-        lim = self.text_w - 200
+        lim = self.text_w - X.TEXT_PAD
         short = lambda: sum(max(0, nd[k] - ws[k]) for k in range(len(cs)))
         if short() > 0:
             room = [max(0, ws[k] - nd[k]) for k in range(len(cs))]
@@ -839,7 +811,7 @@ class Composer:
             out = [self.p(self.para_pr(t.get("align") or "CENTER", 130), [(self.ch(spec), ln)]) for ln in ls]
             out += [self.p(self.para_pr("CENTER", 130), [(self.ch(t["char"], pt=min(16.0, max(11.0, float(t["char"]["pt"]) - 6)), bold=False), s)]) for s in subs]
             return out
-        width = min(t.get("width", self.text_w), self.text_w - 200); rows = []; H = 0
+        width = min(t.get("width", self.text_w), self.text_w - X.TEXT_PAD); rows = []; H = 0
         for k, row in enumerate(t["rows"]):
             if row["role"] == "subtitle" and not subs: continue
             lines = [doc["title"]] if row["role"] == "title" else subs
@@ -852,7 +824,7 @@ class Composer:
             need = int(len(lines) * float(spec.get("pt", 12)) * 130 + 1400)
             has_sub_row = any(r["role"] == "subtitle" for r in t["rows"])
             h = max(row.get("h", 2000), need) if has_sub_row else need   # 부제 칸 없는 기관 서식 높이는 부제 포함 실물 값 → 제목만이면 내용 높이
-            rows.append(self.cell(0, len(rows), width, h, paras, bf, margin=(850, 850, 566, 566))); H += h
+            rows.append(self.cell(0, len(rows), width, h, paras, bf, margin=X.BOX_MARGIN)); H += h
         title_row = next((r for r in t["rows"] if r["role"] == "title"), None)
         if subs and title_row and not any(r["role"] == "subtitle" for r in t["rows"]):   # 부제 칸이 없는 기관: 제목 상자 안, 제목 아래에 '- 부제'(왼쪽, 내어쓰기)
             row = title_row
@@ -871,7 +843,7 @@ class Composer:
             b = row.get("border") or {}
             bf = self.border(row.get("fill"), b.get("line") or "SOLID", b.get("width") or "0.12 mm")
             h = int(len(lines) * tpt * 130 + nsub * sspec["pt"] * 130 + 1400)
-            return [self.tbl_para([self.cell(0, 0, width, h, paras, bf, margin=(850, 850, 566, 566))], 1, 1, width, h, self.border(None, "NONE"))]
+            return [self.tbl_para([self.cell(0, 0, width, h, paras, bf, margin=X.BOX_MARGIN)], 1, 1, width, h, self.border(None, "NONE"))]
         return [self.tbl_para(rows, len(rows), 1, width, H, self.border(None, "NONE"))]
 
     # ── 담당 표 ──
@@ -887,7 +859,7 @@ class Composer:
         L_ = self.L.get("contact") or {"widths": [6236, 15167, 6081, 5605, 5605, 9003], "row_h": 1800}
         # 칸 높이: 기관값이 글자 크기에 비해 과도하면(실물은 두 줄 이름 등) 글자 크기 기준 한 줄 + 여백으로 줄임
         cpt = float((L_.get("value_char") or L_.get("label_char") or DEFAULT_CHAR).get("pt") or 10.0)
-        h = int(min(max(L_.get("row_h", 1800), 1500), cpt * 100 * 1.6 + 700))
+        h = int(min(max(L_.get("row_h", 1800), 1500), cpt * X.PT * 1.6 + 700))
         n = len(people)
         ws = self.fit_widths(L_["widths"])
         line, lw = L_.get("line") or "SOLID", L_.get("line_width") or "0.12 mm"
@@ -921,7 +893,7 @@ class Composer:
         out.append(self.contact(doc))
         if self.slogan_path:   # 슬로건 그림(선택): 담당 표 아래 가운데
             bid, pw, ph = self.add_image(self.slogan_path)
-            out += [self.spacer(10.0), self.p_raw(self.para_pr("CENTER", 100), self.char("바탕", 10.0), self.picture(bid, pw, ph, (self.text_w - 200) * 0.9, 4000))]
+            out += [self.spacer(10.0), self.p_raw(self.para_pr("CENTER", 100), self.char("바탕", 10.0), self.picture(bid, pw, ph, (self.text_w - X.TEXT_PAD) * 0.9, 4000))]
         for k, a in enumerate(doc.get("appendix", []), 1):   # 참고·붙임: 담당 표 다음 새 쪽
             self.blocks([{"type": "appx_h", "text": a.get("title") or f"참고 {k}", "heading": a.get("heading", "")}] + a.get("body", []), out)
         out = [o for o in out if o]

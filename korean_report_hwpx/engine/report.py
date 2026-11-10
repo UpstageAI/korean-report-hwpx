@@ -10,6 +10,7 @@ import re
 
 from . import blank as B
 from . import compose as C
+from . import xml as X
 
 ROOT = C.ROOT
 COMMON = "공통"
@@ -95,13 +96,8 @@ class ReportComposer(C.Composer):
         footer_xml = (
             '<hh:footers itemCnt="1">'
             '<hp:footer id="0" applyPageType="BOTH">'
-            '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
-            'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
-            '<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-            '<hp:run charPrIDRef="0"><hp:t>- </hp:t></hp:run>'
-            '<hp:run charPrIDRef="0"><hp:ctrl><hp:pageNum pageNum="CURRENT" format="DIGIT"/></hp:ctrl></hp:run>'
-            '<hp:run charPrIDRef="0"><hp:t> -</hp:t></hp:run>'
-            '</hp:p></hp:subList></hp:footer></hh:footers>'
+            + X.sublist_xml(X.para_xml("0", X.run_xml("0", "<hp:t>- </hp:t>") + X.run_xml("0", '<hp:ctrl><hp:pageNum pageNum="CURRENT" format="DIGIT"/></hp:ctrl>') + X.run_xml("0", "<hp:t> -</hp:t>")))
+            + '</hp:footer></hh:footers>'
         )
         self.header = re.sub(r'(</hh:refList>)', footer_xml + r'\1', self.header)
 
@@ -143,7 +139,7 @@ class ReportComposer(C.Composer):
             return None
         L_ = self.level("p" if self.R.get("style") == "para" else "l1")
         # pt를 prev 값으로 반영한 paraPr 사용 (간격 옵션이 paraPr의 prev로 반영됨)
-        pid = self.para_pr("JUSTIFY", L_["line"], prev=int(pt * 100))
+        pid = self.para_pr("JUSTIFY", L_["line"], prev=int(pt * X.PT))
         return self.p(pid, [(self.char(L_["font"], pt), "")])
 
     # ── 보고서 머리 ──
@@ -153,7 +149,7 @@ class ReportComposer(C.Composer):
         내부 결재 보고서(report_kind="internal")도 같은 상자(라벨 칸 없음)."""
         if self.style == "simplified":
             return self._simplified_title(doc)
-        tb = self.R["title_box"]; width = self.text_w - 200
+        tb = self.R["title_box"]; width = self.text_w - X.TEXT_PAD
         spec, lines = self.fit_title(doc.get("title") or "", {"font": tb.get("font") or "HY헤드라인M", "pt": float(tb.get("pt") or 16.0) + 4,
                                                              "bold": False, "spacing": -3}, width - 1700)
         cp = self.ch(spec)
@@ -277,16 +273,7 @@ class ReportComposer(C.Composer):
             b_def = (btype(bottom), bwidth(bottom)) if bottom != "NONE" else ("NONE", "0.1 mm")
             l_def = (btype(left), bwidth(left)) if left != "NONE" else ("NONE", "0.1 mm")
             r_def = (btype(right), bwidth(right)) if right != "NONE" else ("NONE", "0.1 mm")
-            el = ('<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">'
-                  '<hh:slash type="NONE" Crooked="0" isCounter="0"/>'
-                  '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
-                  f'<hh:leftBorder type="{l_def[0]}" width="{l_def[1]}" color="#000000"/>'
-                  f'<hh:rightBorder type="{r_def[0]}" width="{r_def[1]}" color="#000000"/>'
-                  f'<hh:topBorder type="{t_def[0]}" width="{t_def[1]}" color="#000000"/>'
-                  f'<hh:bottomBorder type="{b_def[0]}" width="{b_def[1]}" color="#000000"/>'
-                  '<hh:diagonal type="NONE" width="0.1 mm" color="#000000"/>'
-                  + (f'<hc:fillBrush><hc:winBrush faceColor="{fill}" hatchColor="#999999" alpha="0"/></hc:fillBrush>' if fill else "") +
-                  '</hh:borderFill>')
+            el = X.border_xml([(*d, "#000000") for d in (l_def, r_def, t_def, b_def)], fill)
             _bf_cache[key] = self._add("borderFills", "borderFill", el)
             return _bf_cache[key]
         OUTER_TOP = "OUTER_TOP"; OUTER_BOTTOM = "OUTER_BOTTOM"; HEADER_BOTTOM = "HEADER_BOTTOM"
