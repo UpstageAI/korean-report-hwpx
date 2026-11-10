@@ -5,7 +5,7 @@
 - 기관 미지정·규칙 없음: rules_report/_공통.json(기관 간 최빈값). 기관 미지정이면 기관명 칸은 비운다.
 - 본문은 항상 개조식(□ → ㅇ → - → *, ※), 소제목(Ⅰ. 추진 배경 등)은 "h".
 - 간소화 모드(style="simplified"): 제목 상자 없음(일반 제목 문단), 표 머리 음영 없음, 번호 자동 부여, 표 병합 금지."""
-import json
+import copy
 import re
 
 import blank as B
@@ -23,7 +23,7 @@ def ministries():
 
 
 def _common():
-    d = json.loads((ROOT / "rules_report/_공통.json").read_text("utf-8"))
+    d = copy.deepcopy(B.load_json(ROOT / "rules_report/_공통.json"))
     r = d["pooled"]; it = d.get("items", {})
     v = lambda k, dft: (it.get(k) or {}).get("value", dft)
     # 제목 상자·표 머리는 기관별 최빈값의 기관 간 최빈값(일치율 표: refs/보고서_서식_규칙.md 2절)
@@ -45,7 +45,7 @@ def resolve(org):
 def load_rules(org):
     key, _ = resolve(org)
     base = _common()
-    r = json.loads((ROOT / f"rules_report/{key}.json").read_text("utf-8")) if key != COMMON else json.loads(json.dumps(base))
+    r = copy.deepcopy(B.load_json(ROOT / f"rules_report/{key}.json")) if key != COMMON else copy.deepcopy(base)
     r["_base"] = base
     r["style"] = "box"   # 보고서는 개조식(기관 보고서 구간이 문단식이어도 □ㅇ- 로)
     for k in ("title_box", "table_head"):
@@ -222,7 +222,8 @@ class ReportComposer(C.Composer):
                       [(hc, text.strip("* "))], outline_level=None)
 
     # ── 조립 ──
-    def build(self, doc, dst):
+    def render(self, doc):
+        """문서를 조립해 self.section(본문 XML)·self.preview를 채운다. 저장은 save() — 분량 예측이 저장 전 XML을 그대로 쓴다."""
         out = []
         if self.logo_path:   # 사용자가 준 로고(선택): 제목 상자 위 가운데, 높이 12mm 안
             bid, pw, ph = self.add_image(self.logo_path)
@@ -243,8 +244,14 @@ class ReportComposer(C.Composer):
         section = B.section_xml(out)
         prv = "\n".join(t for t in (re.sub(r"<[^>]+>", "", x.replace("<hp:nbSpace/>", " ")) for x in re.findall(r"<hp:t>(.*?)</hp:t>", section)) if t.strip())
         import html
-        B.save(dst, self.header, section, self.images, html.unescape(prv)[:1000], "보고서")
-        return dst
+        self.section, self.preview = section, html.unescape(prv)[:1000]
+        return self
+
+    def save(self, dst):
+        B.save(dst, self.header, self.section, self.images, self.preview, "보고서"); return dst
+
+    def build(self, doc, dst):
+        return self.render(doc).save(dst)
 
     def table(self, rows, head=None):
         """보고서 표: 위·아래 굵은 선(0.5mm), 머리 아래 이중선(DOUBLE_SLIM 0.7mm), 안쪽 선(0.12mm),
@@ -577,4 +584,6 @@ def compose(org, doc, dst, override=None, logo_path=None, style="standard", repo
             for b in a["body"]:
                 if b.get("type") == "table":
                     b["rows"] = _unroll_table_merges(b.get("rows", []))
-    c.build(doc, dst); return c
+    c.render(doc)
+    if dst: c.save(dst)   # dst 없으면 조립만(header·section) — 분량 예측 뒤 c.save(dst)
+    return c

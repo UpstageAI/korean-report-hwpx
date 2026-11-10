@@ -9,7 +9,7 @@
 - 표 = 머리행 굵게·음영·가운데, 숫자 오른쪽, 짧은 글 가운데, 긴 글 양쪽
 - 기관 로고·슬로건 그림은 넣지 않는다(정부상징 사용 규정). 로고 칸은 같은 크기의 '기관 로고' 자리표시로 두고,
   logo_path·slogan_path를 주면 그 자리에 그림을 넣는다."""
-import html, json, random, re, struct
+import copy, html, json, random, re, struct
 from pathlib import Path
 import fit as F
 import blank as B
@@ -53,15 +53,16 @@ def _rid(): return str(random.randint(10**8, 2 * 10**9 - 1))
 
 
 def load_rules(org):
-    base = json.loads((ROOT / "rules/_전체.json").read_text("utf-8"))
+    """기관 규칙(없으면 전체 규칙) + _base. 파일은 blank.load_json이 한 번만 읽고, 부르는 쪽이 고쳐 써도 되게 복사해서 준다."""
+    base = copy.deepcopy(B.load_json(ROOT / "rules/_전체.json"))
     f = ROOT / f"rules/{org}.json"
-    r = json.loads(f.read_text("utf-8")) if f.exists() else base
+    r = copy.deepcopy(B.load_json(f)) if f.exists() else base
     r["_base"] = base
     return r
 
 
 def load_layout(org):
-    return json.loads((ROOT / "templates" / f"{org}.json").read_text("utf-8"))
+    return copy.deepcopy(B.load_json(ROOT / "templates" / f"{org}.json"))
 
 
 def ministries():
@@ -91,7 +92,7 @@ class Composer:
         self.org = org; self.R, self.L = self.load(org); self.cache = {}
         self.override = {}; self.items = {}; self._seq = 7000000  # polish 루프용: 문단 번호 → 자간
         if self.PRESS_SPACING:
-            self._sp = json.loads((ROOT / "rules" / "_문단위간격.json").read_text("utf-8"))
+            self._sp = copy.deepcopy(B.load_json(ROOT / "rules" / "_문단위간격.json"))
         else:
             self._sp = None
         self.header = B.header_xml(); self.base_para = "0"; self.base_char = "0"
@@ -365,8 +366,8 @@ class Composer:
 
     def appx_rule(self):
         """참고·붙임 쪽 머리 규칙: rules_report/_참고머리.json(원본 보도자료 참고 구간 첫 표 실측) 공통값 + 기관값."""
-        d = json.loads((ROOT / "rules_report/_참고머리.json").read_text("utf-8"))
-        r = json.loads(json.dumps(d["common"])); o = d["orgs"].get((self.org or "").strip()) or {}
+        d = B.load_json(ROOT / "rules_report/_참고머리.json")
+        r = copy.deepcopy(d["common"]); o = copy.deepcopy(d["orgs"].get((self.org or "").strip()) or {})
         for k in ("cols", "ratio"):
             if k in o: r[k] = o[k]
         for part in ("label", "heading"): r[part].update(o.get(part) or {})

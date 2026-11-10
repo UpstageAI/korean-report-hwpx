@@ -1,7 +1,7 @@
 """기안문(별지 제1호서식) 생성기. 작성 Mia(윤승미)·Claude 2026-10-14.
 근거: 행정업무의 운영 및 혁신에 관한 규정 제7조④⑤⑥, 시행규칙 제2조·제4조·제6조(법제처 2026-01-01 시행본).
 서식 값: rules_official/_공통.json에서만 읽는다(코드 상수 금지)."""
-import html, json, re
+import copy, html, re
 
 import blank as B
 import compose as C
@@ -12,7 +12,7 @@ ROOT = C.ROOT
 
 
 def _common():
-    return json.loads((ROOT / "rules_official" / "_공통.json").read_text("utf-8"))
+    return copy.deepcopy(B.load_json(ROOT / "rules_official" / "_공통.json"))
 
 
 _HANGUL_ORDER = "가나다라마바사아자차카타파하"

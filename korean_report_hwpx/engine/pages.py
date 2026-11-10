@@ -440,32 +440,34 @@ def _page_body_metrics(page_pr):
     return H, W
 
 
-def estimate(structure, style="standard", report_kind="standard", ministry=""):
+def estimate(structure, style="standard", report_kind="standard", ministry="", xml=None):
     """보고서(doc_type report) 분량 예측.
 
     실제 생성 HWPX를 임시 파일로 만든 뒤 header.xml·section0.xml을 읽어 한글 배치 규칙대로
-    페이지를 쌓아 예측한다.
+    페이지를 쌓아 예측한다. xml=(header_xml, section_xml): 이미 조립한 보고서 XML(ReportComposer의 header·section)을
+    주면 임시 파일을 만들지 않고 그걸로 잰다(build_document가 저장할 문서를 한 번만 조립해 넘김).
     """
     if not structure.get("body"):
         return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
-    tmp_path = _build_temp_hwpx(structure, style, report_kind, ministry)
-    try:
-        header_xml, section_xml = _read_hwpx(tmp_path)
-    except Exception:
-        Path(tmp_path).unlink(missing_ok=True)
-        raise
+    if xml is None:
+        tmp_path = _build_temp_hwpx(structure, style, report_kind, ministry)
+        try:
+            xml = _read_hwpx(tmp_path)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+    return _estimate_xml(*xml)
 
+
+def _estimate_xml(header_xml, section_xml):
     charPrs = _parse_charPr(header_xml)
     paraPrs = _parse_paraPr(header_xml)
     page_pr = _parse_page_pr(section_xml)
     if not page_pr:
-        Path(tmp_path).unlink(missing_ok=True)
         return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
     H, W = _page_body_metrics(page_pr)
     if H <= 0:
-        Path(tmp_path).unlink(missing_ok=True)
         return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
     paragraphs = _parse_section(section_xml)
@@ -660,7 +662,6 @@ def estimate(structure, style="standard", report_kind="standard", ministry=""):
         마지막쪽_채움_y = 0
 
     if 본문_쪽수 == 0:
-        Path(tmp_path).unlink(missing_ok=True)
         return {"본문_쪽수": 0, "마지막쪽_채움": 0.0, "본문_줄수": 0, "전체_쪽수": 0}
 
     마지막쪽_채움 = round(마지막쪽_채움_y / H, 2)
@@ -671,7 +672,6 @@ def estimate(structure, style="standard", report_kind="standard", ministry=""):
     else:
         _, _, _, 전체_쪽수 = simulate(0, len(paragraphs))
 
-    Path(tmp_path).unlink(missing_ok=True)
     return {
         "본문_쪽수": 본문_쪽수,
         "마지막쪽_채움": 마지막쪽_채움,

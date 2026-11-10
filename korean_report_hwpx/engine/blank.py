@@ -3,6 +3,7 @@
 HWPX = zip(mimetype, version.xml, META-INF/*, Contents/content.hpf, Contents/header.xml, Contents/section0.xml, settings.xml, Preview/PrvText.txt, BinData/*).
 header.xml은 글꼴 1개·글자 모양 1개·문단 모양 1개·테두리 2개·스타일 1개만 둔 최소 구성이고,
 생성기(compose.Composer)가 규칙값에 따라 글자·문단·테두리 모양을 덧붙인다."""
+import functools
 import json
 import zipfile
 from pathlib import Path
@@ -23,13 +24,19 @@ ROOT = Path(__file__).resolve().parent.parent
 PAGE_DEFAULTS = json.loads((ROOT / "rules" / "_쪽설정.json").read_text("utf-8"))["default"]
 
 
+@functools.lru_cache(maxsize=None)
+def load_json(path):
+    """규칙·서식 JSON을 경로별로 한 번만 읽는다. 돌려주는 객체는 공유물 — 고치거나 바깥에 줄 때는 copy.deepcopy."""
+    return json.loads(Path(path).read_text("utf-8"))
+
+
 def page_settings(org=""):
     """쪽 설정(편집 용지) dict. org가 있고 templates/<org>.json이 있으면 그 page 값이 default를 덮어쓴다."""
     page = dict(PAGE_DEFAULTS)
     if org:
         tpl = ROOT / "templates" / f"{org}.json"
         if tpl.exists():
-            page.update(json.loads(tpl.read_text("utf-8")).get("page", {}))
+            page.update(load_json(tpl).get("page", {}))   # 값은 수치뿐 — 새 dict에 복사됨
     return page
 
 
