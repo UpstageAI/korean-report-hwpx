@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.5 (2026-11-10)
+
+보완 Claude(뼈대 Solar Pro 4). 통합 시나리오(공문서 3종)에서 나온 고칠 점 — 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일; 달라진 것은 기안문 예시의 날짜 오탐 경고 1건이 사라진 것뿐). 1002 테스트.
+
+- □(l1) '두괄식 한 문장' 점검이 공문서 날짜 표기 '2026. 11. 3.(화)'·'11. 2.'·''26. 10. 8.'·'2026. 11.'의 온점을 문장 끝으로 세던 오탐 수정(`_count_sentences`). 소수(3.5)·약어(p.·No.·etc.)·줄임표도 제외. '…했다. 그리고 …'처럼 진짜 두 문장은 그대로 경고하고, 문장 끝 뒤에 마침표 없는 절이 이어져도 한 문장으로 센다(끝의 '붙임 N' 꼬리표 제외).
+- 날짜 빈칸 규칙을 작성 가이드에 명시: 연·월·일 온점 뒤 빈칸 하나(행정안전부 공문서 작성법). 본문 문장의 날짜·숫자+단위 빈칸은 2026-10-08부터 줄 끝에서 갈라지지 않도록 묶음 빈칸(`<hp:nbSpace/>`)으로 저장해 왔고 한글 화면에는 '11. 3.(화)'로 보인다 — 태그만 떼는 텍스트 추출기에서 '11.3.(화)'처럼 보이는 것은 압축이 아님. 표 칸은 보통 빈칸 그대로(문서 XML 변경 없음, 테스트로 고정).
+- 기안문 입력 형태 검증: body를 문자열 목록으로, approval을 `{"drafter":"주무관 김철수","approver":"시장"}`처럼 납작하게, doc_no·contact를 문자열로 주면 check_structure·build_document가 스택 추적('Error executing tool') 대신 기대 형태(`{title, name, mark}`·`[{type, text}]` 등)와 example_official 위치를 적은 한국어 오류를 돌려준다. 납작한 approval이 check_structure를 통과하던 문제도 막음. 그 밖의 AttributeError도 스키마 안내 문구로.
+- 도구 설명: `get_writing_guide`에 doc_type 'official' 명시, `build_document`에 기안문 body·approval·doc_no·contact 하위 필드, `draft_press_structure`는 facts를 `dict | str`로 받고 facts_template 위치·한 줄 예시를 설명에 넣음. 산문을 주면 'Expecting value' 대신 template 위치를 안내.
+- `list_ministries`가 기관마다 TextContent 53개로 쪼개져 가던 것을 JSON 배열 하나(문자열)로.
+- 1쪽 보고서 안내 보강: 줄이는 문서가 아니라 꽉 채우는 문서(핵심 수치·표로 압축, 세부는 주요 내용마다 붙임, 항목 단순 삭제 금지). 기관 서식(예: 행정안전부)은 □ 전체가 제목 서체(HY헤드라인M)로 찍혀 **…** 강조가 드러나지 않으므로 키워드 강조만 원하면 공통 서식을 쓰라고 안내.
+
 ## 0.5.4 (2026-11-10)
 
 보완 Claude(뼈대 Solar Pro 4). 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일, 984 테스트).

@@ -74,6 +74,8 @@ def _tool():
                 return fn(*a, **kw)
             except (ValueError, TypeError, KeyError, FileNotFoundError, json.JSONDecodeError) as e:
                 raise _InputError(str(e)) from e
+            except AttributeError as e:   # 구조의 한 조각이 기대한 객체가 아닐 때(문자열·목록) — 스택 추적 대신 스키마 안내
+                raise _InputError(f"입력 형식 오류({e}) — 구조 JSON의 각 조각이 get_writing_guide(doc_type=...)의 schema·example과 같은 형태(객체/배열)인지 확인") from e
         return mcp.tool()(inner)
     return deco
 
@@ -97,7 +99,8 @@ COMMON_RULES = """[공통 규칙]
 - 약어·전문 용어·규모(예: PoC, 시상 규모) 같은 보충 설명은 문장 안에 늘어놓지 말고 단어 뒤 '*'(두 번째는 '**')와 바로 아래 note 블록으로 단다.
 - 표·통계·일정·세부 목록 같은 참고 자료는 appendix로 빼고, 본문 해당 문장 끝에 '참고 1'(보도자료) 또는 '붙임 1'(보고서)을 적는다.
 - 담당자·전화가 원고에 없으면 비운다(보도자료는 placeholder_contact=True면 '○○과 / 김○○ / 044-000-0000' 자리표시).
-- 날짜는 '2026. 10. 7.(수)', 시각은 '14:00'."""
+- 날짜는 '2026. 10. 7.(수)', 시각은 '14:00'. 연·월·일 뒤 온점 다음은 빈칸 하나(행정안전부 공문서 작성법, 영 제7조⑤) — '11.3.'처럼 붙여 쓰지 않는다.
+  본문 문장 안의 날짜·숫자+단위 빈칸은 줄 끝에서 갈라지지 않도록 묶음 빈칸(<hp:nbSpace/>)으로 저장되므로 한글 화면에는 '11. 3.(화)'로 보인다(태그만 떼는 텍스트 추출기에서는 '11.3.(화)'처럼 붙어 보일 수 있으나 압축한 것이 아님). 표 칸은 보통 빈칸 그대로."""
 
 REPORT_RULES = """[보고서(개조식) 규칙]
 - title: 보고서 제목 한 줄(예: '○○ 추진계획(안)', '○○ 현황 보고'). date: 원고에 작성일이 명시된 경우에만 '2026. 10. 7.' 형식으로 넣고, 없으면 ""(서버가 오늘 날짜로 채움). 날짜를 추정해 지어내지 않는다. dept: 작성 부서, 없으면 "".
@@ -221,7 +224,9 @@ ONE_PAGE_RULES = """[1쪽 보고서] 사용자가 "1쪽", "한 장", "1페이지
 - 본문에 다 못 담는 세부는 붙임으로 받친다: 주요 내용 하나당 붙임 하나(세부·표), 마지막 붙임은 출처(매체·제목·날짜). 본문 해당 □ 끝에 '붙임 N'을 적는다.
 - 시사점(조치 계획)은 우리 기관이 할 일을 기한과 함께 쓴다.
 - check_structure와 build_document에 target_pages=1을 넘겨 분량을 잰다. 돌려받은 '분량'(본문 쪽수·마지막 쪽 채움)과 경고를 보고, 넘치면 세부를 붙임으로 옮기고, 덜 차면 주요 내용 세부를 보강해 다시 만든다.
-- 끝내기 전에 보고받는 사람이 물을 질문 3개를 떠올려 본문이나 붙임에 답이 있는지 확인한다."""
+- 끝내기 전에 보고받는 사람이 물을 질문 3개를 떠올려 본문이나 붙임에 답이 있는지 확인한다.
+- 1쪽 보고서는 줄이는 문서가 아니라 꽉 채우는 문서다 — '본문이 1쪽을 넘음' 경고가 나오면 항목을 단순 삭제하지 말고, 본문은 핵심 수치·표로 압축하고 세부는 주요 내용마다 붙임으로 옮긴다.
+- 기관 서식(예: 행정안전부)은 □ 항목 전체가 제목 서체(HY헤드라인M, 굵게 보임)로 찍히는 규칙이라 **…** 키워드 강조가 드러나지 않는다. 키워드 강조만 원하면 ministry를 비워 공통 서식으로 만든다."""
 
 def guide_text(doc_type="report", ministry=None, style="standard"):
     t = _norm_type(doc_type)
@@ -242,7 +247,7 @@ def guide_text(doc_type="report", ministry=None, style="standard"):
 def get_writing_guide(doc_type: str = "report", ministry: str = "", style: str = "standard") -> dict:
     """원고를 공문서 구조 JSON으로 바꿀 때 지켜야 할 작성 규칙과 스키마·예시. build_document 전에 먼저 확인한다.
     보도자료를 쓸 때는 doc_type='press_release'와 ministry를 주면 작성 방법(리드·제목·인용·숫자·쉬운 말)과 사실 메모 양식, 기관별 가상 예시를 함께 준다.
-    doc_type: 'report'(보고서) | 'press_release'(보도자료) | 'auto'(둘 다 + 판단 기준). ministry: 기관 이름(선택).
+    doc_type: 'report'(보고서) | 'press_release'(보도자료) | 'official'(기안문·시행문, 별지 제1호서식 — 결재란·문서번호·연락처 스키마와 예시 포함) | 'auto'(보고서·보도자료 둘 다 + 판단 기준). ministry: 기관 이름(선택).
     style: 'standard'(기본, 기존 동작) | 'simplified'(간소화 모드 — 항목 번호 자동 부여, 제목 상자 없음, 표 머리 음영 없음, 표 제목 자동 번호, 서술식 허용)."""
     if style not in STYLES:
         raise ValueError(f"style은 'standard' 또는 'simplified': {style}")
@@ -288,14 +293,26 @@ def _walk(structure):
         for k, b in enumerate(ap.get("body") or []): yield f"appendix[{a}].body[{k}]", b
 
 
+def _block_shape_error(where, b, t):
+    """body 항목이 문자열 등 객체가 아닐 때 — 기대 형태를 적은 한국어 오류 문구(스택 추적 대신)."""
+    kinds = "l1~l6(1.·가.·1)·가)·(1)·(가) 자동 번호)·table·lines" if t == "official" else "h·l1·l2·l3·note·ref·caption·table"
+    shown = json.dumps(b, ensure_ascii=False)[:40]
+    return (f"{where}: body 항목은 {{\"type\": ..., \"text\": ...}} 객체여야 함(받은 값: {type(b).__name__} {shown}). "
+            f"type은 {kinds}. 예: [{{\"type\": \"l1\", \"text\": \"...\"}}, {{\"type\": \"l2\", \"text\": \"...\"}}] — get_writing_guide(doc_type='{t}')의 schema·example 참고")
+
+
 def _normalize(structure, t):
     """기호·대시·앞 공백 제거, 블록 형식 검증. (정리된 구조, 고칠 점) 반환. 원본은 바꾸지 않는다."""
     s = json.loads(json.dumps(structure or {})); w = []
+    if not isinstance(s.get("body", []), list):
+        raise ValueError(f"body는 블록 배열이어야 함(받은 값: {type(s['body']).__name__}) — get_writing_guide(doc_type='{t}')의 schema 참고")
     if not (s.get("title") or "").strip(): w.append("title(제목)이 비어 있음")
     elif len(s["title"]) > 40: w.append(f"제목이 깁니다({len(s['title'])}자) — 40자 안쪽 권장(긴 제목은 두 줄·축소됨)")
     s.setdefault("body", [])
     if not s["body"]: w.append("body가 비어 있음")
     for where, b in _walk(s):
+        if not isinstance(b, dict):
+            raise ValueError(_block_shape_error(where, b, t))
         typ = b.get("type")
         if typ not in ALL_TYPES: w.append(f"{where}: 알 수 없는 type '{typ}' (가능: {', '.join(ALL_TYPES)})"); continue
         if typ in TEXT_TYPES:
@@ -613,6 +630,27 @@ def _is_unit_ok(rest, r, CK):
     return False
 
 
+# 문장 수를 셀 때 마침표로 치지 않는 것: 공문서 날짜 '2026. 11. 3.(화)'·'11. 2.'·''26. 10. 8.'·'2026. 11.', 소수 '3.5', 약어 'p.'·'No.'·'etc.', 줄임표
+_NOT_SENTENCE_DOT = re.compile(
+    r"(?:\d{4}|'\d{2})\.\s?\d{1,2}\.\s?\d{1,2}\.(?:\([월화수목금토일]\))?"     # 2026. 11. 3.(화), '26. 10. 8.
+    r"|(?<![\d.])\d{1,2}\.\s?\d{1,2}\.(?:\([월화수목금토일]\))?"            # 11. 3.(화), 11. 2.
+    r"|(?:\d{4}|'\d{2})\.\s?\d{1,2}\.(?=[\s)~〜]|$)"                      # 2026. 11. (연·월)
+    r"|\d+\.\d+"                                                          # 소수
+    r"|(?<![A-Za-z])(?:[Pp]{1,2}|[Nn]o|[Vv]s|etc|e\.g|i\.e|cf|Dr|Mr|Ms|Jr|St)\."  # 약어
+    r"|…|\.{2,}")                                                           # 줄임표
+_SENTENCE_END = re.compile(r"(?:다|함|임|됨|음)\.(?:\s|$)|[.?!](?=\s+\S)")
+
+
+def _count_sentences(txt):
+    """□(l1) 두괄식 점검용 문장 수: 날짜·소수·약어·줄임표의 온점은 문장 끝으로 세지 않는다.
+    '…했다. 그리고 …'처럼 문장 끝 뒤에 마침표 없는 절이 이어지면 그 절도 한 문장으로 센다(끝의 '붙임 N'·'참고 N' 꼬리표는 제외)."""
+    t = re.sub(r"\s*(붙임|참고)\s?\d+\s*$", "", txt.strip())
+    t = _NOT_SENTENCE_DOT.sub("x", t)
+    n = len(_SENTENCE_END.findall(t))
+    if n and not re.search(r"[.?!][)\]」』”\"']*\**$", t): n += 1
+    return n
+
+
 def _style_warnings(s, t, style="standard"):
     w = []; prev = None
     rank = {"h": -1, "l1": 0, "l2": 1, "l3": 2}
@@ -625,7 +663,7 @@ def _style_warnings(s, t, style="standard"):
             prev = typ
         elif typ == "h": prev = None
         if typ == "l1" and style != "simplified":
-            n = len(re.findall(r"(?:다|함|임|됨|음)\.(?:\s|$)|[.?!](?=\s+\S)", txt.strip()))
+            n = _count_sentences(txt)
             if n >= 2: w.append(f"{where}: □(l1)는 두괄식 한 문장 — 문장이 {n}개")
         if t == "report" and style != "simplified" and typ in ("l1", "l2", "l3") and VERB_END.search(txt):
             w.append(f"{where}: 명사형 종결(~함·~임·~ 예정)이 아님: '…{txt.strip()[-12:]}'")
@@ -673,6 +711,10 @@ def _check_simplified_structure(s, t):
     return w
 
 
+_APPROVAL_SHAPE = ("approval 형태: {drafter: {title, name, mark:'★'|'⊙'|''}, reviewers: [{title, name, opinion:bool}], "
+                   "approver: {title, name}, coordinators: [{title}]} — get_writing_guide(doc_type='official')의 example_official 참고")
+
+
 def _validate_official(structure):
     """기안문 구조 필수 검증: 필수 키, to·disclosure 허용값, 결재란 drafter·approver 필수, attachments 문자열 목록.
     위반 시 Exception 발생 (check_structure 테스트용)."""
@@ -689,12 +731,27 @@ def _validate_official(structure):
     disclosure = (s.get("contact") or {}).get("disclosure", "")
     if disclosure and disclosure not in ("공개", "부분공개", "비공개"):
         raise ValueError(f"disclosure는 '공개'|'부분공개'|'비공개'만 허용: {disclosure}")
-    # approval 필수 키
+    # approval 필수 키·형태
     appr = s.get("approval") or {}
+    if not isinstance(appr, dict):
+        raise ValueError(f"기안문 approval은 객체여야 함(받은 값: {type(appr).__name__}) — {_APPROVAL_SHAPE}")
     if not appr.get("drafter"):
-        raise ValueError("기안문 approval.drafter(결재란 기안자) 누락")
+        raise ValueError(f"기안문 approval.drafter(결재란 기안자) 누락 — {_APPROVAL_SHAPE}")
     if not appr.get("approver"):
-        raise ValueError("기안문 approval.approver(결재권자) 누락")
+        raise ValueError(f"기안문 approval.approver(결재권자) 누락 — {_APPROVAL_SHAPE}")
+    for key in ("drafter", "approver"):
+        v = appr.get(key)
+        if not isinstance(v, dict) or not isinstance(v.get("title", ""), str):
+            raise ValueError(f"기안문 approval.{key}는 {{title, name{', mark' if key == 'drafter' else ''}}} 객체여야 함"
+                             f"(받은 값: {json.dumps(v, ensure_ascii=False)[:40]}) — '주무관 김철수'처럼 한 문자열로 주지 말고 직위와 이름을 나눈다. {_APPROVAL_SHAPE}")
+    for key, fields in (("reviewers", "{title, name, opinion}"), ("coordinators", "{title}")):
+        lst = appr.get(key) or []
+        if not isinstance(lst, list) or not all(isinstance(x, dict) for x in lst):
+            raise ValueError(f"기안문 approval.{key}는 {fields} 객체의 목록이어야 함(받은 값: {json.dumps(lst, ensure_ascii=False)[:40]}) — {_APPROVAL_SHAPE}")
+    for key, fields in (("doc_no", "{issue, issue_date, receive, receive_date}"), ("contact", "{zip, address, homepage, phone, fax, email, disclosure}")):
+        v = s.get(key)
+        if v not in (None, "") and not isinstance(v, dict):
+            raise ValueError(f"기안문 {key}는 {fields} 객체여야 함(받은 값: {json.dumps(v, ensure_ascii=False)[:40]}) — get_writing_guide(doc_type='official')의 example_official 참고")
     # attachments는 문자열 목록(선택이지만 형식 검증)
     atts = s.get("attachments") or []
     if not all(isinstance(a, str) for a in atts):
@@ -942,19 +999,28 @@ def _contact_to_struct(contact):
     return {"dept": dept, "people": out_people}
 
 
+_FACTS_HINT = ("facts는 산문이 아니라 사실 메모 JSON 객체(또는 그 문자열)여야 함 — 필드는 get_writing_guide(doc_type='press_release')의 "
+               "press_writing.facts_template(headline·release·who·when·what·background·points·numbers·plan·quote·appendix·contact 등). "
+               "예: {\"headline\": \"○○ 시행\", \"release\": \"2026. 11. 3.(화) 조간\", \"who\": \"○○부(장관 ○○○)\", \"when\": \"11월 3일(화)\", "
+               "\"what\": \"○○를 시행한다\", \"points\": [\"...\"], \"contact\": {\"dept\": \"○○과\", \"people\": [[\"담당자\", \"사무관\", \"김○○\", \"044-000-0000\"]]}}")
+
+
 @_tool()
-def draft_press_structure(facts, ministry=""):
-    """사실 메모(dict 또는 JSON 문자열)를 보도자료 구조 JSON 초안으로 옮긴다.
+def draft_press_structure(facts: dict | str, ministry: str = "") -> dict:
+    """사실 메모를 보도자료 구조 JSON 초안으로 옮긴다. facts는 산문이 아니라 JSON 객체(또는 그 문자열)이며,
+    필드는 get_writing_guide(doc_type='press_release')의 press_writing.facts_template을 따른다
+    (headline, release, who, when, what 또는 lead, background, points, numbers, plan, quote, appendix, contact; 설명·해명자료는 kind, issue, position, grounds).
+    예: {"headline": "○○ 시행", "release": "2026. 11. 3.(화) 조간", "who": "○○부(장관 ○○○)", "when": "11월 3일(화)", "what": "○○를 시행한다", "points": ["..."], "contact": {"dept": "○○과", "people": [["담당자", "사무관", "김○○", "044-000-0000"]]}}
     메모에 없는 문장·숫자·이름을 만들지 않는다. 붙이는 고정 말은 조사(은/는), “ ”라고, ”라며, “, 인용 동사, 표 머리 구분·수치·기준·비교, 주요 수치, 참고 N뿐이다."""
     if isinstance(facts, str):
         try:
             facts = json.loads(facts)
         except json.JSONDecodeError as e:
-            raise ValueError(f"facts는 dict 또는 JSON 문자열이어야 함: {e}") from e
+            raise ValueError(f"{_FACTS_HINT} (받은 값은 JSON이 아님: '{facts.strip()[:40]}…')") from e
         if not isinstance(facts, dict):
-            raise ValueError("facts는 dict 또는 JSON 문자열이어야 함: 파싱 결과가 dict가 아님")
+            raise ValueError(f"{_FACTS_HINT} (파싱 결과가 객체가 아니라 {type(facts).__name__})")
     if not isinstance(facts, dict):
-        raise ValueError("facts는 dict 또는 JSON 문자열이어야 함")
+        raise ValueError(f"{_FACTS_HINT} (받은 형식: {type(facts).__name__})")
 
     # 기관
     m = ministry or facts.get("ministry", "")
@@ -1234,8 +1300,9 @@ def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placehold
 
 
 @_tool()
-def list_ministries() -> list[dict]:
-    """지원 기관과 문서 종류별 지원 여부. 보고서: 기관 규칙(42곳) 또는 공통 규칙, 보도자료: 52개 기관, 기안문: rules_official/_공통.json.
+def list_ministries() -> str:
+    """지원 기관과 문서 종류별 지원 여부를 JSON 배열 하나(문자열)로 돌려준다: [{기관, 보고서, 보도자료, 기안문, 보도자료_본문방식}, ...].
+    보고서: 기관 규칙(42곳) 또는 공통 규칙, 보도자료: 52개 기관, 기안문: rules_official/_공통.json.
     보고서는 기관을 비우거나 '공통'으로 하면 기관 간 공통 서식으로 만든다. 기안문은 기관 지정 없이 공통 서식으로만 지원."""
     rep = set(RP.ministries()); out = []
     for o in C.ministries():
@@ -1244,7 +1311,7 @@ def list_ministries() -> list[dict]:
                     "보도자료_본문방식": "문단식" if r.get("style") == "para" else "□식"})
     out.append({"기관": "공통(미지정)", "보고서": "공통 규칙", "보도자료": "미지원(기관 지정 필요)", "기안문": "공통 서식",
                 "보도자료_본문방식": ""})
-    return out
+    return json.dumps(out, ensure_ascii=False)   # 배열 한 덩어리(dict 목록을 그대로 주면 MCP가 항목마다 TextContent로 쪼갬)
 
 
 @_tool()
@@ -1330,6 +1397,9 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     doc_type='report': {title, date, dept, body, appendix} — ministry를 비우면 공통 서식(기관명 칸 비움).
     doc_type='press_release': {release, distribute, title, subtitles, body, appendix, contact} — ministry 필수.
     doc_type='official': {org, to, via, title, body, attachments, recipients, sender, approval, doc_no, contact} — 기안문·시행문(별지 제1호서식).
+      body: [{type: l1~l6|table|lines, text|rows|lines}] (문자열 목록 아님, 번호는 서버가 붙임), attachments: [str],
+      approval: {drafter: {title, name, mark:'★'|'⊙'|''}, reviewers: [{title, name, opinion:bool}], approver: {title, name}, coordinators: [{title}]},
+      doc_no: {issue, issue_date, receive, receive_date}, contact: {zip, address, homepage, phone, fax, email, disclosure:'공개'|'부분공개'|'비공개'}. 예시는 get_writing_guide(doc_type='official').example_official.
     입력은 정규화(text 앞 기호·대시·공백 제거)하고, 고칠 점을 warnings로 돌려준다 — 있으면 구조를 고쳐 다시 호출한다.
     ministry 인자로 check_structure에 기관을 넘겨 보도자료 작성 점검(E1~E18)을 수행한다.
     out_path: 저장 경로(선택, 기본은 아웃폴더). 폴더면 그 안에 기본 파일 이름으로 저장, 확장자 없는 이름이면 .hwpx를 붙인다.
