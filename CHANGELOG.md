@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.3 (2026-11-10)
+
+보완 Claude(뼈대 Solar Pro 4). 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일 확인).
+
+- 보고서 빌드 때 조립(compose)을 2번 하던 것을 1번으로 — 분량 예측(`pages.estimate`)이 임시 HWPX를 만들지 않고 이미 조립한 XML을 받는다. 3쪽 보고서 build_document 0.156초 → 0.080초. polish=True·logo_path가 있는 경우는 종전 경로 그대로.
+- 규칙 JSON(공통·기관·문단위간격·참고머리)을 매번 읽던 것을 경로별 캐시(`engine/blank.py` `load_json`) + 반환 시 deepcopy로 — 호출자가 반환 dict를 고쳐도 다음 호출에 새지 않음(테스트 8건). 기관 보고서 1회 빌드 규칙 파일 열람 10회 → 첫 빌드 2회·이후 0회, `list_ministries` 104회 → 0회.
+- `build_from_structure`에 target_pages 전달, polish 경로에 style·report_kind 전달(빠져 있던 통로).
+- 죽은 코드·중복 정의 정리(PR #13): 호출 0인 함수 13개, 번호 접두사 정규식 3벌 → 1벌(기안문·마크다운 경로도 "Ⅺ."·"XIII." 제거), `_convert_table_titles`·`_unroll_table_merges` 단일 정의, 기안문 금액 경고 판정 한 곳. −359줄.
+
 ## 0.5.2 (2026-11-08)
 
 > 작성: Claude(데모 검토서에서 찾은 쪽 나눔 문제).
