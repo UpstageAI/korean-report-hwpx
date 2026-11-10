@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4 (2026-11-10)
+
+보완 Claude(뼈대 Solar Pro 4). 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일, 984 테스트).
+
+- engine을 정식 패키지 `korean_report_hwpx.engine`으로 — 그동안 server·tests·polish가 sys.path를 고쳐 `compose`·`report`·`fit`·`pages` 같은 흔한 이름을 최상위 모듈로 import했다(다른 패키지와 이름 충돌 가능). 상대 import로 바꾸고 sys.path 조작 제거. 휠 내용(engine·rules·templates·guides)과 콘솔 스크립트는 그대로.
+- HWPX XML 조각을 `engine/xml.py` 도우미(`tbl_xml`·`tc_xml`·`border_xml`·`para_xml`·`sublist_xml`)와 상수(`PT`·`TEXT_PAD`·`CELL_MARGIN`·`TBL_MARGIN`·`BOX_MARGIN`)로 — 손으로 쓰던 `<hp:tbl>` 4곳·`<hp:subList>` 5곳·`<hp:p id="0">` 9곳·borderFill 4곳이 0, 여백 리터럴 53곳 → 5곳.
+
 ## 0.5.3 (2026-11-10)
 
 보완 Claude(뼈대 Solar Pro 4). 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일 확인).
