@@ -5,19 +5,14 @@
 - export_markdown: .md 파일 동시 출력
 - check_structure: 간소화 규칙 점검(번호 수준 건너뜀, 표 제목 누락, 병합 사용, 5단계 초과)
 """
-import sys
 import zipfile
 from pathlib import Path
 
 import pytest
 
-# 서버 모듈 임포트를 위한 경로 추가
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "korean_report_hwpx"))
-
-import report as R
-from hwpx_doc import Hwpx
-from server import build_document, check_structure, get_writing_guide
+from korean_report_hwpx.engine import report as R
+from korean_report_hwpx.engine.hwpx_doc import Hwpx
+from korean_report_hwpx.server import build_document, check_structure, get_writing_guide
 
 
 # ── 테스트용 구조 ──

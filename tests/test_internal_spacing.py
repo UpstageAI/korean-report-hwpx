@@ -6,11 +6,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-# conftest.py와 동일하게 경로 설정
-ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine"), str(Path(__file__).parent)]
-
-import report as R
+from korean_report_hwpx.engine import report as R
 
 
 # ── 검증용 구조 ──

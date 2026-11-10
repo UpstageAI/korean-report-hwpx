@@ -12,9 +12,9 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-import fit as F
-import compose as C
-import report as RP
+from . import fit as F
+from . import compose as C
+from . import report as RP
 
 WIDTHS = C.WIDTHS
 

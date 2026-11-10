@@ -12,8 +12,8 @@ import json, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "korean_report_hwpx" / "engine"))
-from hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from korean_report_hwpx.engine.hwpx_doc import Hwpx, first_tbl, rows_of, tcs_of, paras_of  # noqa: E402
 
 LABEL = re.compile(r"^[/\s]*(보도\s*(시점|일시)|배\s*포(\s*(일시|시점))?)\s*[:：]?\s*$")
 INLINE = re.compile(r"^\s*(보도\s*(시점|일시)|배\s*포(\s*(일시|시점))?)\s*[:：]\s*\S")

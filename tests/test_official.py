@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_doc import Hwpx
+from korean_report_hwpx.engine.hwpx_doc import Hwpx
 from sample_official import SAMPLE_OFFICIAL as S, SAMPLE_INTERNAL as SI
 
 RULES = json.loads((Path(__file__).resolve().parents[1] / "korean_report_hwpx" / "rules_official" / "_공통.json").read_text("utf-8"))

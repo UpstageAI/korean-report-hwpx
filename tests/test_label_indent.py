@@ -3,8 +3,8 @@ import json, re
 
 import pytest
 
-import compose as C
-import report as R
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine import report as R
 
 
 def intent(c, xml):

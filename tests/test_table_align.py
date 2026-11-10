@@ -1,10 +1,6 @@
 """표 본문 칸 정렬은 열 단위로 맞춘다: 열의 모든 칸이 한 줄이면 가운데, 한 칸이라도 줄이 바뀌면 그 열 본문 전체 양쪽 정렬. 작성 Mia(윤승미)"""
-import re, sys, zipfile
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine")]
-import report as R  # noqa: E402
+import re, zipfile
+from korean_report_hwpx.engine import report as R
 
 
 def _cells(rows, tmp_path):

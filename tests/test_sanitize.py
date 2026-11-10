@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-import compose as C
-from hwpx_doc import Hwpx, balanced
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine.hwpx_doc import Hwpx, balanced
 from dummy import DUMMY
 
 ORGS = C.ministries()

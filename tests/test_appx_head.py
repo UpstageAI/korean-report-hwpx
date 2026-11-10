@@ -3,8 +3,8 @@ import json, re, zipfile
 
 import pytest
 
-import compose as C
-import report as R
+from korean_report_hwpx.engine import compose as C
+from korean_report_hwpx.engine import report as R
 from sample_release import SAMPLE
 from sample_report import SAMPLE_REPORT
 
@@ -90,7 +90,7 @@ def test_report_level_size_monotone(org):
 
 
 def _para_pts(path):
-    from hwpx_doc import Hwpx
+    from korean_report_hwpx.engine.hwpx_doc import Hwpx
     d = Hwpx(path); out = []
     for *_, p in d.paragraphs():   # 최상위 문단(표 안 문단 제외)
         if "<hp:tbl" in p: continue
@@ -123,7 +123,7 @@ def test_inline_ref_not_attached(tmp_path):
 
 # ── 문단 앞머리 라벨·장평 ──
 def _label_runs(path):
-    from hwpx_doc import Hwpx
+    from korean_report_hwpx.engine.hwpx_doc import Hwpx
     d = Hwpx(path); out = []
     for *_, p in d.paragraphs():
         if "<hp:tbl" in p: continue
@@ -165,5 +165,5 @@ def test_ratio_used_when_it_saves_a_line():
     base = "가" * int(c.text_w / (L_["pt"] * 100 * w.get("hangul", 1.0)))
     txt = base[:-2] + " 나다라마"   # 1줄 + 2~3자 넘침
     sp, ra = c.pick_spacing(txt, L_, 0)
-    from fit import wrap
+    from korean_report_hwpx.engine.fit import wrap
     assert len(wrap(txt, L_["pt"], sp, c.text_w, c.text_w, ra, w, True)) == 1 and 95 <= ra <= 100

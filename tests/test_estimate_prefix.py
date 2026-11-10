@@ -1,13 +1,8 @@
 """분량 예측의 문단 앞머리(기호·내어쓰기) 폭은 생성 엔진과 같은 함수에서 나온다 — 간소화 모드 기호 없음 포함. 작성 Mia(윤승미)"""
-import sys
-from pathlib import Path
-
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "korean_report_hwpx" / "engine")]
-import report as RP  # noqa: E402
-import pages  # noqa: E402
+from korean_report_hwpx.engine import report as RP
+from korean_report_hwpx.engine import pages
 
 
 @pytest.mark.parametrize("style", ["standard", "simplified"])
