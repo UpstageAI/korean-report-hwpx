@@ -1208,13 +1208,14 @@ def _normalize_official_dates(doc):
     return doc
 
 
-def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placeholder_contact=True, polish=False, style="standard", report_kind="standard"):
+def _build(doc_type, ministry, doc, dst, logo_path="", slogan_path="", placeholder_contact=True, polish=False, style="standard", report_kind="standard",
+           composed=None):
     if doc_type == "report":
-        if not str(doc.get("date") or "").strip():
-            doc["date"] = _today()  # 작성일 미기재 시 오늘 날짜
-        if polish:
+        if composed is not None:   # build_document가 분량 예측에 쓴 조립 결과 — 다시 조립하지 않고 저장만
+            composed.save(dst)
+        elif polish:
             import polish as PL
-            PL.polish(ministry, doc, dst, log=lambda m: None, build=RP.compose, logo_path=logo_path or None)
+            PL.polish(ministry, doc, dst, log=lambda m: None, build=RP.compose, logo_path=logo_path or None, style=style, report_kind=report_kind)
         else:
             RP.compose(ministry, doc, dst, logo_path=logo_path or None, style=style, report_kind=report_kind)
     elif doc_type == "official":
@@ -1257,7 +1258,7 @@ def get_rules(ministry: str = "", doc_type: str = "report") -> dict:
     if t == "auto": t = "report"
     _check_ministry(ministry, t)
     if t == "official":
-        r = dict(json.loads((ROOT / "rules_official" / "_공통.json").read_text("utf-8")))
+        r = O._common()
         r.pop("_설명", None)
         return r
     r = RP.load_rules(ministry) if t == "report" else C.load_rules(ministry)
@@ -1361,12 +1362,6 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     if t == "press_release":
         s["kind"] = s.get("kind") or "보도자료"
     result = {"hwpx": "", "doc_type": t, "문서종류": LABEL[t], "기관": ministry or "공통(미지정)", "warnings": w, "structure": s}
-    # 보고서일 때 분량 예측
-    if t == "report":
-        result["분량"] = pages.estimate(s, style=style, report_kind=report_kind, ministry=ministry)
-        if target_pages > 0:
-            _size_warnings(s, w, target_pages, result)
-            result["warnings"] = w
     org = ministry if ministry and ministry != "공통" else ""
     _check_ministry(org, t)
     dst = _dst(org, s.get("title"), out_path, t)
@@ -1376,7 +1371,19 @@ def build_document(structure: dict | str, doc_type: str = "", ministry: str = ""
     s_for_md = _prepare_simplified_for_md(s, style)
     if t == "official":
         s_for_md = _number_official_body_for_md(s_for_md)
-    _build(t, org, s, dst, logo_path, slogan_path, placeholder_contact, polish, style, report_kind)
+    composed = None
+    # 보고서일 때 분량 예측: 저장할 문서를 한 번만 조립해 그 XML로 잰다(polish·로고가 있으면 예전처럼 따로 잰 뒤 만듦)
+    if t == "report":
+        if not str(s.get("date") or "").strip():
+            s["date"] = _today()  # 작성일 미기재 시 오늘 날짜
+        if not (polish or logo_path):
+            composed = RP.compose(org, s, None, style=style, report_kind=report_kind)
+        result["분량"] = pages.estimate(s, style=style, report_kind=report_kind, ministry=ministry,
+                                      xml=(composed.header, composed.section) if composed else None)
+        if target_pages > 0:
+            _size_warnings(s, w, target_pages, result)
+            result["warnings"] = w
+    _build(t, org, s, dst, logo_path, slogan_path, placeholder_contact, polish, style, report_kind, composed)
     # 저장용 구조는 변환 전 원본 유지
     dst.with_suffix(".json").write_text(json.dumps(s, ensure_ascii=False, indent=1), "utf-8")
     result["hwpx"] = str(dst)
@@ -1572,9 +1579,9 @@ def _export_markdown(s, hwpx_path, style="standard", doc_type="report"):
 @_tool()
 def build_from_structure(structure: dict | str, doc_type: str = "", ministry: str = "", out_path: str = "",
                          logo_path: str = "", slogan_path: str = "", placeholder_contact: bool = True, polish: bool = False,
-                         style: str = "standard", export_markdown: bool = False, report_kind: str = "standard") -> dict:
+                         style: str = "standard", export_markdown: bool = False, report_kind: str = "standard", target_pages: int = 0) -> dict:
     """build_document와 같다(별칭). structure는 JSON 문자열로 줘도 된다."""
-    return build_document(structure, doc_type, ministry, out_path, logo_path, slogan_path, placeholder_contact, polish, style, export_markdown, report_kind)
+    return build_document(structure, doc_type, ministry, out_path, logo_path, slogan_path, placeholder_contact, polish, style, export_markdown, report_kind, target_pages)
 
 
 def main():
