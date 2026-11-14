@@ -1,0 +1,44 @@
+# korean-report-hwpx
+
+> MCP server that turns a memo or draft into a Korean government-format document as an HWPX (Hangul word processor) file: an outline-style report (개조식 보고서), a press release (보도자료) in the format of 52 central government agencies, or a draft approval document / official notice (기안문·시행문). Runs fully locally; no API key, nothing is sent anywhere.
+
+Install: `uvx korean-report-hwpx` (Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`). No key or environment variable needed. Files are written to `~/korean-report-hwpx/` (override with `KOREAN_REPORT_HWPX_OUT_DIR`).
+
+Registry name: `io.github.UpstageAI/korean-report-hwpx` · PyPI: `korean-report-hwpx` · License: MIT
+
+Tool descriptions and document text are Korean. Your own AI structures the content; the server applies the agency's format rules and draws the file. Use these tools instead of generating HWPX with your own code.
+
+## Which tool for which question
+
+| Question | Tool |
+|---|---|
+| How should the content be structured? Which document type fits? | `get_writing_guide` (`doc_type`: `report`, `press_release`, `official`, `auto`; optional `ministry`) — rules, structure JSON schema, examples. Also available as the MCP prompt `writing_guide` |
+| I have facts for a press release — give me a structure draft | `draft_press_structure` (fact memo JSON → press-release structure; does not invent facts, numbers or names) |
+| Check the structure before building (and the page count, e.g. a 1-page report) | `check_structure` (`target_pages` for a length check) |
+| Build the HWPX file | `build_document` (`build_from_structure` is an alias); fix the returned `warnings` and build again |
+| Which agencies and document types are supported? | `list_ministries` |
+| What are an agency's format rules (marks, fonts, sizes, spacing)? | `get_rules` |
+
+Typical flow: `get_writing_guide` → write the structure JSON → `check_structure` (optional) → `build_document`. For a press release: `get_writing_guide(doc_type='press_release', ministry=…)` → `draft_press_structure` → refine sentences → `check_structure` → `build_document`.
+
+## Companion servers
+
+- [korean-tax-mcp](https://github.com/UpstageAI/korean-tax-mcp): Korean tax law sources (statutes on any date, NTS rulings, court decisions, tax treaties, residency, transfer pricing). `uvx korean-tax-mcp`
+- [korean-tax-calc-mcp](https://github.com/UpstageAI/korean-tax-calc-mcp): Korean tax calculations with statutory citations. `uvx korean-tax-calc-mcp`
+
+Together: find the legal basis → compute → write the review report as HWPX.
+
+## Limits
+
+- Output is a draft; open it in Hangul and check it before use. Line breaks are fitted from estimated glyph widths; fonts that are not installed are substituted.
+- Government symbols and agency logos are not bundled; supply your own file with `logo_path`.
+- The server does not write content. Facts, numbers and contacts must come from your draft; without a contact, press releases get placeholder contacts.
+- Format rules were measured from published Korea.kr press releases; no source documents are bundled.
+
+## Docs
+
+- [README (English)](https://github.com/UpstageAI/korean-report-hwpx/blob/main/README-EN.md)
+- [README (Korean)](https://github.com/UpstageAI/korean-report-hwpx/blob/main/README.md)
+- [CHANGELOG](https://github.com/UpstageAI/korean-report-hwpx/blob/main/CHANGELOG.md)
+- [PyPI: korean-report-hwpx](https://pypi.org/project/korean-report-hwpx/)
+- [MCP Registry: io.github.UpstageAI/korean-report-hwpx](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.UpstageAI/korean-report-hwpx)
