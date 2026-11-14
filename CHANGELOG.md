@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.6 (2026-11-14)
+
+작성: Claude(공개 MCP 노출면 점검에서 나온 고칠 점). 생성 문서·도구 동작은 바뀌지 않음.
+
+- serverInfo.version: `MCPServer`에 버전을 넘기지 않아 initialize 응답의 `serverInfo.version`이 빈 문자열이었다. 패키지 메타데이터 버전(`importlib.metadata`)을 `korean_report_hwpx.__version__`으로 두고 서버에 넘김(korean-tax-mcp 0.15.2와 같은 방식). `tests/test_server_info_version.py`.
+- README·README-EN 재구성: 열어 두는 것은 한 단락 소개·한 줄 안내·설치(Claude Code 한 줄, Claude 앱 3단계, 윈도 안내 링크)·흐름 그림 1장(메모 → get_writing_guide·draft_press_structure → check_structure → build_document → 기관 서식 HWPX, 세법 MCP와 검토 보고서 연결)·"이렇게 물어보세요" 표·링크 줄. 도구 7개 표, 서식 기능, 간소화·내부 결재, 구조 JSON 예, 지원 기관, 근거, 작성 주체, 유의는 접기 안으로.
+- Registry 배지 글자를 옛 이름 `korean-gov-docs`에서 `korean-report-hwpx`로, 배지 링크는 등록 이름 `io.github.UpstageAI/korean-report-hwpx` 검색으로.
+- 작성 주체 문구를 CHANGELOG와 맞춤: 0.2.0부터 0.3.x까지 Solar Pro 4 작성·CodeSolar·Claude 검수, 0.4.0부터 뼈대 Solar Pro 4·보완·명세·정답 테스트 Claude(0.5.2·0.5.6은 Claude 작성). 데모 캡션의 "코드는 Solar Pro 4가 작성" 문장 삭제.
+- 보도자료 건수 표기 정리: 서식 규칙은 수집 2,670건 전수 파싱, 본문 실측·쪽 설정은 그중 2,667건 기준임을 근거에 밝힘.
+- README-EN: 분량 예측 설명을 한글 배치 규칙·실측 54개 문서 일치로 고치고, 국문판에만 있던 서식 기능 표·Claude 앱 설치·간소화 모드·내부 결재 보고서·질문 예를 번역해 넣음.
+- pyproject: 설명에 기안문과 도구 7개, `[project.urls]`에 Homepage(소개 페이지)·Documentation·Changelog, keywords `official-draft`. server.json 설명에 기안문(official drafts).
+- 라이선스 줄을 `MIT © 2026 Upstage · Created by Mia(윤승미)` 한 줄로.
+
 ## 0.5.5 (2026-11-10)
 
 보완 Claude(뼈대 Solar Pro 4). 통합 시나리오(공문서 3종)에서 나온 고칠 점 — 생성 문서는 바뀌지 않음(고정 입력 26건의 header·section XML·md 바이트 동일; 달라진 것은 기안문 예시의 날짜 오탐 경고 1건이 사라진 것뿐). 1002 테스트.
