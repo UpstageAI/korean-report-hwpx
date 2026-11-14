@@ -1,43 +1,105 @@
-# korean-report-hwpx — 한국 공문서 MCP (보고서·보도자료 HWPX)
+# korean-report-hwpx — 한국 공문서 MCP (보고서·보도자료·기안문 HWPX)
 
 <!-- mcp-name: io.github.UpstageAI/korean-report-hwpx -->
 
 ![데모: 회의 메모 한 장 → 다른 기관 사례 조사 → 과장님 보고용 1쪽 보고서 + 교육 실시 계획 기안문(내부결재) 한글 파일](https://raw.githubusercontent.com/UpstageAI/korean-report-hwpx/main/docs/demo-cowork.gif)
 
-<sub>영상: Claude 앱(코워크)에 "회의메모 보고 다른 기관 AI 교육 사례 찾아서 과장님 보고용 1쪽 보고서 만들어 줘. 교육 실시 계획 기안문도 같이 한글 파일로 줘" 요청 하나 → 사례 표·우리 기관 계획 1쪽 보고서 + 그 보고서를 붙임으로 단 내부결재 기안문(예산 '금1,200,000원(금일백이십만원)' 한글 병기)까지(2026-11-08 공개, 회의 메모는 가상 예시). **이 도구의 코드는 업스테이지 Solar Pro 4가 작성했습니다.**</sub>
+<sub>영상: Claude 앱(코워크)에 "회의메모 보고 다른 기관 AI 교육 사례 찾아서 과장님 보고용 1쪽 보고서 만들어 줘. 교육 실시 계획 기안문도 같이 한글 파일로 줘" 요청 하나 → 사례 표·우리 기관 계획 1쪽 보고서 + 그 보고서를 붙임으로 단 내부결재 기안문(예산 '금1,200,000원(금일백이십만원)' 한글 병기)까지(2026-11-08 공개, 회의 메모는 가상 예시).</sub>
+
+[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--report--hwpx-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.UpstageAI/korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
+
+**공무원 공문서(보고서·보도자료·기안문)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 이 서버가 작성 규칙을 알려 주고 구조를 점검한 뒤 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다. 서식은 정책브리핑 보도자료 2,670건 조사로 정한 값입니다. 도구 7개, 외부 전송 없음·API 키 불필요 — 모든 처리는 설치한 컴퓨터 안에서 끝납니다.
+
+> 결과물은 초안입니다. 한글에서 확인한 뒤 쓰세요. 이 서버는 원고를 외부로 보내지 않습니다.
+
+## 설치
+
+**Claude Code** — 한 줄: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
+
+**Claude 앱(데스크톱·코워크)** — 3단계
+
+1. **uv 설치** (한 번만) — 맥은 터미널에, 윈도는 PowerShell에 붙여 넣습니다.
+   - 맥: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+   - 윈도: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+2. **Claude 앱 설정 → 개발자(Developer) → 구성 편집(Edit Config)** 으로 열린 `claude_desktop_config.json`에 아래 `mcpServers` 내용을 넣고 저장합니다.
+   앱이 `uvx`를 못 찾으면 `command`에 전체 경로를 씁니다(맥 터미널에서 `which uvx`로 확인, 예: `/Users/이름/.local/bin/uvx`).
+3. **Claude 앱을 완전히 종료했다가 다시 열고** "이 메모를 1쪽 보고서로 만들어 줘"라고 요청합니다.
+
+```json
+{
+  "mcpServers": {
+    "korean-report-hwpx": {
+      "command": "uvx",
+      "args": ["korean-report-hwpx"]
+    }
+  }
+}
+```
+
+- API 키·환경변수 필요 없음. 만든 파일은 `~/korean-report-hwpx/`에 저장됩니다(`KOREAN_REPORT_HWPX_OUT_DIR`로 변경, 이전 이름 `KOREAN_GOV_DOCS_OUT_DIR`도 인식).
+- 윈도에서 쓰기: [docs/WINDOWS.md](docs/WINDOWS.md)
+
+## 이렇게 동작합니다
+
+```mermaid
+flowchart LR
+  M["메모·초안·사실관계"] --> AI["사용자 AI<br/>Claude·ChatGPT 등"]
+  T["korean-tax-mcp·korean-tax-calc-mcp<br/>세법 근거·계산 결과"] -.->|검토 보고서| AI
+  AI --> G["get_writing_guide<br/>작성 규칙·구조 스키마"]
+  AI -.->|보도자료| P["draft_press_structure<br/>사실 메모 → 구조 초안"]
+  G --> J["구조 JSON"]
+  P --> J
+  J --> C["check_structure<br/>점검·target_pages 분량"]
+  C --> B["build_document<br/>기관 서식 HWPX"]
+  B -->|warnings| J
+  R[("기관 규칙값 52곳<br/>list_ministries·get_rules")] -.-> B
+  B --> O["~/korean-report-hwpx/<br/>.hwpx + 구조 .json + 간소화 .md"]
+```
+
+세법 MCP([korean-tax-mcp](https://github.com/UpstageAI/korean-tax-mcp)·[korean-tax-calc-mcp](https://github.com/UpstageAI/korean-tax-calc-mcp))와 함께 쓰면 근거 찾기 → 계산 → 검토 보고서 HWPX까지 이어집니다.
+
+## 이렇게 물어보세요
+
+AI에게 평소처럼 말하면 됩니다. 도구 이름을 몰라도 됩니다.
+
+| 이렇게 말하면 | 이렇게 나옵니다 |
+|---|---|
+| "어제 회의 결과를 과장님께 보고할 **1쪽짜리 보고서**로 만들어 줘" | 본문 1쪽을 꽉 채우고 세부는 붙임으로. 넘치거나 덜 차면 `target_pages` 경고대로 AI가 다시 만듦 |
+| "이 메모를 ○○부 보고서로 만들어 줘" | 42개 기관 보고서 서식(기관을 말하지 않으면 공통 서식) |
+| "**내부 결재용**으로 만들어 줘" | 내부 결재 보고서 서식(`'26. 11. 8.(일) / 과명`, 쪽 번호 "- n -") |
+| "**번호 매기는 간소화 양식**으로, 마크다운도 같이" | Ⅰ. 1. 가. 번호 서식 + .md 파일 |
+| "이 원고 국세청 보도자료로 만들어 줘, 보도시점 2026. 10. 8.(목) 조간" | 52개 기관 보도자료 서식, 리드·제목·인용·숫자 표기 점검 |
+| "이 보고서 결재 올릴 기안문 만들어 줘, 붙임은 방금 보고서" | 기안문(별지 제1호서식), 항목 번호·결재란·"끝." 자동 |
+| "아까 보고서에서 Ⅲ장 □ 문장만 바꿔서 다시 만들어 줘" | 파일 옆에 저장된 구조(.json)를 고쳐 다시 생성 |
+| "산림청 보고서 서식 규칙 보여 줘" | 계층별 기호·글꼴·크기·빈 줄 규칙값 |
+
+검토서·추진계획·회의 결과·현황 보고는 모두 보고서로 만듭니다. 같은 자료로 보고서 → 보도자료 → 기안문을 이어서 만들 수도 있습니다.
+
+## 링크
+
+[English README](README-EN.md) · [llms.txt](llms.txt) · [CHANGELOG](CHANGELOG.md) · [PyPI](https://pypi.org/project/korean-report-hwpx/) · [소개 페이지](https://upstageai.github.io/korean-tax-mcp/) · 짝 서버 [korean-tax-mcp](https://github.com/UpstageAI/korean-tax-mcp)·[korean-tax-calc-mcp](https://github.com/UpstageAI/korean-tax-calc-mcp)
 
 > ⭐ 써 보시고 도움이 되셨다면 별 하나 눌러 주세요. 무료 공개를 계속 이어 가는 힘이 됩니다.
 
-[![PyPI](https://img.shields.io/pypi/v/korean-report-hwpx)](https://pypi.org/project/korean-report-hwpx/) [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-korean--gov--docs-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=korean-report-hwpx) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Built with Upstage Solar Pro 4](https://img.shields.io/badge/Built%20with-Upstage%20Solar%20Pro%204-7A3FF2)](https://www.upstage.ai/) · [English](README-EN.md)
-
-> **0.2.0부터 업스테이지 Solar Pro 4로 개발합니다.** 간소화 모드·마크다운 출력·내부 결재 보고서는 Solar Pro 4가 코드를 작성하고, Claude가 결과를 검증했습니다.
-
-**공무원 공문서(보고서·보도자료)를 기관 서식 HWPX로.** 쓰고 있는 AI(Claude·ChatGPT 등)가 메모·초안을 공문서 구조로 정리하면, 52개 중앙행정기관의 서식 규칙값으로 한글(HWPX) 파일을 그립니다.
-
-**외부 전송 없음 · API 키 불필요** — 모든 처리는 설치한 컴퓨터 안에서 끝납니다. 원고는 이 서버 밖으로 나가지 않습니다. → [English README](README-EN.md)
-
 ---
 
-> "이 내용 공문서처럼 써 줘" 한마디로 개조식 보고서(□ → ㅇ → -) 또는 보도자료를 기관 서식대로 만듭니다. 서식은 정책브리핑 보도자료 2,670건 전수 조사로 정한 규칙값이며, 원본 문서·로고는 포함하지 않습니다.
+<details>
+<summary><b>도구 (7개)</b></summary>
 
-## 이렇게 씁니다
+| 도구 | 하는 일 |
+|---|---|
+| `get_writing_guide` | 문서 종류 판단 기준, 작성 규칙(□ 두괄식 한 문장·ㅇ 근거·- 세부, 명사형 종결, 사실·숫자 창작 금지, 기호는 텍스트에 넣지 않음, 참고·붙임 구조, 기안문 항목 번호·날짜·금액·끝 표시·붙임), 구조 JSON 스키마·예시. MCP prompt `writing_guide`로도 제공 |
+| `draft_press_structure` | 사실 메모(누가·언제·무엇, 배경·핵심 내용·계획, 인용, 담당 부서, 숫자 등)를 보도자료 구조 JSON 초안으로 옮긴다. 메모에 없는 문장·숫자·이름을 만들지 않으며, 리드·인용·표·참고 자료를 규칙에 맞게 배치한다 |
+| `check_structure` | 생성 전 점검: 필수 필드, text 속 기호, 계층 건너뜀, □ 두 문장 이상, 명사형 종결 아닌 문장, 긴 제목, `target_pages` 분량, 기안문은 필수 키·to·disclosure 허용값·결재란 drafter/approver 필수·attachments 문자열 목록 검증 |
+| `build_document` | 구조 JSON → 기관 서식 HWPX. 입력 정규화(기호·대시·앞 공백 제거) + 고칠 점(`warnings`) 반환. 기안문은 `doc_type="official"`, 금액 한글 병기 경고·날짜 정규화 포함 |
+| `build_from_structure` | `build_document`의 별칭(이전 이름, 인자 같음) |
+| `list_ministries` | 지원 기관과 문서 종류별 지원 여부(보고서: 기관 규칙/공통 규칙, 보도자료: 본문 방식, 기안문: 공통 서식) |
+| `get_rules` | 기관·문서 종류별 서식 규칙값(계층별 기호·글꼴·크기·내어쓰기·빈 줄, 제목 상자·표 머리, 기안문은 rules_official/_공통.json) |
 
-AI(Claude·ChatGPT 등)에게 평소처럼 말하면, AI가 이 도구로 작성 규칙을 읽고 → 원고를 정리하고 → 점검한 뒤 → 한글 파일을 만듭니다. 도구 이름을 몰라도 됩니다.
+</details>
 
-**보고서** (검토서·추진계획·회의 결과·현황 보고 모두 보고서로 만듭니다)
-- "어제 회의 결과를 과장님께 보고할 **1쪽짜리 보고서**로 만들어 줘" — 본문을 1쪽에 꽉 채우고 세부는 붙임으로. 1쪽을 넘거나 덜 차면 도구가 알려 주고 AI가 다시 만듭니다
-- "이 메모를 ○○부 보고서로 만들어 줘" — 42개 기관 보고서 서식, 기관을 말하지 않으면 공통 서식
-- "**내부 결재용**으로 만들어 줘" — 내부 결재 보고서 서식(`'26. 11. 8.(일) / 과명`, 쪽 번호 "- n -")
-- "**번호 매기는 간소화 양식**으로, 마크다운도 같이" — Ⅰ. 1. 가. 번호 서식 + .md 파일
-- "아까 보고서에서 Ⅲ장 □ 문장만 바꿔서 다시 만들어 줘" — 만든 파일 옆에 구조(.json)가 함께 저장돼 고쳐 다시 만들 수 있습니다
-
-**보도자료** — "이 원고 국세청 보도자료로 만들어 줘, 보도시점 2026. 10. 8.(목) 조간" (52개 기관 서식, 리드·제목·인용·숫자 표기 점검)
-
-**기안문·시행문** — "이 보고서 결재 올릴 기안문 만들어 줘, 붙임은 방금 보고서" (별지 제1호서식, 항목 번호·결재란·"끝." 자동)
-
-같은 자료로 보고서 → 보도자료 → 기안문을 이어서 만들 수도 있습니다. 서식 규칙만 궁금하면 "산림청 보고서 서식 규칙 보여 줘".
-
-## 보고서가 이렇게 나옵니다
+<details>
+<summary><b>보고서가 이렇게 나옵니다 (서식 기능)</b></summary>
 
 | 기능 | 내용 |
 |---|---|
@@ -50,9 +112,10 @@ AI(Claude·ChatGPT 등)에게 평소처럼 말하면, AI가 이 도구로 작성
 | 자간 맞춤 | 문단마다 자간·장평을 골라 마지막 줄에 한두 글자만 남지 않게. 맥+한글이 있으면 `polish=True`로 실제 줄 배치에 맞춰 다듬기 |
 | 서식 세 가지 | 표준 · 내부 결재(`report_kind="internal"`) · 간소화(`style="simplified"`, 마크다운 동시 출력) |
 
-**설치** — Claude 앱(데스크톱·코워크)은 [3단계](#claude-앱데스크톱코워크에서-쓰기), Claude Code는 한 줄: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
+</details>
 
-## 문서 종류
+<details>
+<summary><b>문서 종류·분량 점검</b></summary>
 
 | 종류 | 구성 | 기관 지정 | 규칙 |
 |---|---|---|---|
@@ -66,51 +129,12 @@ AI(Claude·ChatGPT 등)에게 평소처럼 말하면, AI가 이 도구로 작성
 
 문서 종류 판단 기준(가이드에 포함): 언론·국민 대상 발표·배포용이면 보도자료, 내부 보고·계획·검토면 보고서, 행정업무규정 별지 제1호서식 기안문·시행문이 필요하면 official.
 
-## 설치
+</details>
 
-### Claude 앱(데스크톱·코워크)에서 쓰기
+<details>
+<summary><b>보도자료 작성 방법과 사실 메모 예시</b></summary>
 
-1. **uv 설치** (한 번만) — 맥은 터미널에, 윈도는 PowerShell에 붙여 넣습니다.
-   - 맥: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-   - 윈도: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-2. **Claude 앱 설정 → 개발자(Developer) → 구성 편집(Edit Config)** 으로 열린 `claude_desktop_config.json`에 아래 `mcpServers` 내용을 넣고 저장합니다.
-   앱이 `uvx`를 못 찾으면 `command`에 전체 경로를 씁니다(맥 터미널에서 `which uvx`로 확인, 예: `/Users/이름/.local/bin/uvx`).
-3. **Claude 앱을 완전히 종료했다가 다시 열고** "이 메모를 1쪽 보고서로 만들어 줘"라고 요청합니다. 만든 파일은 `~/korean-report-hwpx/`에 저장됩니다.
-
-### 설정 내용
-
-[uv](https://docs.astral.sh/uv/)가 있으면 설치 없이 바로 실행됩니다.
-
-```json
-{
-  "mcpServers": {
-    "korean-report-hwpx": {
-      "command": "uvx",
-      "args": ["korean-report-hwpx"]
-    }
-  }
-}
-```
-
-Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
-
-- API 키·환경변수 필요 없음.
-- 만든 파일은 `~/korean-report-hwpx/`에 저장됩니다(`KOREAN_REPORT_HWPX_OUT_DIR`로 변경, 이전 이름 `KOREAN_GOV_DOCS_OUT_DIR`도 인식).
-
-## 도구
-
-| 도구 | 하는 일 |
-|---|---|
-| `get_writing_guide` | 문서 종류 판단 기준, 작성 규칙(□ 두괄식 한 문장·ㅇ 근거·- 세부, 명사형 종결, 사실·숫자 창작 금지, 기호는 텍스트에 넣지 않음, 참고·붙임 구조, 기안문 항목 번호·날짜·금액·끝 표시·붙임), 구조 JSON 스키마·예시. MCP prompt `writing_guide`로도 제공 |
-| `check_structure` | 생성 전 점검: 필수 필드, text 속 기호, 계층 건너뜀, □ 두 문장 이상, 명사형 종결 아닌 문장, 긴 제목, 기안문은 필수 키·to·disclosure 허용값·결재란 drafter/approver 필수·attachments 문자열 목록 검증 |
-| `build_document` | 구조 JSON → 기관 서식 HWPX. 입력 정규화(기호·대시·앞 공백 제거) + 고칠 점(`warnings`) 반환. `build_from_structure`는 별칭. 기안문은 `doc_type="official"`, 금액 한글 병기 경고·날짜 정규화 포함 |
-| `list_ministries` | 지원 기관과 문서 종류별 지원 여부(보고서: 기관 규칙/공통 규칙, 보도자료: 본문 방식, 기안문: 공통 서식) |
-| `get_rules` | 기관·문서 종류별 서식 규칙값(계층별 기호·글꼴·크기·내어쓰기·빈 줄, 제목 상자·표 머리, 기안문은 rules_official/_공통.json) |
-| `draft_press_structure` | 사실 메모(누가·언제·무엇, 배경·핵심 내용·계획, 인용, 담당 부서, 숫자 등)를 보도자료 구조 JSON 초안으로 옮긴다. 메모에 없는 문장·숫자·이름을 만들지 않으며, 리드·인용·표·참고 자료를 규칙에 맞게 배치한다. |
-
-### 보도자료 작성 방법 (국립국어원 지침·정책브리핑 실측)
-
-`get_writing_guide(doc_type='press_release', ministry=기관)`을 호출하면 보도자료 작성 방법(리드·제목·인용·숫자·쉬운 말)과 사실 메모 양식, 기관별 가상 예시를 함께 제공한다. 근거는 국립국어원 보도자료 작성 지침과 정책브리핑 보도자료 2,667건 실측이다.
+`get_writing_guide(doc_type='press_release', ministry=기관)`을 호출하면 보도자료 작성 방법(리드·제목·인용·숫자·쉬운 말)과 사실 메모 양식, 기관별 가상 예시를 함께 제공한다. 근거는 국립국어원 보도자료 작성 지침과 정책브리핑 보도자료 2,667건 실측이다(수집 2,670건 중 본문 실측에 쓴 2,667건).
 
 **사실 메모 예시(과학기술정보통신부 가상 사례):**
 ```json
@@ -140,7 +164,10 @@ Claude Code: `claude mcp add korean-report-hwpx -- uvx korean-report-hwpx`
 - 문화체육관광부·국립국어원, 『쉬운 공공언어 쓰기 길잡이』(2014) — E14
 - 정책브리핑(korea.kr) 보도자료 2,667건 본문 실측(52개 중앙행정기관) — C
 
-### 간소화 모드 (style="simplified")
+</details>
+
+<details>
+<summary><b>간소화 모드 (style="simplified")</b></summary>
 
 AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 단순한 표). 항목 기호를 단계별 번호로 자동 부여하고, 제목 상자·표 머리 음영을 없앤 간결한 서식.
 
@@ -159,7 +186,10 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 - 줄 간격 150%, 문단 위 10pt(1수준)·5pt(그 외), 빈 줄 없이 문단 간격으로 구분
 - 번호는 글자로 넣음. 한글 '개요' 번호 연동은 다음 버전 예정
 
-### 내부 결재 보고서 (report_kind="internal")
+</details>
+
+<details>
+<summary><b>내부 결재 보고서 (report_kind="internal")</b></summary>
 
 정보공개포털 내부 결재 보고서 실물 표본 측정값 반영: 라벨 칸 없는 제목, 작성일·부서 줄 `'26. 10. 9.(금) / 과·팀명`, 줄 간격 150%, 문단 위 10pt(□)·5pt(ㅇ·-).
 
@@ -177,6 +207,11 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 }
 ```
 → 간소화 모드로 생성 시: `Ⅰ. 추진 배경`, `1. 민원 대기 시간 감소를 위해 AI 안내 도입 필요`, `가. 하루 평균 창구 민원 약 400건`, `〈표 1〉 소요 예산` 형식으로 표시.
+
+</details>
+
+<details>
+<summary><b>구조 JSON 예 — 보고서·보도자료·기안문</b></summary>
 
 보고서 구조 JSON 예:
 
@@ -223,7 +258,10 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 ```
 기안문 항목 번호는 l1→1. / l2→가. / l3→1) / l4→가) / l5→(1) / l6→(가). 같은 계층 안에서 순서대로 증가하고 상위 계층이 바뀌면 하위 번호 초기화(제2조①). 둘째 계층부터 상위 번호 시작 위치에서 2타(한 글자) 오른쪽 들여쓰기. 금액은 `금113,560원(금일십일만삼천오백육십원)`처럼 한글 병기를 붙여야 하며, 없으면 `warnings`에 "금액 한글 병기 필요(시행규칙 제2조②)"가 나옵니다(제2조②). 날짜는 YYYY-MM-DD·YYYY.MM.DD를 YYYY. MM. DD.로 정규화합니다(영 제7조⑤). `disclosure`는 "공개"|"부분공개"|"비공개"만 허용됩니다.
 
-## 지원 기관 (52곳)
+</details>
+
+<details>
+<summary><b>지원 기관 (52곳)</b></summary>
 
 | 기관 | 보고서 | 보도자료 | 기관 | 보고서 | 보도자료 |
 |---|---|---|---|---|---|
@@ -256,19 +294,20 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 
 보고서: 기관 규칙 = 그 기관 보도자료 참고·붙임 구간 실측값(42곳), 공통 규칙 = 기관 간 최빈값(기관을 지정하지 않으면 기관명 칸은 비움). 보도자료: 문단식 = 기호 없는 기사체 문단 위주, □식 = □ → ㅇ → - 개조식.
 
-## 기관 로고
+</details>
+
+<details>
+<summary><b>기관 로고</b></summary>
 
 정부상징·기관 로고는 사용 규정상 이 패키지에 포함하지 않습니다. 소속 기관 담당자가 자기 기관 로고 파일을 지정하세요.
 
 - `logo_path`로 로고 그림 파일을 지정하면 보도자료는 표지의 로고 자리(기관별 크기)에, 보고서는 제목 상자 위에 들어갑니다. 보도자료 슬로건 그림은 `slogan_path`.
 - 지정하지 않으면 보도자료 표지에 같은 크기의 「기관 로고」 자리표시가 들어갑니다. 한글에서 글을 지우고 그림을 넣으면 됩니다.
 
-## 데이터 전송 안내
+</details>
 
-- 모든 처리는 로컬입니다. 이 서버는 외부 API를 부르지 않고, 원고·결과 파일을 어디로도 보내지 않습니다.
-- 원고를 구조로 정리하는 일은 사용자가 쓰는 AI가 합니다. 그 AI 서비스의 데이터 정책은 별도로 확인하세요.
-
-## 근거
+<details>
+<summary><b>근거 — 정책브리핑 보도자료 2,670건 조사와 공식 기준</b></summary>
 
 - 정책브리핑(korea.kr) 보도자료 HWPX **2,670건(52개 중앙행정기관)** 전수 파싱. 보도자료 본문 서식은 2,016건의 문단 35,465개·빈 줄 35,434개·표 칸 32,392개 실측.
 - 보고서 서식은 같은 자료 중 「참고·붙임」 보고서형 구간이 있는 **1,326건**(문단 13,757개)에서 기관별로 산출(42개 기관, 3건 이상). 공통 골격(□·-·*·※ 기호, 기호 뒤 1타, 1행 제목 상자, 표 머리 맑은 고딕·가운데·굵게)은 기관 간 90% 이상 일치.
@@ -276,8 +315,12 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 - 실측: 정책브리핑 보도자료 2,670건·52개 기관(보고서 구간 1,326건)에서 기관별 기호·글꼴·빈 줄·표지 표 수치를 산출.
 - 규칙 문서: [보도자료 서식 규칙](korean_report_hwpx/refs/보도자료_서식_규칙.md), [보고서 서식 규칙](korean_report_hwpx/refs/보고서_서식_규칙.md). 규칙값: `rules/`, `rules_report/`, 보도자료 표지·담당 표 수치: `templates/`.
 - 원자료는 정책브리핑에 공공누리로 공개된 보도자료이며, 이 저장소에는 원본 파일·본문·그림을 포함하지 않고 서식 수치만 담았습니다.
+- 건수: 서식 규칙(기호·글꼴·빈 줄·보고서 구간)은 수집한 2,670건 전수 파싱, 보도자료 본문 문장 실측과 쪽 설정은 같은 자료 중 2,667건 기준입니다.
 
-## 서식 근거 (쪽 설정)
+</details>
+
+<details>
+<summary><b>서식 근거 (쪽 설정)</b></summary>
 
 모든 문서 종류(보고서·보도자료·기안문)의 편집 용지는 A4(210×297mm, HWPUNIT 59528×84188), 좌우 여백 20mm(HWPUNIT 5669), 위·아래 여백 15mm(HWPUNIT 4252), 머리말·꼬리말 10mm(HWPUNIT 2835), gutter 0을 기본값으로 쓴다. 본문폭(text width)은 width − left − right = 48190(HWPUNIT, 170mm)이며, 표(`<hp:tbl>`)의 폭은 본문폭을 넘지 않는다.
 
@@ -286,15 +329,27 @@ AI가 읽기 쉬운 보고서 서식(번호 체계 표준화, 서술식 문장, 
 - 기안문 쪽 설정은 「행정업무의 운영 및 혁신에 관한 규정」 제7조⑥(용지 A4)에 따라 위 공통값을 쓴다.
 - 규칙값 파일: `korean_report_hwpx/rules/_쪽설정.json`.
 
-## 유의
+</details>
+
+<details>
+<summary><b>작성 주체 (Solar Pro 4·Claude)</b></summary>
+
+- 0.2.0부터 0.3.x까지: Solar Pro 4 작성, CodeSolar·Claude 검수.
+- 0.4.0부터: 뼈대는 Solar Pro 4, 보완·명세·정답 테스트(한글 실측 자료 포함)는 Claude. 0.5.2·0.5.6은 Claude 작성.
+- 버전별 작성 주체는 [CHANGELOG](CHANGELOG.md) 각 절 머리에 적혀 있습니다.
+
+</details>
+
+<details>
+<summary><b>유의와 데이터 전송</b></summary>
 
 - 결과물은 초안입니다. 보고·배포 전 한글에서 확인하세요.
 - 줄 끝(마지막 줄 한두 글자 등)은 글자 폭 추정으로 맞추므로 일부 남을 수 있습니다. **macOS + 한컴오피스 한글**이 있으면 `polish=True`로 실제 줄 배치를 받아 문단별 자간을 다시 고릅니다(한글 창이 여러 번 열리고 수 분 걸림).
 - 글꼴은 사용하는 컴퓨터에 설치된 글꼴로 표시됩니다(휴먼명조·HY헤드라인M 등 미설치 시 대체 글꼴).
 - 기안문·시행문은 `doc_type="official"`로 지원합니다(별지 제1호서식, rules_official/_공통.json). 항목 번호(1.→가.→1)→가)→(1)→(가))는 서버가 부여, 사용자는 번호를 쓰지 않습니다. 날짜는 YYYY-MM-DD·YYYY.MM.DD를 YYYY. MM. DD.로 정규화합니다.
+- 모든 처리는 로컬입니다. 이 서버는 외부 API를 부르지 않고, 원고·결과 파일을 어디로도 보내지 않습니다.
+- 원고를 구조로 정리하는 일은 사용자가 쓰는 AI가 합니다. 그 AI 서비스의 데이터 정책은 별도로 확인하세요.
 
-## 라이선스
+</details>
 
-MIT © 2026 Upstage
-
-Created by Mia(윤승미)
+MIT © 2026 Upstage · Created by Mia(윤승미)

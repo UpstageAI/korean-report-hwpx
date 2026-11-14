@@ -20,6 +20,8 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
+from . import __version__
+
 ROOT = Path(__file__).resolve().parent
 from .engine import compose as C
 from .engine import report as RP
@@ -33,7 +35,7 @@ STYLES = ("standard", "simplified")
 REPORT_KINDS = ("standard", "internal")
 
 mcp = MCPServer(
-    "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료·기안문)",
+    "korean-report-hwpx", title="Korean Government Documents (공문서 HWPX — 보고서·보도자료·기안문)", version=__version__,
     instructions="사용자가 '보도자료', '보도참고자료', '설명자료', '해명자료', '보고서', '기안문', 'HWPX', '한글' 파일을 원할 때 쓴다. "
                  "파이썬 등으로 HWPX를 직접 만들지 말고 이 도구를 쓴다. 외부 API 없이 로컬에서 동작한다. "
                  "보도자료 순서: get_writing_guide(doc_type='press_release', ministry=기관) → draft_press_structure(사실 메모 → 구조 초안) → 문장 다듬기 → check_structure → build_document. "
