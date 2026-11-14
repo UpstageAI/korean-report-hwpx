@@ -1,0 +1,27 @@
+name: Feature request
+description: Request a new tool, document type, or agency format (새 도구·문서 종류·기관 서식 요청)
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: area
+    attributes:
+      label: Document type, agency, or tool (문서 종류·기관·도구)
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you want to ask or produce? (하고 싶은 일)
+      description: A concrete example question or task, and what answer you need.
+    validations:
+      required: true
+  - type: textarea
+    id: basis
+    attributes:
+      label: Format source (서식 근거)
+      description: Guideline or regulation that defines the format, if you know it. Do not attach original agency files.
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else (기타)
