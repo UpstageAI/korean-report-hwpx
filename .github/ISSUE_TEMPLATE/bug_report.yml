@@ -1,0 +1,46 @@
+name: Wrong result or format rule
+description: A tool produced a wrong document, broke a format rule, or failed (서식·출력 오류)
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys (`LAW_OC`, `UPSTAGE_API_KEY`) or personal data. Report security problems through the Security tab instead.
+        API 키와 개인정보는 넣지 마세요. 보안 문제는 Security 탭으로 알려 주세요.
+  - type: input
+    id: tool
+    attributes:
+      label: Tool name (도구 이름)
+      description: The MCP tool you called.
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs (입력값)
+      description: The arguments you passed, or the question you asked the assistant.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result (실제 결과)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected value and basis (기대값과 근거)
+      description: Expected result with the guideline or regulation name, article or section, and its effective date or edition.
+      placeholder: "e.g. Body text 15pt with 160% line spacing — guideline name, section, edition"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version (버전)
+      description: Output of `pip show korean-report-hwpx`, plus the client you used.
+    validations:
+      required: true

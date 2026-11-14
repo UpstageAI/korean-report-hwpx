@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: README and usage notes (사용 안내)
+    url: https://github.com/UpstageAI/korean-report-hwpx#readme
+    about: "Generated documents are drafts to review before official use. Read the README first. (생성 문서는 검토용 초안입니다)"
